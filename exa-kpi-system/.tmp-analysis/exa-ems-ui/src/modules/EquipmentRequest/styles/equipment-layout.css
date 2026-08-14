@@ -1,0 +1,105 @@
+/* Responsive layout: no horizontal scroll by default */
+.eq-wrap {
+  width: 100%;
+  overflow-x: auto; /* you can change to auto if you want fallback */
+}
+
+/* All three aligned tables share the same sizing rules */
+.eq-table,
+.eq-counter-table,
+.eq-switches-table {
+  table-layout: fixed;
+  width: 100%;            /* 👈 key change (no max-content) */
+  border-collapse: collapse;
+  margin: 0;
+}
+
+/* Fixed small columns */
+.eq-table col.col-row,
+.eq-counter-table col.col-row,
+.eq-switches-table col.col-row {
+  width: 64px; /* tweak */
+}
+
+.eq-table col.col-actions,
+.eq-counter-table col.col-actions,
+.eq-switches-table col.col-actions {
+  width: 88px; /* tweak */
+}
+
+/* When Trip is shown, distribute remaining width across 4 columns:
+   Trip (25%) + 3 main columns (25% each) = 100% of remaining area */
+.eq-table col.col-trip,
+.eq-counter-table col.col-trip,
+.eq-switches-table col.col-trip {
+  width: 25%;
+}
+
+
+.eq-table col.col-main,
+.eq-counter-table col.col-main,
+.eq-switches-table col.col-main {
+  width: 25%;
+}
+
+col.col-id {
+  width: 10%;
+}
+
+/* When Trip is NOT shown, distribute across 3 main columns:
+   33.333% each */
+.eq-wrap.no-trip .eq-table col.col-main,
+.eq-wrap.no-trip .eq-counter-table col.col-main,
+.eq-wrap.no-trip .eq-switches-table col.col-main {
+  width: 20%;
+}
+
+/* Consistent padding everywhere */
+.eq-table td,
+.eq-table th,
+.eq-counter-table td,
+.eq-counter-table th,
+.eq-switches-table td,
+.eq-switches-table th {
+  padding: var(--cui-table-cell-padding-y, 0.75rem) var(--cui-table-cell-padding-x, 0.75rem);
+  vertical-align: middle;
+}
+
+/* Spacers: truly empty */
+.eq-switches-table .eq-spacer,
+.eq-counter-table .eq-spacer {
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+/* Switches row: no borders, small gap below */
+.eq-switches-table td,
+.eq-switches-table th {
+  border: 0 !important;
+}
+
+.eq-switches-table {
+  margin-bottom: 0.5rem;
+}
+
+/* Counter row: align similar to header feel (optional) */
+.eq-counter-table td,
+.eq-counter-table th {
+  vertical-align: top;
+}
+
+/* Make controls fit the cell (important for responsiveness) */
+.eq-table select,
+.eq-table .form-select,
+.eq-table .form-control {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Optional: prevent long text from forcing width */
+.eq-table td,
+.eq-table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

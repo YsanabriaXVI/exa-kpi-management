@@ -1,0 +1,35 @@
+.sortable-table-header {
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sortable-table-header svg {
+  flex: 0 0 auto;
+  color: #8994a5;
+}
+
+th[aria-sort="ascending"] .sortable-table-header svg,
+th[aria-sort="descending"] .sortable-table-header svg {
+  color: #13759a;
+}
+
+.sortable-table-header:hover,
+.sortable-table-header:focus-visible {
+  color: #13759a;
+}
+
+.sortable-table-header:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid rgba(19, 117, 154, 0.35);
+  outline-offset: 2px;
+}

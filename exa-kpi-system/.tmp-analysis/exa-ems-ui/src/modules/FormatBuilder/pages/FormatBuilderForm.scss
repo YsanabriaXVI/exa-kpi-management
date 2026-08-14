@@ -1,0 +1,83 @@
+.formatbuilder-form-page {
+  .formatbuilder-form-card {
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    border: none;
+    margin-bottom: 1.5rem;
+  }
+
+  .attribute-card-header {
+    padding: 1.1rem 1.5rem;
+    background-color: var(--cui-card-cap-bg);
+    border-bottom: 1px solid var(--cui-border-color);
+
+    .attribute-card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .attribute-card-subtitle {
+      font-size: 0.9rem;
+      margin-top: 0.2rem;
+    }
+  }
+
+  .attribute-form-footer {
+    border-top: 1px solid var(--cui-border-color);
+    background: var(--cui-card-cap-bg);
+    padding: 1rem 1.5rem;
+  }
+
+  .attribute-toggle {
+    margin-top: 0.25rem;
+  }
+
+  .form-select,
+  .form-control {
+    border-radius: 0.65rem;
+  }
+
+  .form-multi-select,
+  .form-multiselect {
+    --cui-multiselect-active-bg: #0f9d9d;
+    --cui-multiselect-active-border-color: #0f9d9d;
+    --cui-multiselect-active-color: #fff;
+
+    .form-multiselect-selection .badge,
+    .form-multiselect-selection .form-multiselect-tag,
+    .form-multiselect-tag,
+    .badge.bg-body,
+    .form-multiselect-selection .badge.bg-body,
+    .badge.bg-secondary,
+    .form-multiselect-selection .badge.bg-secondary {
+      background-color: #0f9d9d !important;
+      border-color: #0f9d9d !important;
+      color: #fff !important;
+    }
+
+    // Style the options container for scrolling
+    .dropdown-menu,
+    .form-multi-select-dropdown,
+    .form-multi-select-options,
+    .form-multi-select-options-container {
+      max-height: 260px !important;
+      overflow-y: auto !important;
+    }
+  }
+}
+
+// Global override for CoreUI multiselect dropdowns within this page
+// This helps even if the dropdown is appended to body but somehow scoped or if class structure differs
+// Moved outside of .formatbuilder-form-page to ensure it targets portals
+.form-multi-select-options-container {
+  max-height: 260px !important;
+  overflow-y: auto !important;
+}
+
+.form-multi-select-options,
+.form-multi-select-dropdown {
+  max-height: 260px !important;
+  overflow-y: auto !important;
+}

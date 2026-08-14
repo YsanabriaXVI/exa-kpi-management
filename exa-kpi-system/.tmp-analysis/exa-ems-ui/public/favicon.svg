@@ -1,0 +1,18 @@
+<!-- EMS Favicon - Bold E in Circle -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background Circle with gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d6efd;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0a58ca;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <circle cx="256" cy="256" r="256" fill="url(#bgGradient)"/>
+  
+  <!-- Letter E - Bold and centered -->
+  <path d="M 170 130 L 370 130 L 370 190 L 250 190 L 250 225 L 350 225 L 350 285 L 250 285 L 250 322 L 370 322 L 370 382 L 170 382 Z" 
+        fill="#ffffff" 
+        stroke="none"/>
+</svg>
+

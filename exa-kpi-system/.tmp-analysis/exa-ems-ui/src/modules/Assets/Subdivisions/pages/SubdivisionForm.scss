@@ -1,0 +1,46 @@
+/**
+ * Subdivision Form Page Styles
+ */
+
+.subdivision-form-page {
+  .subdivision-hero-card {
+    background: linear-gradient(135deg, rgba(46, 124, 255, 0.08), rgba(46, 124, 255, 0.02));
+    border-radius: 14px;
+  }
+
+  .subdivision-section-card {
+    border-radius: 12px;
+  }
+
+  .subdivision-section-header {
+    background-color: var(--cui-card-cap-bg);
+    border-bottom: 1px solid var(--cui-border-color);
+    padding: 1.25rem 1.5rem;
+
+    .section-kicker {
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--cui-body-color);
+      opacity: 0.7;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+  }
+
+  .subdivision-form-actions {
+    padding: 1rem 0 0.5rem;
+  }
+
+  .subdivision-form .card-body .form-label {
+    font-weight: 600;
+  }
+}
+
+.subdivision-form-loading {
+  min-height: 60vh;
+}

@@ -1,0 +1,151 @@
+.weekly-report-wrapper {
+  overflow-x: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  background: #fff;
+}
+
+.weekly-report-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+
+  th, td {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #dee2e6;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  // ── Header ──
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .group-header-row th {
+    background: #343a40;
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+  }
+
+  .sub-header-row th {
+    background: #495057;
+    color: #fff;
+    font-weight: 500;
+    text-align: center;
+    font-size: 0.72rem;
+  }
+
+  // ── Group header colors ──
+  .group-credits {
+    background: #198754 !important;
+  }
+
+  .group-debits {
+    background: #dc3545 !important;
+  }
+
+  .group-not-included {
+    background: #e67700 !important;
+  }
+
+  .col-credit {
+    background: rgba(25, 135, 84, 0.85) !important;
+  }
+
+  .col-debit {
+    background: rgba(220, 53, 69, 0.85) !important;
+  }
+
+  .col-not-included {
+    background: rgba(230, 119, 0, 0.85) !important;
+  }
+
+  .col-subtotal {
+    background: #212529 !important;
+    font-weight: 700;
+  }
+
+  .col-total {
+    background: #0d6efd !important;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  // ── Sticky columns ──
+  .sticky-col {
+    position: sticky;
+    z-index: 5;
+    background: inherit;
+  }
+
+  .col-subdivision {
+    left: 0;
+    min-width: 150px;
+  }
+
+  .col-supplier {
+    left: 150px;
+    min-width: 130px;
+    border-right: 2px solid #adb5bd;
+  }
+
+  // ── Header sticky cols need higher z-index ──
+  thead .sticky-col {
+    z-index: 12;
+  }
+
+  // ── Body rows ──
+  .data-row {
+    cursor: pointer;
+    transition: background-color 0.1s;
+
+    td {
+      background: #fff;
+    }
+
+    &.alt-row td {
+      background: #f8f9fa;
+    }
+
+    &:hover td {
+      background: #e8f0fe !important;
+    }
+  }
+
+  .col-credit-cell {
+    color: #198754;
+  }
+
+  .col-debit-cell {
+    color: #dc3545;
+  }
+
+  .col-not-included-cell {
+    color: #e67700;
+  }
+
+  .col-subtotal-cell {
+    background: #f0f0f0 !important;
+  }
+
+  .col-total-cell {
+    background: #e7f1ff !important;
+    color: #0a58ca;
+  }
+
+  // ── Footer ──
+  .totals-row {
+    td {
+      background: #e9ecef;
+      border-top: 2px solid #343a40;
+      font-weight: 700;
+    }
+  }
+}

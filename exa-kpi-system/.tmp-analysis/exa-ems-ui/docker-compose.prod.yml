@@ -1,0 +1,18 @@
+services:
+  exa-ems-ui-prod:
+    container_name: exa-ems-ui-prod
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3000:80"
+    networks:
+      - exa-network
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+
+networks:
+  exa-network:
+    external: true
+

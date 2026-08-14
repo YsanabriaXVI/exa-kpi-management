@@ -1,0 +1,161 @@
+image: node:21.5.0
+
+definitions:
+  services:
+    docker:
+      memory: 3072
+
+pipelines:
+  branches:
+    develop:
+      - step:
+          name: Lint & Build (develop)
+          caches:
+            - node
+          script:
+            - npm install
+            - npm run lint || true
+            - npm test -- --watch=false || true
+            - npm run build
+
+    staging:
+      - step:
+          name: Build (staging)
+          caches:
+            - node
+          script:
+            - npm install
+            - npm run build
+          artifacts:
+            - dist/**
+      - step:
+          name: Build & Push Docker (staging)
+          services:
+            - docker
+          script:
+            - IMAGE_TAG="${BITBUCKET_BUILD_NUMBER}"
+            - CHART_FOLDER="exa-ems-ui"
+            - echo $CHART_FOLDER > chartfolder.txt
+            - echo $IMAGE_TAG > imagetag.txt
+            - docker build -t exaems/exa-ems-ui:${IMAGE_TAG} .
+            - echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            - docker push exaems/exa-ems-ui:${IMAGE_TAG}
+          artifacts:
+            - imagetag.txt
+            - chartfolder.txt
+      - step:
+          name: Trigger Helm Chart Update (STG)
+          script:
+            - IMAGE_TAG=$(cat imagetag.txt)
+            - CHART_FOLDER=$(cat chartfolder.txt)
+            - >-
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST
+              -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}"
+              -H "Content-Type: application/json"
+              "https://api.bitbucket.org/2.0/repositories/emsexasa/exa-helm-charts-stg/pipelines/"
+              -d "{\"target\":{\"type\":\"pipeline_ref_target\",\"ref_type\":\"branch\",\"ref_name\":\"master\",\"selector\":{\"type\":\"default\"}},\"variables\":[{\"key\":\"IMAGE_TAG\",\"value\":\"${IMAGE_TAG}\"},{\"key\":\"CHART_FOLDER\",\"value\":\"${CHART_FOLDER}\"}]}")
+            - HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            - BODY=$(echo "$RESPONSE" | sed '$d')
+            - echo "Response ($HTTP_CODE):$BODY"
+            - if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then echo "Failed to trigger pipeline"; exit 1; fi
+            - echo "Helm chart pipeline triggered successfully"
+
+    payment-staging:
+      - step:
+          name: Build (payment-staging)
+          caches:
+            - node
+          script:
+            - npm install
+            - npm run build
+          artifacts:
+            - dist/**
+      - step:
+          name: Build & Push Docker (payment-staging)
+          services:
+            - docker
+          script:
+            - IMAGE_TAG="${BITBUCKET_BUILD_NUMBER}"
+            - CHART_FOLDER="exa-ems-ui-payments"
+            - echo $CHART_FOLDER > chartfolder.txt
+            - echo $IMAGE_TAG > imagetag.txt
+            - docker build -t exaems/exa-ems-ui:${IMAGE_TAG} .
+            - echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            - docker push exaems/exa-ems-ui:${IMAGE_TAG}
+          artifacts:
+            - imagetag.txt
+            - chartfolder.txt
+      - step:
+          name: Trigger Helm Chart Update (STG - Payments)
+          script:
+            - IMAGE_TAG=$(cat imagetag.txt)
+            - CHART_FOLDER=$(cat chartfolder.txt)
+            - >-
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST
+              -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}"
+              -H "Content-Type: application/json"
+              "https://api.bitbucket.org/2.0/repositories/emsexasa/exa-helm-charts-stg/pipelines/"
+              -d "{\"target\":{\"type\":\"pipeline_ref_target\",\"ref_type\":\"branch\",\"ref_name\":\"master\",\"selector\":{\"type\":\"default\"}},\"variables\":[{\"key\":\"IMAGE_TAG\",\"value\":\"${IMAGE_TAG}\"},{\"key\":\"CHART_FOLDER\",\"value\":\"exa-ems-ui-payments\"}]}")
+            - HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            - BODY=$(echo "$RESPONSE" | sed '$d')
+            - echo "Response ($HTTP_CODE):$BODY"
+            - if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then echo "Failed to trigger pipeline"; exit 1; fi
+            - echo "Helm chart pipeline triggered successfully"
+
+    main:
+      - step:
+          name: Build (production)
+          caches:
+            - node
+          script:
+            - npm install
+            - npm run build
+          artifacts:
+            - dist/**
+      - step:
+          name: Build & Push Docker (production)
+          services:
+            - docker
+          script:
+            - IMAGE_TAG="${BITBUCKET_BUILD_NUMBER}"
+            - CHART_FOLDER="exa-ems-ui"
+            - echo $CHART_FOLDER > chartfolder.txt
+            - echo $IMAGE_TAG > imagetag.txt
+            - docker build -t exaems/exa-ems-ui:${IMAGE_TAG} .
+            - echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            - docker push exaems/exa-ems-ui:${IMAGE_TAG}
+          artifacts:
+            - imagetag.txt
+            - chartfolder.txt
+      - step:
+          name: Trigger Helm Chart Update
+          script:
+            - IMAGE_TAG=$(cat imagetag.txt)
+            - CHART_FOLDER=$(cat chartfolder.txt)
+            - >-
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST
+              -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}"
+              -H "Content-Type: application/json"
+              "https://api.bitbucket.org/2.0/repositories/emsexasa/exa-helm-charts/pipelines/"
+              -d "{\"target\":{\"type\":\"pipeline_ref_target\",\"ref_type\":\"branch\",\"ref_name\":\"master\",\"selector\":{\"type\":\"default\"}},\"variables\":[{\"key\":\"IMAGE_TAG\",\"value\":\"${IMAGE_TAG}\"},{\"key\":\"CHART_FOLDER\",\"value\":\"${CHART_FOLDER}\"}]}")
+            - HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            - BODY=$(echo "$RESPONSE" | sed '$d')
+            - echo "Response ($HTTP_CODE):$BODY"
+            - if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then echo "Failed to trigger pipeline"; exit 1; fi
+            - echo "Helm chart pipeline triggered successfully"
+      - step:
+          name: Trigger Helm Chart Update (PRD)
+          script:
+            - IMAGE_TAG=$(cat imagetag.txt)
+            - CHART_FOLDER=$(cat chartfolder.txt)
+            - >-
+              RESPONSE=$(curl -s -w "\n%{http_code}" -X POST
+              -u "${BITBUCKET_USERNAME}:${BITBUCKET_APP_PASSWORD}"
+              -H "Content-Type: application/json"
+              "https://api.bitbucket.org/2.0/repositories/emsexasa/exa-helm-charts-prd/pipelines/"
+              -d "{\"target\":{\"type\":\"pipeline_ref_target\",\"ref_type\":\"branch\",\"ref_name\":\"master\",\"selector\":{\"type\":\"default\"}},\"variables\":[{\"key\":\"IMAGE_TAG\",\"value\":\"${IMAGE_TAG}\"},{\"key\":\"CHART_FOLDER\",\"value\":\"${CHART_FOLDER}\"}]}")
+            - HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            - BODY=$(echo "$RESPONSE" | sed '$d')
+            - echo "Response ($HTTP_CODE):$BODY"
+            - if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then echo "Failed to trigger pipeline"; exit 1; fi
+            - echo "Helm chart pipeline triggered successfully"

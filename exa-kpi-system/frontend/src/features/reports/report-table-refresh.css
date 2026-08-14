@@ -1,0 +1,808 @@
+/* Shared visual treatment for the report screens requested to follow the
+   ScoreCard Overview table and Latest ScoreCard Results filter patterns. */
+.report-analysis-page .dynamic-filters,
+.history-page .history-filters {
+  padding: 18px;
+  gap: 13px;
+  border-radius: 12px;
+  align-items: end;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.report-analysis-page .dynamic-filters > header,
+.history-page .history-filters > header {
+  padding: 2px 0 8px;
+}
+
+.report-analysis-page .dynamic-filters h2,
+.history-page .history-filters h2 {
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.report-analysis-page .dynamic-filters header p,
+.history-page .history-filters header p {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.report-analysis-page .dynamic-filters label,
+.history-page .history-filters label {
+  gap: 7px;
+  color: var(--ems-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.report-analysis-page .dynamic-filters select,
+.report-analysis-page .analysis-multiselect > button,
+.history-page :is(.history-input, .history-multiselect > button, .history-period-select select) {
+  height: 46px !important;
+  min-height: 46px !important;
+  padding-inline: 12px !important;
+  border-color: var(--ems-border) !important;
+  border-radius: 8px !important;
+  color: var(--ems-text) !important;
+  background-color: #fff !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.2;
+}
+
+/* Native selects use the same right-aligned chevron as the multiselects. */
+.report-analysis-page .dynamic-filters select,
+.history-page .history-period-select select {
+  padding-right: 38px !important;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236f7a8b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  cursor: pointer;
+}
+
+.history-page .history-period-select > div > svg {
+  display: none;
+}
+
+.report-analysis-page .analysis-multiselect > button > svg,
+.history-page .history-multiselect > button > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ems-muted);
+  stroke-width: 2;
+}
+
+.report-analysis-page :is(.analysis-multi-placeholder, .analysis-multi-options button),
+.history-page :is(.history-filter-placeholder, .history-filter-options button),
+.history-page .history-input input {
+  color: var(--ems-text);
+  font-family: inherit !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+
+.report-analysis-page .analysis-multi-placeholder,
+.history-page .history-filter-placeholder,
+.history-page .history-input input::placeholder {
+  color: var(--ems-muted);
+  opacity: 1;
+}
+
+/* Search bars stay neutral on focus, matching the other overview screens. */
+.report-analysis-page .analysis-search,
+.history-page :is(.history-input, .history-search) {
+  border-color: var(--ems-border) !important;
+  outline: 0 !important;
+  background: #fff;
+  box-shadow: none !important;
+}
+
+.report-analysis-page .analysis-result-section > header p {
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.report-analysis-page .analysis-search {
+  width: min(540px, 100%);
+  height: 46px;
+  padding-inline: 13px;
+}
+
+.report-analysis-page .analysis-search:focus-within,
+.history-page :is(.history-input, .history-search):focus-within {
+  border-color: var(--ems-border) !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.report-analysis-page .analysis-search input,
+.history-page :is(.history-input, .history-search) input {
+  color: var(--ems-text);
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.report-analysis-page .analysis-search input,
+.report-analysis-page .analysis-search input::placeholder {
+  font-size: 15px;
+}
+
+.report-analysis-page .analysis-search input::placeholder {
+  color: var(--ems-muted);
+  opacity: 1;
+}
+
+.report-analysis-page .analysis-search input:focus,
+.report-analysis-page .analysis-search input:focus-visible,
+.history-page :is(.history-input, .history-search) input:focus,
+.history-page :is(.history-input, .history-search) input:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.report-analysis-page .analysis-multiselect > button.open,
+.history-page .history-multiselect > button.open {
+  border-color: var(--ems-border) !important;
+  box-shadow: none !important;
+}
+
+/* A selected period is a column state, not a selected record. The solid
+   header makes that distinction immediately visible. */
+.history-page .history-matrix .report-table-wrap th.history-period.focused {
+  color: #fff !important;
+  background: #5b2a78 !important;
+  box-shadow: inset 0 -3px #3f1859 !important;
+}
+
+.history-page .history-matrix .report-table-wrap th.history-period.focused:hover {
+  color: #fff !important;
+  background: #51226e !important;
+}
+
+html[data-theme="dark"] .report-analysis-page .dynamic-filters select,
+html[data-theme="dark"] .report-analysis-page .analysis-multiselect > button,
+html[data-theme="dark"] .history-page :is(.history-input, .history-multiselect > button, .history-period-select select),
+html[data-theme="dark"] .report-analysis-page .analysis-search,
+html[data-theme="dark"] .history-page .history-search {
+  color: var(--ems-text) !important;
+  background-color: var(--ems-surface) !important;
+}
+
+html[data-theme="dark"] .history-page .history-matrix .report-table-wrap th.history-period.focused {
+  color: #fff !important;
+  background: #78459a !important;
+  box-shadow: inset 0 -3px #c08ae2, 0 0 0 1px #9563b5 !important;
+}
+
+html[data-theme="dark"] .history-page .history-matrix .report-table-wrap th.history-period.focused:hover {
+  color: #fff !important;
+  background: #814ca3 !important;
+}
+
+.report-analysis-page .report-table-wrap,
+.history-page .history-matrix .report-table-wrap {
+  border-radius: 9px;
+}
+
+/* Match the typography and result colors used by ScoreCards Summary Trip. */
+.report-analysis-page .analysis-summary-cards {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.report-analysis-page .analysis-summary-cards strong {
+  color: var(--ems-text);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.report-analysis-page .analysis-summary-cards small {
+  color: var(--ems-muted);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.report-analysis-page .analysis-summary-cards em {
+  color: #258255;
+  font-size: 24px !important;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+html[data-theme="dark"] .report-analysis-page .analysis-summary-cards em {
+  color: #71dba4;
+}
+
+.report-analysis-page .analysis-summary-cards article:nth-child(n+3) strong {
+  font-size: 21px;
+  line-height: 1.35;
+}
+
+.report-analysis-page .analysis-summary-cards article {
+  min-width: 0;
+}
+
+.report-analysis-page .analysis-summary-cards strong,
+.report-analysis-page .analysis-summary-cards em {
+  overflow-wrap: anywhere;
+}
+
+.report-analysis-page .report-table-wrap th,
+.history-page .history-matrix .report-table-wrap th {
+  height: 48px;
+  padding: 12px 14px;
+  vertical-align: middle;
+  color: var(--ems-muted);
+  background: var(--ems-surface-muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .045em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.report-analysis-page .report-table-wrap td,
+.history-page .history-matrix .report-table-wrap td {
+  height: 58px;
+  padding: 12px 14px;
+  vertical-align: middle;
+  color: var(--ems-text);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.report-analysis-page .report-table-wrap td {
+  height: 58px !important;
+  color: var(--ems-text) !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.report-analysis-page .report-table-wrap th {
+  height: 52px !important;
+  color: var(--ems-muted) !important;
+  background: var(--ems-surface-muted) !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  letter-spacing: .045em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.report-analysis-page .report-table-wrap tbody tr,
+.history-page .history-matrix .report-table-wrap tbody tr {
+  transition: background-color .16s ease;
+}
+
+.report-analysis-page .report-table-wrap tbody tr:hover,
+.history-page .history-matrix .report-table-wrap tbody tr:hover {
+  background: color-mix(in srgb, var(--ems-primary) 5%, var(--ems-surface));
+}
+
+.report-analysis-page .report-table-wrap td > strong,
+.history-page .history-matrix .report-table-wrap td > strong,
+.history-page .history-score strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.report-analysis-page .report-table-wrap td > strong {
+  font-family: inherit;
+  font-size: 14px !important;
+  font-weight: 650;
+}
+
+.report-analysis-page :is(.detail-traffic, .report-status, .history-trend) {
+  font-size: 12px;
+}
+
+/* Keep the ScoreCard Analysis row action centered, with a subtle left offset. */
+.report-analysis-page .report-table-wrap td:last-child > .history-view {
+  margin: 0 auto;
+  transform: translateX(-6px);
+}
+
+.report-analysis-page .analysis-table-pagination {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.report-analysis-page .analysis-table-pagination button {
+  width: 34px;
+  height: 34px;
+  border-color: #d5d9df;
+  color: #667085;
+  background: #f3f4f6;
+  transition: color .16s ease, background-color .16s ease, border-color .16s ease;
+}
+
+.report-analysis-page .analysis-table-pagination button:not(:disabled):hover {
+  border-color: #596273;
+  color: #fff;
+  background: #596273;
+}
+
+.report-analysis-page .analysis-table-pagination button:disabled {
+  border-color: #dfe3e8;
+  color: #aeb5bf;
+  background: #f3f4f6;
+  opacity: 1;
+}
+
+.report-analysis-page .analysis-page-number {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #7650a0;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 3px 8px rgb(73 39 99 / 22%);
+}
+
+.history-page .history-score small {
+  font-size: 12px;
+}
+
+/* The history matrix has many more columns, so it uses a slightly tighter
+   reading scale than the two analysis tables. */
+.history-page .history-matrix .report-table-wrap th {
+  font-size: 11px;
+}
+
+.history-page .history-matrix .report-table-wrap th.history-period {
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.history-page .history-matrix .report-table-wrap td,
+.history-page .history-matrix .report-table-wrap td > strong,
+.history-page .history-score strong {
+  font-size: 13px;
+}
+
+.history-page .history-score small {
+  font-size: 10px;
+}
+
+.history-page .history-filters {
+  grid-template-columns: minmax(340px, 1.55fr) repeat(4, minmax(155px, 1fr));
+}
+
+.history-page .history-input {
+  width: 100%;
+}
+
+.history-matrix-tools {
+  width: 100%;
+  margin-bottom: 13px;
+  display: grid;
+  grid-template-columns: minmax(270px, 360px) minmax(420px, 1fr);
+  align-items: end;
+  gap: 12px;
+}
+
+.history-page .history-matrix-tools .history-search {
+  width: 100%;
+  margin: 0;
+}
+
+.history-page .history-matrix-tools .history-period-select {
+  display: grid;
+  gap: 6px;
+  color: var(--ems-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-page .history-matrix-tools .history-period-select select {
+  width: 100%;
+  height: 42px !important;
+  min-height: 42px !important;
+  border: 1px solid var(--ems-border);
+  border-radius: 8px;
+  color: var(--ems-text);
+  background-color: #fff !important;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.history-page .history-matrix-tools .history-search svg {
+  flex: 0 0 auto;
+  color: var(--ems-muted);
+}
+
+/* Refined report actions: quieter borders, clearer hierarchy and softer depth. */
+.history-page .history-matrix > header button,
+.report-analysis-page .analysis-result-section > header button {
+  min-width: 118px;
+  height: 44px;
+  padding: 0 17px;
+  border-radius: 9px;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 10%);
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+
+.history-page .history-matrix > header button svg,
+.report-analysis-page .analysis-result-section > header button svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.2;
+}
+
+.history-page .history-matrix > header button:hover,
+.report-analysis-page .analysis-result-section > header button:hover {
+  filter: brightness(.97);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgb(15 23 42 / 14%);
+}
+
+.history-page .history-matrix > header button:active,
+.report-analysis-page .analysis-result-section > header button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 12%);
+}
+
+.report-analysis-page .analysis-result-section > header button:not(.xls):not(.pdf):not(.graphs) {
+  color: #526074;
+  border-color: #d5dce5;
+  background: #fff;
+}
+
+.report-analysis-page .analysis-result-section > header button.graphs {
+  color: #71389b;
+  border-color: #d7c2e7;
+  background: #f7f1fb;
+}
+
+.history-page .history-matrix > header button.xls,
+.report-analysis-page .analysis-result-section > header button.xls {
+  border-color: #278d55;
+  background: linear-gradient(135deg, #2c9b60, #237b4d);
+}
+
+.history-page .history-matrix > header button.pdf,
+.report-analysis-page .analysis-result-section > header button.pdf {
+  border-color: #d34a50;
+  background: linear-gradient(135deg, #e1575d, #c94047);
+}
+
+/* KPI Analysis traffic lights read as compact, intentional status badges. */
+.report-analysis-page .detail-traffic {
+  min-width: 88px;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  justify-content: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.report-analysis-page .detail-traffic i {
+  width: 9px;
+  height: 9px;
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 55%);
+}
+
+.report-analysis-page .detail-traffic.excellent {
+  color: #176b42;
+  border-color: #bde5cf;
+  background: #e7f7ee;
+}
+
+.report-analysis-page .detail-traffic.warning {
+  color: #80600f;
+  border-color: #eedb9b;
+  background: #fff5d8;
+}
+
+.report-analysis-page .detail-traffic.danger {
+  color: #9b3936;
+  border-color: #efc1be;
+  background: #ffebe9;
+}
+
+/* ScoreCard Analysis status needs more presence at the larger table scale. */
+.report-analysis-page .report-status {
+  min-height: 32px;
+  padding: 8px 12px;
+  gap: 7px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.report-analysis-page .report-status i {
+  width: 8px;
+  height: 8px;
+}
+
+html[data-theme="dark"] .report-analysis-page .detail-traffic.excellent {
+  color: #8ee4b5;
+  border-color: rgb(70 211 135 / 38%);
+  background: rgb(29 139 82 / 30%);
+}
+
+html[data-theme="dark"] .report-analysis-page .detail-traffic.warning {
+  color: #f6d47b;
+  border-color: rgb(235 184 50 / 40%);
+  background: rgb(167 116 14 / 30%);
+}
+
+html[data-theme="dark"] .report-analysis-page .detail-traffic.danger {
+  color: #ffaaa6;
+  border-color: rgb(234 91 84 / 42%);
+  background: rgb(161 48 43 / 32%);
+}
+
+html[data-theme="dark"] .report-analysis-page .detail-traffic i {
+  box-shadow: none;
+}
+
+/* Trend values use the same badge language as statuses and traffic lights. */
+.history-page .history-trend,
+.report-analysis-page .history-trend {
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.history-page .history-trend.improved,
+.report-analysis-page .history-trend.improved {
+  color: #176b42;
+  border-color: #bde5cf;
+  background: #e7f7ee;
+}
+
+.history-page .history-trend.stable,
+.report-analysis-page .history-trend.stable {
+  color: #4d6474;
+  border-color: #ccd8df;
+  background: #edf3f6;
+}
+
+.history-page .history-trend.declined,
+.report-analysis-page .history-trend.declined {
+  color: #9b3936;
+  border-color: #efc1be;
+  background: #ffebe9;
+}
+
+html[data-theme="dark"] .history-page .history-matrix-tools .history-search,
+html[data-theme="dark"] .history-page .history-matrix-tools .history-period-select select {
+  color: #eef3f8 !important;
+  border-color: #485568 !important;
+  background: #293545 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .history-page .history-matrix-tools .history-search input {
+  color: #eef3f8 !important;
+}
+
+html[data-theme="dark"] .history-page .history-matrix-tools .history-search input::placeholder,
+html[data-theme="dark"] .history-page .history-matrix-tools .history-search svg {
+  color: #aeb9c7 !important;
+  opacity: 1;
+}
+
+html[data-theme="dark"] :is(.history-page, .report-analysis-page) .history-trend.improved {
+  color: #8ee4b5;
+  border-color: rgb(70 211 135 / 38%);
+  background: rgb(29 139 82 / 30%);
+}
+
+html[data-theme="dark"] :is(.history-page, .report-analysis-page) .history-trend.stable {
+  color: #c2d0da;
+  border-color: #536274;
+  background: #344353;
+}
+
+html[data-theme="dark"] :is(.history-page, .report-analysis-page) .history-trend.declined {
+  color: #ffaaa6;
+  border-color: rgb(234 91 84 / 42%);
+  background: rgb(161 48 43 / 32%);
+}
+
+.history-page .history-filters :is(.history-frequency-filter, .history-department-filter),
+.history-page .history-filters :is(.history-frequency-filter, .history-department-filter) .history-multiselect,
+.history-page .history-filters :is(.history-frequency-filter, .history-department-filter) .history-multiselect > button {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1250px) {
+  .history-page .history-filters { grid-template-columns: repeat(3, 1fr); }
+  .history-page .history-filters > label:first-of-type { grid-column: span 2; }
+  .history-matrix-tools { width: 100%; }
+}
+
+@media (max-width: 760px) {
+  .history-page .history-filters,
+  .history-matrix-tools { width: 100%;grid-template-columns: 1fr; }
+  .history-page .history-filters > label:first-of-type { grid-column: auto; }
+}
+
+@media (max-width: 700px) {
+  .report-analysis-page .dynamic-filters,
+  .history-page .history-filters { padding: 16px; }
+}
+
+.report-page-back {
+  min-width: 105px;
+  height: 40px;
+  margin: 16px 0 4px;
+  padding: 0 15px;
+  border: 1px solid var(--ems-border);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--ems-text);
+  cursor: pointer;
+  background: var(--ems-surface);
+  box-shadow: var(--ems-shadow);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform .16s ease, background-color .16s ease, box-shadow .16s ease;
+}
+
+.report-page-back:hover {
+  background: var(--ems-surface-muted);
+  box-shadow: 0 5px 12px rgb(15 23 42 / 12%);
+  transform: translateY(-1px);
+}
+
+/* Sortable report tables aligned with the KPI Config / KPI Pool overview pattern. */
+.report-analysis-page .report-table-wrap table,
+.history-page .history-matrix .report-table-wrap table,
+.report-analysis-page .analysis-table-pagination,
+.history-page .history-period-slider {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.report-analysis-page .report-table-wrap th,
+.history-page .history-matrix .report-table-wrap th {
+  color: #667286 !important;
+  background: #eceff3 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  transition: color 150ms ease;
+}
+
+.report-analysis-page .report-table-wrap th .sortable-table-header,
+.history-page .history-matrix .report-table-wrap th .sortable-table-header {
+  justify-content: center;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.report-analysis-page .report-table-wrap th .sortable-table-header > span,
+.history-page .history-matrix .report-table-wrap th .sortable-table-header > span {
+  text-align: center;
+}
+
+.report-analysis-page .report-table-wrap th:hover,
+.history-page .history-matrix .report-table-wrap th:hover {
+  color: #13759a !important;
+}
+
+.report-analysis-page .report-table-wrap,
+.history-page .history-matrix .report-table-wrap {
+  border-radius: 9px 9px 0 0;
+}
+
+.report-analysis-page .analysis-table-pagination {
+  margin-top: -1px;
+  padding: 13px 16px;
+  border: 0;
+  border-top: 1px solid #e2e6eb;
+  border-bottom: 1px solid #e2e6eb;
+  border-radius: 0 0 9px 9px;
+  background: var(--ems-surface);
+}
+
+.history-page .history-period-slider {
+  margin-top: -1px;
+  padding: 13px 16px;
+  border-top: 1px solid #e2e6eb;
+  border-bottom: 1px solid #e2e6eb;
+  border-radius: 0 0 9px 9px;
+  background: var(--ems-surface);
+}
+
+.history-page .history-record-pagination {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.history-page .history-record-pagination button,
+.history-page .history-record-pagination strong {
+  width: 31px;
+  height: 31px;
+  padding: 0;
+  border: 1px solid #d9dfe6;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.history-page .history-record-pagination strong {
+  color: #fff;
+  border-color: #14799e;
+  background: #14799e;
+  font-size: 13px;
+}
+
+.history-page .history-record-pagination button:disabled {
+  color: #b8c0ca;
+  background: #f7f8fa;
+}
+
+html[data-theme="dark"] .report-analysis-page .report-table-wrap th,
+html[data-theme="dark"] .history-page .history-matrix .report-table-wrap th {
+  color: var(--ems-muted) !important;
+  border-color: var(--ems-border) !important;
+  background: var(--ems-surface-muted) !important;
+}
+
+html[data-theme="dark"] .report-analysis-page .report-table-wrap th:hover,
+html[data-theme="dark"] .history-page .history-matrix .report-table-wrap th:hover {
+  color: #69b7f4 !important;
+}
+
+.history-page .history-score strong {
+  font-weight: 400;
+}
+
+.history-page .history-score small {
+  font-size: 11px;
+}
+
+.report-analysis-page .report-table-wrap th:first-child,
+.report-analysis-page .report-table-wrap td:first-child,
+.history-page .history-matrix .report-table-wrap th:first-child,
+.history-page .history-matrix .report-table-wrap td:first-child {
+  padding-left: 10px;
+  padding-right: 10px;
+}

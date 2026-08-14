@@ -1,0 +1,93 @@
+.manage-pool-empty {
+  margin-bottom: 14px;
+  padding: 38px 20px;
+  border: 1px dashed var(--ems-border);
+  border-radius: 10px;
+  color: var(--ems-muted);
+  background: var(--ems-surface);
+  text-align: center;
+}
+
+.manage-pool-empty h2 {
+  margin: 8px 0 4px;
+  color: var(--ems-text);
+  font-size: 17px;
+}
+
+.manage-pool-empty p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.manage-kpis-page .detail-record-search:focus-within,
+.manage-kpis-page .detail-record-search input:focus,
+.manage-kpis-page .detail-record-search input:focus-visible,
+.manage-kpis-page .detail-record-options > button:focus,
+.manage-kpis-page .detail-record-options > button:focus-visible {
+  border-color: var(--ems-border) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.manage-kpis-page .detail-record-search input {
+  caret-color: var(--ems-text);
+}
+
+.manage-pool-loading {
+  min-height: 130px;
+  margin-bottom: 14px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  color: var(--ems-muted);
+}
+
+.manage-pool-loading span {
+  width: 27px;
+  height: 27px;
+  border: 3px solid var(--ems-border);
+  border-top-color: var(--ems-primary);
+  border-radius: 50%;
+  animation: manage-pool-spin .7s linear infinite;
+}
+
+.manage-pool-loading p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.manage-pool-loaded {
+  animation: manage-pool-enter .58s cubic-bezier(.22, .78, .3, 1) both;
+}
+
+@keyframes manage-pool-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes manage-pool-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manage-pool-loaded,
+  .manage-pool-loading span {
+    animation: none;
+  }
+}
+
+html[data-theme="dark"] .manage-kpis-page .detail-record-options .code-pill {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-weight: 850;
+}

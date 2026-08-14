@@ -1,0 +1,4 @@
+import type { User } from "../types/user.types";
+import type { Role } from "../../roles/types/role.types";
+import { UserStatusBadge } from "./UserStatusBadge";
+export function UserProfileCard({ user, role }: { user: User; role?: Role | null }) { return <section className="ru-card ru-profile"><div className="ru-avatar">{user.firstName[0]}{user.lastName[0]}</div><div><h2>{user.fullName}</h2><p>@{user.username} · {user.email}</p></div><UserStatusBadge status={user.status}/><dl><div><dt>Role</dt><dd>{user.roleName}</dd></div><div><dt>Access Scope</dt><dd>{user.isGlobalScope ? "Global / all departments" : user.departments.map((item) => item.name).join(", ")}</dd></div><div><dt>Last Login</dt><dd>{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : "Never"}</dd></div><div><dt>Permissions</dt><dd>{role?.permissionCodes.length ?? 0} inherited from {user.roleName}</dd></div></dl></section>; }

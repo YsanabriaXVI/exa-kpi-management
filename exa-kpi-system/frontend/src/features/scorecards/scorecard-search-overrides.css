@@ -1,0 +1,25 @@
+.assignment-selection-card > header label:focus-within {
+  border-color: var(--ems-border) !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.assignment-selection-card > header input,
+.assignment-selection-card > header input:focus,
+.assignment-selection-card > header input:focus-visible {
+  border: 0 !important;
+  outline: 0 !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.assignment-selection-card > header input:-webkit-autofill,
+.assignment-selection-card > header input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ems-text);
+  box-shadow: 0 0 0 1000px transparent inset !important;
+  transition: background-color 9999s ease-out;
+}
+
+.assignment-page > .kpi-breadcrumb + .assignment-hero {
+  margin-top: 18px;
+}

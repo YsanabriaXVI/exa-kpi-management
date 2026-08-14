@@ -1,0 +1,30 @@
+services:
+  exa-ems-ui-dev:
+    container_name: exa-ems-ui-dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.mts:/app/vite.config.mts
+      - ./tsconfig.json:/app/tsconfig.json
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_URL=${VITE_API_URL:-/api}
+      - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY:-}
+      - VITE_CLIENT_ID=${VITE_CLIENT_ID:-1_1l29yg3q0ev4wosgwssccs00o4g44ko4ockgcwowgwwo88cg04}
+      - VITE_CLIENT_SECRET=${VITE_CLIENT_SECRET:-45diujtrpyww04s84w8sc0swgkgsckc0cco4os800g0gw4cw8s}
+    networks:
+      - exa-network
+    extra_hosts:
+      - "composer:107.20.211.206"
+    restart: unless-stopped
+
+networks:
+  exa-network:
+    external: true

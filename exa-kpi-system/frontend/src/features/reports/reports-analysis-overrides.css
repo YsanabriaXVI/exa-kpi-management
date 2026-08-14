@@ -1,0 +1,25 @@
+.analysis-page,
+.analysis-page button { font-family:Calibri,Carlito,Arial,sans-serif; }
+.analysis-page .reports-header > div > span { font-size:13px; }
+.analysis-page .reports-header h1 { font-size:36px; }
+.analysis-page .reports-header p { font-size:17px; }
+.analysis-page .analysis-selector { padding:28px;border-radius:16px; }
+.analysis-page .analysis-selector > header > span { width:50px;height:50px; }
+.analysis-page .analysis-selector h2 { font-size:25px; }
+.analysis-page .analysis-selector header p { font-size:14px; }
+.analysis-page .analysis-options { width:min(1080px,100%);gap:25px; }
+.analysis-page .analysis-options article { padding:29px;border-radius:14px; }
+.analysis-page .analysis-option-icon { width:62px;height:62px; }
+.analysis-page .analysis-options article > span { font-size:11px; }
+.analysis-page .analysis-options article > h2 { font-size:23px; }
+.analysis-page .analysis-options article > p { min-height:58px;font-size:15px;line-height:1.5; }
+.analysis-page .analysis-best { padding:14px;gap:8px; }
+.analysis-page .analysis-best strong { font-size:13px; }
+.analysis-page .analysis-best span { padding:7px 10px;font-size:12px; }
+.analysis-page .analysis-options ul { gap:9px; }
+.analysis-page .analysis-options li { font-size:13px; }
+.analysis-page .analysis-options article > button { height:46px;padding:0 18px;border-radius:8px;gap:9px;font-size:15px; }
+.analysis-page .analysis-tip { padding:16px 18px; }
+.analysis-page .analysis-tip strong { font-size:14px; }
+.analysis-page .analysis-tip p { font-size:13px; }
+@media(max-width:760px){.analysis-page .analysis-selector{padding:20px}.analysis-page .analysis-options article{padding:22px}}

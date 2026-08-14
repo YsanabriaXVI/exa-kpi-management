@@ -1,0 +1,1 @@
+export function PermissionCheckbox({ checked, disabled, label, onChange }: { checked: boolean; disabled?: boolean; label: string; onChange: () => void }) { return <input type="checkbox" aria-label={label} checked={checked} disabled={disabled} onChange={onChange}/>; }

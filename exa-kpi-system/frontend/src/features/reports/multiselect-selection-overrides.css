@@ -1,0 +1,28 @@
+.analysis-multi-chip,
+.history-filter-chip {
+  max-width: 100%;
+}
+
+.analysis-multi-chips.has-more > .analysis-multi-chip:first-child,
+.history-filter-chips.has-more > .history-filter-chip:first-child {
+  max-width: calc(100% - 75px);
+}
+
+.analysis-multi-chip > span:first-child,
+.history-filter-chip > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analysis-multi-chip i,
+.history-filter-chip i {
+  flex: 0 0 auto;
+}
+
+.analysis-multi-chip.more,
+.history-filter-chip.more {
+  min-width: max-content;
+  max-width: none;
+  flex: 0 0 auto;
+}

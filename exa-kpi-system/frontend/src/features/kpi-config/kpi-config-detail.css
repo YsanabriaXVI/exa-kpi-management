@@ -1,0 +1,513 @@
+.config-detail-hero{margin:10px 0 12px;padding:17px 19px;border:1px solid #e0e5eb;border-radius:9px;display:flex;align-items:center;justify-content:space-between;gap:20px;background:#fff;box-shadow:0 2px 9px rgba(23,32,51,.04)}
+.config-detail-hero>div>span{color:#14799e;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.config-detail-hero h1{margin:4px 0 3px;font-size:22px;letter-spacing:-.02em}
+.config-detail-hero p{margin:0;color:#7b8696;font-size:10px}
+.config-detail-main-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:10px}
+.config-detail-card,.measurement-detail-strip{padding:15px;border:1px solid #e0e5eb;border-radius:9px;background:#fff}
+.detail-card-heading{margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.detail-card-heading>div{display:flex;align-items:center;gap:7px;color:#14799e}
+.detail-card-heading h2{margin:0;color:#253044;font-size:13px}
+.detail-card-heading>span{color:#8993a1;font-size:8px;text-transform:uppercase;letter-spacing:.05em}
+.config-detail-data{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:12px 18px}
+.config-detail-data .full{grid-column:1/-1}
+.config-detail-data dt{margin-bottom:3px;color:#8a94a2;font-size:8px;font-weight:750;text-transform:uppercase}
+.config-detail-data dd{margin:0;color:#344054;font-size:10px}
+.config-audit-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.config-audit-item{display:grid;grid-template-columns:27px 1fr;align-items:center;gap:6px}
+.config-audit-item>span{width:27px;height:27px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#6d3ea0;background:#f0e8fa}
+.config-audit-item small,.config-audit-item strong{display:block}
+.config-audit-item small{color:#8a94a2;font-size:8px}
+.config-audit-item strong{margin-top:2px;color:#344054;font-size:9px}
+.measurement-detail-strip{margin-top:10px}
+.measurement-values{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.measurement-values div{padding:9px 10px;border-radius:7px;background:#f6f8fa}
+.measurement-values span,.measurement-values strong{display:block}
+.measurement-values span{margin-bottom:3px;color:#8892a0;font-size:8px;text-transform:uppercase}
+.measurement-values strong{color:#344054;font-size:10px}
+.config-detail-bottom-grid{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.range-detail-table{width:100%;border-collapse:collapse}
+.range-detail-table th,.range-detail-table td{padding:7px 8px;border:1px solid #e0e5eb;font-size:9px;text-align:left}
+.range-detail-table th{color:#697587;background:#f5f7f9;font-size:8px;text-transform:uppercase}
+.range-detail-color{display:flex;align-items:center;gap:6px}
+.range-detail-color i{width:8px;height:8px;border-radius:50%}
+.range-detail-color.green i{background:#28b967}.range-detail-color.yellow i{background:#e9bd24}.range-detail-color.red i{background:#e95151}
+.detail-traffic-overview{margin-top:12px;padding:0 3px}.detail-traffic-bar{height:12px;overflow:hidden;border-radius:999px;display:flex;background:#e8ebef}.detail-traffic-bar span{height:100%}.detail-traffic-bar .red{background:#ef7777}.detail-traffic-bar .yellow{background:#f2c94c}.detail-traffic-bar .green{background:#58cf8b}.detail-traffic-labels{margin-top:4px;display:flex;color:#687587;font-size:8px;font-weight:700}.detail-traffic-labels span{text-align:center}
+.usage-total{padding:9px 10px;border-radius:7px;background:#f6f2fb}
+.usage-total span,.usage-total strong{display:block}
+.usage-total span{color:#897c98;font-size:8px;text-transform:uppercase}
+.usage-total strong{margin-top:2px;color:#5f3c82;font-size:12px}
+.pool-usage-list{margin-top:8px;display:grid;gap:6px}
+.pool-usage-list>div{padding:8px 9px;border:1px solid #e2e6eb;border-radius:6px;display:flex;justify-content:space-between;gap:10px;font-size:9px}
+.pool-usage-list strong{display:flex;align-items:center;gap:5px;color:#23734a;font-size:8px}
+.pool-usage-list strong i{width:7px;height:7px;border-radius:50%;background:#25b868}
+.pool-usage-list p{color:#7d8796;font-size:9px}
+.config-detail-actions{padding:13px 0 2px}
+.config-detail-search-card{margin:10px 0 12px;padding:14px 16px;border:1px solid #e0e5eb;border-radius:9px;background:#fff;box-shadow:0 2px 9px rgba(23,32,51,.04)}.config-detail-search-card>label{display:block;margin-bottom:6px;color:#536073;font-size:11px;font-weight:750}.config-detail-search-card>p{margin:6px 0 0;color:#818b99;font-size:9px}.config-detail-search{position:relative;max-width:720px;height:40px;padding:0 10px;border:1px solid #cdd5df;border-radius:7px;display:flex;align-items:center;gap:8px;color:#718093}.config-detail-search:focus-within{border-color:#2988a9;box-shadow:0 0 0 3px rgba(42,139,173,.1)}.config-detail-search input{width:100%;border:0;outline:0;color:#293447;background:transparent;font:inherit;font-size:12px}.config-detail-search>button{padding:3px;border:0;display:flex;color:#6f7b8b;cursor:pointer;background:transparent}.config-detail-search-options{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:100%;padding:6px;border:1px solid #d9dfe6;border-radius:8px;background:#fff;box-shadow:0 14px 32px rgba(23,32,51,.16)}.config-detail-search-options>button{width:100%;padding:9px;border:0;border-radius:6px;display:block;color:#344054;text-align:left;cursor:pointer;background:#fff}.config-detail-search-options>button:hover{background:#f2f7f9}.config-detail-search-options strong,.config-detail-search-options small{display:block}.config-detail-search-options strong{font-size:10px}.config-detail-search-options small{margin-top:3px;color:#7c8797;font-size:9px}.config-detail-search-options p{padding:12px;color:#7c8797;text-align:center;font-size:10px}.config-detail-hero.locked{box-shadow:none}.locked-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.locked-field-grid label{display:grid;gap:4px}.locked-field-grid span{color:#8a94a2;font-size:8px;font-weight:750;text-transform:uppercase}.locked-field-grid input{height:32px;border:1px solid #e1e5ea;border-radius:6px;background:#f4f6f8}.locked-config-detail .measurement-values strong{color:#a0a8b3}
+.config-detail-empty{min-height:55vh;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#718093;text-align:center}
+.config-detail-empty h1{margin:9px 0 3px;color:#253044;font-size:20px}.config-detail-empty p{margin:0 0 14px;font-size:10px}
+@media(max-width:900px){.config-detail-main-grid,.config-detail-bottom-grid{grid-template-columns:1fr}.measurement-values{grid-template-columns:1fr 1fr}}
+
+/* Detail record readability. */
+.config-detail-page .config-detail-hero {
+  padding: 21px 23px;
+}
+
+.config-detail-page .config-detail-hero > div > span {
+  font-size: 12px;
+}
+
+.config-detail-page .config-detail-hero h1 {
+  font-size: 28px;
+}
+
+.config-detail-page .config-detail-hero p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.config-detail-page .config-detail-hero .config-status {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.config-detail-page .config-detail-main-grid {
+  grid-template-columns: minmax(0, 1.08fr) minmax(430px, 0.92fr);
+  gap: 14px;
+}
+
+.config-detail-page .config-detail-card,
+.config-detail-page .measurement-detail-strip {
+  padding: 20px;
+}
+
+.config-detail-page .detail-card-heading {
+  margin-bottom: 16px;
+}
+
+.config-detail-page .detail-card-heading h2 {
+  font-size: 17px;
+}
+
+.config-detail-page .detail-card-heading > span {
+  font-size: 11px;
+}
+
+.config-detail-page .config-detail-data {
+  gap: 17px 22px;
+}
+
+.config-detail-page .config-detail-data dt {
+  margin-bottom: 5px;
+  color: #667386;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.config-detail-page .config-detail-data dd {
+  color: #253044;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.config-detail-page .config-detail-data .no-data-value {
+  color: #758193;
+  font-style: italic;
+}
+
+.config-detail-page .config-audit-grid {
+  gap: 13px;
+}
+
+.config-detail-page .config-audit-item {
+  grid-template-columns: 32px 1fr;
+  gap: 9px;
+}
+
+.config-detail-page .config-audit-item > span {
+  width: 32px;
+  height: 32px;
+}
+
+.config-detail-page .config-audit-item small {
+  color: #667386;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.config-detail-page .config-audit-item strong {
+  margin-top: 4px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.config-detail-page .measurement-values {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.config-detail-page .measurement-values div {
+  padding: 13px 14px;
+}
+
+.config-detail-page .measurement-values span {
+  margin-bottom: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.config-detail-page .measurement-values strong {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.config-detail-page .measurement-values .no-data-value {
+  color: #758193;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.config-detail-page .range-detail-table th {
+  padding: 10px;
+  font-size: 11px;
+}
+
+.config-detail-page .range-detail-table {
+  margin-top: 7px;
+  overflow: hidden;
+  border: 1px solid #dfe4ea;
+  border-radius: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.config-detail-page .range-detail-table th,
+.config-detail-page .range-detail-table td {
+  border: 0;
+  border-right: 1px solid #dfe4ea;
+  border-bottom: 1px solid #dfe4ea;
+}
+
+.config-detail-page .range-detail-table th:last-child,
+.config-detail-page .range-detail-table td:last-child {
+  border-right: 0;
+}
+
+.config-detail-page .range-detail-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.config-detail-page .range-detail-table td {
+  padding: 11px 10px;
+  font-size: 13px;
+}
+
+.config-detail-page .range-detail-table .range-no-data {
+  padding: 18px 12px;
+  color: #758193;
+  font-style: italic;
+  text-align: center;
+}
+
+.config-detail-page .detail-traffic-bar.no-data-bar {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #596577;
+  background: #cbd1d9;
+}
+
+.config-detail-page .detail-traffic-bar.no-data-bar span {
+  width: 100%;
+  height: auto;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.config-detail-page .range-detail-color {
+  gap: 8px;
+}
+
+.config-detail-page .range-detail-color i {
+  width: 10px;
+  height: 10px;
+}
+
+.config-detail-page .detail-traffic-labels {
+  margin-top: 7px;
+  font-size: 12px;
+}
+
+.config-detail-page .usage-total {
+  padding: 13px 14px;
+}
+
+.config-detail-page .usage-detail-card .detail-card-heading > span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #6d3ea0;
+  background: #f0e8fa;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.config-detail-page .usage-total span {
+  font-size: 11px;
+}
+
+.config-detail-page .usage-total strong {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.config-detail-page .pool-usage-list {
+  margin-top: 11px;
+  gap: 8px;
+}
+
+.config-detail-page .pool-usage-list > div {
+  padding: 11px 12px;
+  font-size: 13px;
+}
+
+.config-detail-page .pool-usage-list strong {
+  font-size: 12px;
+}
+
+.config-detail-page .pool-usage-list p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.config-detail-page .config-detail-search-card {
+  padding: 18px 20px;
+}
+
+.config-detail-page .config-detail-search-card > label {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.config-detail-page .config-detail-search-card > p {
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.config-detail-page .config-detail-search {
+  height: 44px;
+}
+
+.config-detail-page .config-detail-search input {
+  font-size: 14px;
+}
+
+.config-detail-page .config-detail-search-options strong {
+  font-size: 15px;
+}
+
+.config-detail-page .config-detail-search-options small,
+.config-detail-page .config-detail-search-options p {
+  font-size: 14px;
+}
+
+.config-detail-page .config-detail-search-options > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.config-detail-page .config-detail-search-options > button strong,
+.config-detail-page .config-detail-search-options > button small {
+  grid-column: 1;
+}
+
+.config-detail-page .config-detail-search-options > button.selected {
+  background: #eef9f3;
+}
+
+.config-detail-page .config-detail-selected-check {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  color: #22a861;
+  stroke-width: 3;
+}
+
+html[data-theme="dark"] .config-detail-page .config-detail-search-options > button.selected {
+  background: rgba(34, 168, 97, .16);
+}
+
+html[data-theme="dark"] .config-detail-page .config-detail-selected-check {
+  color: #56d58d;
+}
+
+.config-detail-page .config-detail-search-options{
+  max-height:300px;
+  overflow-y:auto;
+}
+.config-detail-page .config-detail-search-options>button.config-detail-placeholder-option{
+  margin-bottom:5px;
+  border-bottom:1px solid var(--ems-border);
+  border-radius:7px 7px 3px 3px;
+}
+.config-detail-page .config-detail-search>button:hover{
+  color:#fff;
+  border-radius:50%;
+  background:#7650a0;
+}
+
+.config-detail-page .locked-field-grid span {
+  font-size: 11px;
+}
+
+.config-detail-page .locked-field-grid input {
+  height: 38px;
+}
+
+.config-detail-page.config-detail-empty {
+  font-size: 14px;
+}
+
+.config-detail-page.config-detail-empty h1 {
+  font-size: 26px;
+}
+
+.config-detail-page.config-detail-empty p {
+  font-size: 13px;
+}
+
+.config-detail-loading {
+  min-height: 120px;
+  padding: 22px 28px;
+  border: 1px solid var(--ems-border);
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ems-muted);
+  background: var(--ems-surface);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--ems-shadow);
+}
+
+.config-detail-loading svg {
+  color: #7b8797;
+  animation: config-detail-spin 0.9s linear infinite;
+}
+
+html[data-theme="dark"] .config-detail-page .config-detail-data dt,
+html[data-theme="dark"] .config-detail-page .config-audit-item small {
+  color: #cbd4e1;
+}
+
+html[data-theme="dark"] .config-detail-page .config-detail-data dd,
+html[data-theme="dark"] .config-detail-page .config-audit-item strong {
+  color: #fff;
+}
+
+html[data-theme="dark"] .config-detail-page .config-detail-data .no-data-value {
+  color: #c4cedb;
+}
+
+html[data-theme="dark"] .config-detail-page .measurement-values span {
+  color: #cbd4e1;
+}
+
+html[data-theme="dark"] .config-detail-page .measurement-values strong {
+  color: #fff;
+}
+
+html[data-theme="dark"] .config-detail-page .measurement-values .no-data-value,
+html[data-theme="dark"] .config-detail-page .range-detail-table .range-no-data {
+  color: #c4cedb;
+}
+
+html[data-theme="dark"] .config-detail-page .range-detail-table th {
+  color: #cbd4e1;
+  border-color: var(--ems-border);
+  background: var(--ems-surface-muted);
+}
+
+html[data-theme="dark"] .config-detail-page .range-detail-table {
+  border-color: var(--ems-border);
+}
+
+html[data-theme="dark"] .config-detail-page .range-detail-table td {
+  color: #fff;
+  border-color: var(--ems-border);
+  background: var(--ems-surface);
+}
+
+html[data-theme="dark"] .config-detail-page .detail-traffic-labels {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+html[data-theme="dark"] .config-detail-page .detail-traffic-bar.no-data-bar {
+  color: #f1f4f8;
+  background: #667386;
+}
+
+html[data-theme="dark"] .config-detail-page .usage-total {
+  border: 1px solid var(--ems-border);
+  background: var(--ems-surface-muted);
+}
+
+html[data-theme="dark"] .config-detail-page .usage-detail-card .detail-card-heading > span {
+  color: #f0d9ff;
+  background: rgba(124, 63, 163, 0.34);
+}
+
+html[data-theme="dark"] .config-detail-page .usage-total span {
+  color: #cbd4e1;
+}
+
+html[data-theme="dark"] .config-detail-page .usage-total strong {
+  color: #fff;
+}
+
+html[data-theme="dark"] .config-detail-page .pool-usage-list > div {
+  color: #fff;
+  border-color: var(--ems-border);
+  background: var(--ems-surface);
+}
+
+html[data-theme="dark"] .config-detail-page .pool-usage-list p {
+  color: #cbd4e1;
+}
+
+@keyframes config-detail-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1100px) {
+  .config-detail-page .config-detail-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .config-detail-page .measurement-values {
+    grid-template-columns: 1fr 1fr;
+  }
+}

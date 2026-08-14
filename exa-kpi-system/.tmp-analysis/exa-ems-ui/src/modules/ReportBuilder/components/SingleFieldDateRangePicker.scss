@@ -1,0 +1,146 @@
+.single-field-date-range-picker {
+  // Main trigger input - wider to accommodate date range display
+  // This targets ONLY the trigger input, not inputs inside dropdown
+  > .dropdown > .dropdown-toggle .form-control {
+    min-width: 600px; // Increased to fit both dates with arrow separator and full formatting
+  }
+
+  // Dropdown menu styling
+  .date-range-dropdown-menu {
+    max-width: none !important;
+    background-color: var(--cui-body-bg);
+    border: 1px solid var(--cui-border-color);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+
+    // Inputs inside dropdown - reset width and allow shrinking
+    .form-control,
+    input[type="date"],
+    input[type="time"] {
+      min-width: 0 !important;
+      width: 100%;
+      background-color: var(--cui-body-bg);
+      border-color: var(--cui-border-color);
+      color: var(--cui-body-color);
+
+      &:focus {
+        background-color: var(--cui-body-bg);
+        border-color: var(--cui-primary);
+        color: var(--cui-body-color);
+        box-shadow: 0 0 0 0.25rem rgba(var(--cui-primary-rgb), 0.25);
+      }
+
+      // Calendar and clock icons in date/time inputs
+      &::-webkit-calendar-picker-indicator {
+        filter: var(--cui-btn-close-white-filter, none);
+        opacity: 0.6;
+        cursor: pointer;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
+  }
+
+  // Calendar icon styling
+  .calendar-icon {
+    color: var(--cui-body-color);
+    opacity: 0.6;
+    transition: opacity 0.15s ease-in-out;
+  }
+
+  .dropdown-toggle:hover .calendar-icon {
+    opacity: 1;
+  }
+
+  // Quick range buttons
+  .btn-quick-range {
+    background-color: var(--cui-body-bg);
+    border: 1px solid var(--cui-border-color);
+    color: var(--cui-body-color);
+    transition: all 0.15s ease-in-out;
+    white-space: nowrap;
+    
+    &:hover {
+      background-color: var(--cui-tertiary-bg);
+      border-color: var(--cui-border-color-translucent);
+      color: var(--cui-body-color);
+    }
+
+    &:active, &:focus {
+      background-color: var(--cui-primary);
+      border-color: var(--cui-primary);
+      color: #fff;
+    }
+  }
+
+  // Section labels
+  .section-label {
+    color: var(--cui-secondary-color);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
+  }
+
+  // Form labels
+  .form-label {
+    color: var(--cui-body-color);
+    font-weight: 500;
+  }
+
+  // Ensure row doesn't overflow
+  .row {
+    margin: 0;
+    
+    > [class*="col-"] {
+      overflow: hidden;
+    }
+  }
+
+  // Border between sections
+  .border-end {
+    border-color: var(--cui-border-color) !important;
+  }
+
+  // Apply/Clear buttons
+  .btn-primary {
+    --cui-btn-bg: var(--cui-primary);
+    --cui-btn-border-color: var(--cui-primary);
+    color: #fff;
+  }
+
+  .btn-secondary {
+    background-color: var(--cui-secondary-bg);
+    border-color: var(--cui-border-color);
+    color: var(--cui-body-color);
+
+    &:hover {
+      background-color: var(--cui-tertiary-bg);
+    }
+  }
+}
+
+// Dark mode specific overrides
+[data-coreui-theme="dark"] {
+  .single-field-date-range-picker {
+    .btn-quick-range {
+      background-color: var(--cui-dark-bg-subtle);
+      border-color: var(--cui-border-color);
+      color: var(--cui-body-color);
+
+      &:hover {
+        background-color: var(--cui-tertiary-bg);
+        border-color: var(--cui-primary);
+      }
+    }
+
+    // Fix date/time picker icons in dark mode
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+    }
+  }
+}

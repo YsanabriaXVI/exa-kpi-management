@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" role="img" aria-labelledby="title">
+  <title id="title">EXA</title>
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3399ff"/>
+      <stop offset="100%" stop-color="#747af2"/>
+    </linearGradient>
+  </defs>
+  <path d="M30 30h120v30H70v25h60v30H70v25h80v30H30z" fill="url(#logoGradient)"/>
+  <path d="M180 30h50l45 60 45-60h50l-70 85 75 55h-50l-50-65-50 65h-50l75-55z" fill="url(#logoGradient)"/>
+  <path d="M400 30h50l100 140h-50l-15-30H365l-15 30h-50zm25 60-35 20h70z" fill="url(#logoGradient)"/>
+  <text x="590" y="132" font-family="Inter,Arial,sans-serif" font-size="58" font-weight="700" fill="#aeb8c7">KPI</text>
+</svg>

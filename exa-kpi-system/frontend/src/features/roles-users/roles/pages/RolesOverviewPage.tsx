@@ -1,0 +1,3 @@
+import { RolesTable } from "../components/RolesTable";
+import { useRoles } from "../hooks/useRoles";
+export function RolesOverviewPage() { const roles = useRoles(); return <main className="ru-page"><header className="ru-header"><div><nav>Roles/Users / Roles & Permissions</nav><h1>Roles Overview</h1><p>Review the four MVP roles and open their inherited permission matrices.</p></div></header><section className="ru-card"><RolesTable roles={roles.data ?? []}/><div className="ru-rule-grid"><p><strong>Admin is protected.</strong> The last active Admin role cannot be disabled or deleted.</p><p><strong>Roles are never physically deleted.</strong> Roles with users stay preserved, and inactive roles are excluded from assignment.</p></div></section></main>; }

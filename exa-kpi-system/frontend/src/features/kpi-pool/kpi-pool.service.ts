@@ -1,0 +1,243 @@
+import type { KpiConfigRecord } from "../kpi-config/kpi-config.types";
+import type { ScorecardRecord } from "../scorecards/scorecard.types";
+import type { KpiPoolInput, KpiPoolRecord, ManageablePoolKpi, PoolKpi, PoolScorecard } from "./kpi-pool.types";
+
+const sampleKpis: PoolKpi[] = [
+  { configCode: "KPC-049-01", kpiCode: "KPI-049", name: "Reduce operating costs", category: "Financial", goal: "Reduce 20%", measurementUnit: "%", dataSource: "EMS - SAP Integration", status: "ACTIVE" },
+  { configCode: "KPC-050-01", kpiCode: "KPI-050", name: "Productivity kms/head", category: "Financial", goal: "3,700 kms", measurementUnit: "$/km", dataSource: "EMS - GPS Integration", status: "ACTIVE" },
+  { configCode: "KPC-051-01", kpiCode: "KPI-051", name: "Increase container sales", category: "Financial", goal: "+100", measurementUnit: "$", dataSource: "Depot - EMS", status: "ACTIVE" },
+  { configCode: "KPC-052-01", kpiCode: "KPI-052", name: "Transport damage", category: "Quality", goal: "0 damage", measurementUnit: "Count", dataSource: "EMS", status: "ACTIVE" },
+  { configCode: "KPC-053-01", kpiCode: "KPI-053", name: "Increase Genset sales", category: "Quality", goal: "+5%", measurementUnit: "$", dataSource: "Depot - EMS", status: "ACTIVE" },
+];
+
+let kpiCatalog: PoolKpi[] = [
+  ...sampleKpis,
+  { configCode: "KPC-052-02", kpiCode: "KPI-058", name: "On-time delivery without service incidents", category: "Operations", goal: "100%", measurementUnit: "%", dataSource: "EMS", status: "ACTIVE" },
+  { configCode: "KPC-054-01", kpiCode: "KPI-054", name: "Fleet availability", category: "Operations", goal: "95%", measurementUnit: "%", dataSource: "GPS Integration", status: "ACTIVE" },
+  { configCode: "KPC-055-01", kpiCode: "KPI-055", name: "Customer claim resolution", category: "Quality", goal: "48 hours", measurementUnit: "Hours", dataSource: "CRM", status: "INACTIVE" },
+];
+
+const hiddenKpisByPool = new Map<number, Set<string>>();
+
+const importableKpis: PoolKpi[] = [
+  { configCode: "KPC-056-01", kpiCode: "KPI-056", name: "Fuel efficiency per route", category: "Operations", goal: "8.5 km/L", measurementUnit: "km/L", dataSource: "GPS Integration", status: "ACTIVE" },
+  { configCode: "KPC-057-01", kpiCode: "KPI-057", name: "Invoice collection cycle", category: "Financial", goal: "30 days", measurementUnit: "Days", dataSource: "SAP", status: "ACTIVE" },
+  { configCode: "KPC-059-01", kpiCode: "KPI-059", name: "Preventive maintenance compliance", category: "Quality", goal: "98%", measurementUnit: "%", dataSource: "EMS", status: "ACTIVE" },
+  { configCode: "KPC-060-01", kpiCode: "KPI-060", name: "Legacy fuel variance control", category: "Operations", goal: "5%", measurementUnit: "%", dataSource: "Legacy GPS", status: "INACTIVE" },
+  { configCode: "KPC-061-01", kpiCode: "KPI-061", name: "Manual invoice exception rate", category: "Financial", goal: "2%", measurementUnit: "%", dataSource: "Excel Import", status: "INACTIVE" },
+];
+
+const sampleScorecards: PoolScorecard[] = [
+  { code: "SCD-01", name: "EXA Operations ScoreCard", company: "EXA", duration: "Jan 2026 - Jun 2026", frequency: "Monthly", selectedKpis: "3/8", expectedInputs: 6, status: "ACTIVE" },
+  { code: "SCD-02", name: "EXA Security ScoreCard", company: "EXA", duration: "Jan 2026 - Mar 2026", frequency: "Monthly", selectedKpis: "2/10", expectedInputs: 3, status: "ACTIVE" },
+];
+
+let pools: KpiPoolRecord[] = [
+  { id: 1, code: "PL-OPS-SEG-01", name: "EXA Operations KPI Pool", companies: ["EXA", "CONMOXA"], frequency: "Monthly", validFrom: "2026-01-01", validTo: "2026-12-31", description: "Operational KPIs used across EXA and CONMOXA.", status: "ACTIVE", kpis: sampleKpis, scorecards: sampleScorecards },
+  { id: 2, code: "PL-FIN-01", name: "Financial KPI Pool", companies: ["EXA"], frequency: "Monthly", validFrom: "2026-01-01", validTo: "2026-12-31", description: "Financial performance indicators for 2026.", status: "ACTIVE", kpis: sampleKpis.slice(0, 3), scorecards: sampleScorecards.slice(0, 1) },
+  { id: 3, code: "PL-OPS-SEC-01", name: "EXA Security KPI Pool", companies: ["Grupo EXA"], frequency: "Monthly", validFrom: "2026-01-01", validTo: "2026-12-31", description: "Security and quality indicators.", status: "ACTIVE", kpis: sampleKpis.slice(2), scorecards: sampleScorecards },
+  { id: 4, code: "PL-OPS-SEC-02", name: "Operations Security 2025", companies: ["EXA"], frequency: "Monthly", validFrom: "2025-01-01", validTo: "2025-12-31", description: "Closed operational pool for 2025.", status: "INACTIVE", kpis: sampleKpis.slice(0, 2), scorecards: sampleScorecards.slice(0, 1) },
+  { id: 5, code: "PL-LOG-H1-26", name: "Logistics Performance H1", companies: ["EXA"], frequency: "Monthly", validFrom: "2026-01-01", validTo: "2026-06-30", description: "First-semester logistics and delivery performance indicators.", status: "ACTIVE", kpis: kpiCatalog.slice(1, 7), scorecards: [{ ...sampleScorecards[0], code: "SCD-LOG-H1", name: "Logistics H1 ScoreCard", duration: "Jan 2026 - Jun 2026", selectedKpis: "6/6" }] },
+  { id: 6, code: "PL-MNT-H2-26", name: "Fleet Maintenance H2", companies: ["CONMOXA"], frequency: "Monthly", validFrom: "2026-07-01", validTo: "2026-12-31", description: "Second-semester fleet availability and preventive maintenance KPIs.", status: "ACTIVE", kpis: kpiCatalog.slice(3, 8), scorecards: [{ ...sampleScorecards[0], code: "SCD-MNT-H2", name: "Fleet Maintenance H2", company: "CONMOXA", duration: "Jul 2026 - Dec 2026", selectedKpis: "5/5" }] },
+  { id: 7, code: "PL-COM-AN-26", name: "Commercial Annual Pool", companies: ["EXA", "Grupo EXA"], frequency: "Monthly", validFrom: "2026-01-01", validTo: "2026-12-31", description: "Annual commercial growth, sales, and customer indicators.", status: "ACTIVE", kpis: kpiCatalog.slice(0, 6), scorecards: [] },
+  { id: 8, code: "PL-HR-H1-26", name: "People & Culture H1", companies: ["Grupo EXA"], frequency: "Quarterly", validFrom: "2026-01-01", validTo: "2026-06-30", description: "People, training, and retention indicators for the first half of 2026.", status: "ACTIVE", kpis: kpiCatalog.slice(4, 8), scorecards: [{ ...sampleScorecards[1], code: "SCD-HR-H1", name: "People & Culture H1", company: "Grupo EXA", duration: "Jan 2026 - Jun 2026", frequency: "Quarterly", selectedKpis: "4/4", expectedInputs: 2 }] },
+  { id: 9, code: "PL-CX-H2-26", name: "Customer Experience H2", companies: ["EXA"], frequency: "Monthly", validFrom: "2026-07-01", validTo: "2026-12-31", description: "Customer service quality and claim-resolution indicators.", status: "ACTIVE", kpis: kpiCatalog.slice(2, 7), scorecards: [] },
+  { id: 10, code: "PL-COMP-26", name: "Compliance Annual Pool", companies: ["EXA", "CONMOXA", "Grupo EXA"], frequency: "Quarterly", validFrom: "2026-01-01", validTo: "2026-12-31", description: "Annual safety, compliance, and governance indicators.", status: "ACTIVE", kpis: kpiCatalog.slice(2), scorecards: [{ ...sampleScorecards[1], code: "SCD-COMP-26", name: "Corporate Compliance", company: "Grupo EXA", duration: "Jan 2026 - Dec 2026", frequency: "Quarterly", selectedKpis: "6/6", expectedInputs: 4 }] },
+  { id: 11, code: "PL-FIN-H1-25", name: "Finance H1 Historical", companies: ["EXA"], frequency: "Monthly", validFrom: "2025-01-01", validTo: "2025-06-30", description: "Historical six-month financial pool retained for consultation.", status: "INACTIVE", kpis: sampleKpis.slice(0, 3), scorecards: [] },
+  { id: 12, code: "PL-OPS-MAY-SEP", name: "Operations Seasonal Pool", companies: ["CONMOXA"], frequency: "Monthly", validFrom: "2026-05-01", validTo: "2026-09-30", description: "Seasonal operational KPIs used during the May-to-September peak period.", status: "ACTIVE", kpis: kpiCatalog.slice(1, 5), scorecards: [{ ...sampleScorecards[0], code: "SCD-SEA-26", name: "Peak Season Operations", company: "CONMOXA", duration: "May 2026 - Sep 2026", selectedKpis: "4/4", expectedInputs: 5 }] },
+];
+
+const wait = () => new Promise((resolve) => window.setTimeout(resolve, 180));
+const clone = (pool: KpiPoolRecord): KpiPoolRecord => ({
+  ...pool,
+  companies: [...pool.companies],
+  kpis: pool.kpis.map((kpi) => ({ ...kpi })),
+  scorecards: pool.scorecards.map((scorecard) => ({ ...scorecard })),
+});
+
+export const kpiPoolService = {
+  async list() {
+    await wait();
+    return pools.map(clone);
+  },
+  async get(id: number) {
+    await wait();
+    const pool = pools.find((item) => item.id === id);
+    if (!pool) throw new Error("KPI Pool not found.");
+    return clone(pool);
+  },
+  async save(input: KpiPoolInput, id?: number) {
+    await wait();
+    if (id) {
+      const current = pools.find((pool) => pool.id === id);
+      if (!current) throw new Error("KPI Pool not found.");
+      const updated = { ...current, ...input };
+      pools = pools.map((pool) => pool.id === id ? updated : pool);
+      return clone(updated);
+    }
+    const nextId = Math.max(0, ...pools.map((pool) => pool.id)) + 1;
+    const created: KpiPoolRecord = {
+      ...input,
+      id: nextId,
+      code: `PL-${String(nextId).padStart(3, "0")}`,
+      kpis: [],
+      scorecards: [],
+    };
+    pools = [created, ...pools];
+    return clone(created);
+  },
+  async deactivate(id: number) {
+    await wait();
+    pools = pools.map((pool) => pool.id === id ? { ...pool, status: "INACTIVE" } : pool);
+  },
+  async getManageableKpis(poolId: number): Promise<ManageablePoolKpi[]> {
+    await wait();
+    const pool = pools.find((item) => item.id === poolId);
+    if (!pool) throw new Error("KPI Pool not found.");
+    const included = new Set(pool.kpis.map((kpi) => kpi.configCode));
+    const hidden = hiddenKpisByPool.get(poolId) ?? new Set<string>();
+    return kpiCatalog.filter((kpi) => !hidden.has(kpi.configCode)).map((kpi) => ({
+      ...kpi,
+      availability: included.has(kpi.configCode)
+        ? "IN_POOL"
+        : kpi.status === "INACTIVE"
+          ? "NOT_AVAILABLE"
+          : "AVAILABLE",
+    }));
+  },
+  async getImportableKpis(search: string, recentOnly = false) {
+    await wait();
+    const existing = new Set(kpiCatalog.map((kpi) => kpi.configCode));
+    const term = search.trim().toLowerCase();
+    if (!term && !recentOnly) return [];
+    const matches = importableKpis
+      .filter((kpi) => !existing.has(kpi.configCode))
+      .filter((kpi) => !term || `${kpi.configCode} ${kpi.kpiCode} ${kpi.name} ${kpi.category} ${kpi.dataSource}`.toLowerCase().includes(term));
+    return (recentOnly && !term ? [...matches].reverse().slice(0, 5) : matches).map((kpi) => ({ ...kpi }));
+  },
+  async getConfigurationDetailByCode(configCode: string): Promise<KpiConfigRecord> {
+    await wait();
+    const kpi = [...kpiCatalog, ...importableKpis].find((item) => item.configCode === configCode);
+    if (!kpi) throw new Error("KPI Configuration not found.");
+    const usedBy = pools.filter((pool) => pool.kpis.some((item) => item.configCode === configCode));
+    const numericGoal = Number(kpi.goal.replace(/[^0-9.-]/g, "")) || 0;
+    return {
+      id: Number(kpi.configCode.replace(/\D/g, "")) || 0,
+      code: kpi.configCode,
+      definitionId: Number(kpi.kpiCode.replace(/\D/g, "")) || 0,
+      definitionCode: kpi.kpiCode,
+      definitionName: kpi.name,
+      goal: numericGoal,
+      measurementUnit: kpi.measurementUnit,
+      evaluationType: "Higher is better",
+      dataSource: kpi.dataSource,
+      ranges: { redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100 },
+      usedIn: usedBy.length,
+      status: kpi.status === "ACTIVE" ? "CONFIGURED" : "INACTIVE",
+      createdAt: "2026-01-15T09:00:00",
+      createdBy: "KPI Management",
+      updatedAt: "2026-07-30T09:00:00",
+      updatedBy: "KPI Management",
+      poolNames: usedBy.map((pool) => pool.name),
+    };
+  },
+  async getScorecardDetailByCode(scorecardCode: string): Promise<ScorecardRecord> {
+    await wait();
+    const owningPool = pools.find((pool) => pool.scorecards.some((item) => item.code === scorecardCode));
+    const scorecard = owningPool?.scorecards.find((item) => item.code === scorecardCode);
+    if (!scorecard || !owningPool) throw new Error("ScoreCard not found.");
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const durationParts = scorecard.duration.match(/^([A-Za-z]{3})\s+(\d{4})\s+-\s+([A-Za-z]{3})\s+(\d{4})$/);
+    const startMonth = durationParts ? monthNames.indexOf(durationParts[1]) : 0;
+    const endMonth = durationParts ? monthNames.indexOf(durationParts[3]) : 11;
+    const year = durationParts ? Number(durationParts[2]) : new Date().getFullYear();
+    const durationMonths = Array.from(
+      { length: Math.max(1, endMonth - startMonth + 1) },
+      (_, index) => startMonth + index,
+    );
+    return {
+      id: Number(scorecard.code.replace(/\D/g, "")) || 0,
+      code: scorecard.code,
+      name: scorecard.name,
+      departments: ["Operations"],
+      durationMonths,
+      year,
+      inputFrequency: scorecard.frequency,
+      kpis: Number(scorecard.selectedKpis.split("/")[1]) || 0,
+      linkedScorecards: 0,
+      poolSource: owningPool.name,
+      company: scorecard.company,
+      status: scorecard.status === "ACTIVE" ? "ACTIVE" : "EXPIRED",
+      collaborators: 0,
+    };
+  },
+  async importKpis(configCodes: string[]) {
+    await wait();
+    const imported = importableKpis.filter((item) => configCodes.includes(item.configCode));
+    if (!imported.length) throw new Error("KPI Configurations not found.");
+    const existing = new Set(kpiCatalog.map((item) => item.configCode));
+    kpiCatalog = [...kpiCatalog, ...imported.filter((item) => !existing.has(item.configCode)).map((item) => ({ ...item }))];
+    return imported.map((item) => ({ ...item }));
+  },
+  async addKpis(poolId: number, configCodes: string[]) {
+    await wait();
+    const pool = pools.find((item) => item.id === poolId);
+    if (!pool) throw new Error("KPI Pool not found.");
+    const current = new Set(pool.kpis.map((kpi) => kpi.configCode));
+    const additions = kpiCatalog.filter((kpi) => configCodes.includes(kpi.configCode) && kpi.status === "ACTIVE" && !current.has(kpi.configCode));
+    pool.kpis = [...pool.kpis, ...additions.map((kpi) => ({ ...kpi }))];
+    return clone(pool);
+  },
+  async addConfigurations(poolId: number, configurations: KpiConfigRecord[]) {
+    await wait();
+    const pool = pools.find((item) => item.id === poolId);
+    if (!pool) throw new Error("KPI Pool not found.");
+
+    const eligible = configurations.filter((config) => config.status === "CONFIGURED");
+    const incoming: PoolKpi[] = eligible.map((config) => ({
+      configCode: config.code,
+      kpiCode: config.definitionCode,
+      name: config.definitionName,
+      category: "General",
+      goal: `${config.goal}`,
+      measurementUnit: config.measurementUnit,
+      dataSource: config.dataSource,
+      status: "ACTIVE",
+    }));
+    const catalogCodes = new Set(kpiCatalog.map((kpi) => kpi.configCode));
+    kpiCatalog = [
+      ...kpiCatalog,
+      ...incoming.filter((kpi) => !catalogCodes.has(kpi.configCode)).map((kpi) => ({ ...kpi })),
+    ];
+
+    const currentCodes = new Set(pool.kpis.map((kpi) => kpi.configCode));
+    const additions = incoming.filter((kpi) => !currentCodes.has(kpi.configCode));
+    pool.kpis = [...pool.kpis, ...additions.map((kpi) => ({ ...kpi }))];
+    return { pool: clone(pool), addedCount: additions.length };
+  },
+  async removeKpis(poolId: number, configCodes: string[]) {
+    await wait();
+    const pool = pools.find((item) => item.id === poolId);
+    if (!pool) throw new Error("KPI Pool not found.");
+    pool.kpis = pool.kpis.filter((kpi) => !configCodes.includes(kpi.configCode));
+    return clone(pool);
+  },
+  async hideKpisFromPool(poolId: number, configCodes: string[]) {
+    await wait();
+    const pool = pools.find((item) => item.id === poolId);
+    if (!pool) throw new Error("KPI Pool not found.");
+    const hidden = hiddenKpisByPool.get(poolId) ?? new Set<string>();
+    configCodes.forEach((code) => hidden.add(code));
+    hiddenKpisByPool.set(poolId, hidden);
+    pool.kpis = pool.kpis.filter((kpi) => !hidden.has(kpi.configCode));
+    return clone(pool);
+  },
+  async softDeleteKpi(configCode: string) {
+    await wait();
+    const current = kpiCatalog.find((kpi) => kpi.configCode === configCode);
+    if (!current) throw new Error("KPI Configuration not found.");
+    kpiCatalog = kpiCatalog.map((kpi) => kpi.configCode === configCode ? { ...kpi, status: "INACTIVE" } : kpi);
+    pools = pools.map((pool) => ({ ...pool, kpis: pool.kpis.filter((kpi) => kpi.configCode !== configCode) }));
+    return { ...current, status: "INACTIVE" as const };
+  },
+};

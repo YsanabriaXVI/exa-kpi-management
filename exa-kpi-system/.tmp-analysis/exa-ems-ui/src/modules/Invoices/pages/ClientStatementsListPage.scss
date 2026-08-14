@@ -1,0 +1,18 @@
+.client-statements-table {
+  th {
+    white-space: nowrap !important;
+    vertical-align: middle;
+
+    // Ensure the content inside header stays inline
+    div {
+      display: inline-flex !important;
+      align-items: center;
+      gap: 0.25rem;
+    }
+  }
+
+  td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+}

@@ -1,0 +1,32 @@
+.detail-record-locked-badge {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #8b4d16;
+  background: #fff0d9;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.detail-record-disabled-message {
+  margin: 8px 0 0;
+  color: var(--ems-muted);
+  font-size: 11px;
+}
+
+.detail-record-selector.disabled .detail-record-search {
+  background: var(--ems-surface-muted);
+  opacity: .88;
+}
+
+.detail-record-selector.disabled .detail-record-search input {
+  cursor: not-allowed;
+}
+
+html[data-theme="dark"] .detail-record-locked-badge {
+  color: #ffd9a8;
+  background: #67451f;
+}

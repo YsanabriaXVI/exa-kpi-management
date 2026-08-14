@@ -1,0 +1,421 @@
+/**
+ * Weekly Analytics Components - Dark Mode Compatible Styles
+ */
+
+// Table Card Styling
+.weekly-analytics-table,
+.weekly-analytics-matrix {
+  .card {
+    background-color: var(--cui-card-bg);
+    border-color: var(--cui-border-color);
+  }
+
+  .card-header {
+    background-color: var(--cui-card-cap-bg);
+    border-bottom-color: var(--cui-border-color);
+    color: var(--cui-body-color);
+  }
+
+  .card-body {
+    background-color: var(--cui-card-bg);
+  }
+
+  .card-footer {
+    background-color: var(--cui-card-cap-bg);
+    border-top-color: var(--cui-border-color);
+  }
+}
+
+// Table Styles
+.weekly-summary-table {
+  // Table Base
+  .table {
+    color: var(--cui-body-color);
+    background-color: var(--cui-card-bg);
+    border-color: var(--cui-border-color);
+    
+    // All cells
+    th, td {
+      border-color: var(--cui-border-color);
+      background-color: var(--cui-card-bg);
+      color: var(--cui-body-color);
+    }
+
+    // Header row
+    thead {
+      th {
+        background-color: var(--cui-tertiary-bg) !important;
+        color: var(--cui-body-color);
+        border-bottom: 2px solid var(--cui-border-color);
+        font-weight: 600;
+      }
+    }
+
+    // Body rows
+    tbody {
+      tr {
+        &:hover {
+          background-color: var(--cui-tertiary-bg);
+          
+          td {
+            background-color: var(--cui-tertiary-bg);
+          }
+        }
+      }
+
+      td {
+        background-color: var(--cui-card-bg);
+      }
+    }
+
+    // Footer row
+    tfoot {
+      tr {
+        background-color: var(--cui-dark-bg-subtle);
+        
+        td {
+          background-color: var(--cui-dark-bg-subtle) !important;
+          color: var(--cui-light);
+          border-top: 2px solid var(--cui-border-color);
+        }
+      }
+
+      // Warning row (margin)
+      tr.table-warning {
+        td {
+          background-color: var(--cui-warning-bg-subtle) !important;
+          color: var(--cui-warning-text-emphasis);
+        }
+      }
+    }
+
+    // Sticky elements
+    thead th,
+    tbody td:first-child.sticky-col,
+    tfoot td:first-child {
+      position: sticky;
+      z-index: 1;
+    }
+
+    thead th {
+      top: 0;
+      z-index: 2;
+    }
+  }
+
+  // Links in table
+  a {
+    color: var(--cui-link-color);
+    
+    &:hover {
+      color: var(--cui-link-hover-color);
+    }
+  }
+
+  // Empty state
+  .alert-info {
+    background-color: var(--cui-info-bg-subtle);
+    color: var(--cui-info-text-emphasis);
+    border-color: var(--cui-info-border-subtle);
+  }
+
+  // Row count badge
+  .text-muted {
+    color: var(--cui-secondary-color) !important;
+  }
+}
+
+// Matrix Styles
+.weekly-summary-matrix {
+  .table {
+    color: var(--cui-body-color);
+    background-color: var(--cui-card-bg);
+    border-color: var(--cui-border-color);
+
+    th, td {
+      border-color: var(--cui-border-color);
+      color: var(--cui-body-color);
+    }
+
+    // Header
+    thead {
+      th {
+        background-color: var(--cui-tertiary-bg) !important;
+        color: var(--cui-body-color);
+        border-bottom: 2px solid var(--cui-border-color);
+        font-weight: 600;
+        
+        // Sticky first column header
+        &:first-child {
+          z-index: 3;
+        }
+      }
+    }
+
+    // Body
+    tbody {
+      tr {
+        &:hover {
+          td {
+            background-color: var(--cui-tertiary-bg);
+          }
+        }
+        
+        &:nth-of-type(odd) {
+          td {
+            background-color: var(--cui-card-bg);
+          }
+        }
+
+        &:nth-of-type(even) {
+          td {
+            background-color: var(--cui-tertiary-bg);
+          }
+        }
+      }
+
+      td {
+        background-color: var(--cui-card-bg);
+        
+        // First column (subdivision names)
+        &:first-child {
+          background-color: var(--cui-secondary-bg) !important;
+          font-weight: 500;
+          border-right: 2px solid var(--cui-border-color);
+        }
+      }
+    }
+
+    // Footer
+    tfoot {
+      tr {
+        td {
+          background-color: var(--cui-dark-bg-subtle) !important;
+          color: var(--cui-light);
+          border-top: 2px solid var(--cui-border-color);
+          
+          &:first-child {
+            background-color: var(--cui-dark) !important;
+          }
+        }
+      }
+    }
+
+    // Negative values
+    .text-danger {
+      color: var(--cui-danger) !important;
+    }
+  }
+
+  // Scroll hint
+  .scroll-hint {
+    color: var(--cui-secondary-color);
+    background-color: var(--cui-card-cap-bg);
+    border-top-color: var(--cui-border-color);
+  }
+}
+
+// Dark mode specific overrides
+[data-coreui-theme="dark"] {
+  .weekly-summary-table,
+  .weekly-summary-matrix {
+    .table {
+      --cui-table-bg: var(--cui-body-bg);
+      --cui-table-border-color: var(--cui-border-color);
+      --cui-table-striped-bg: rgba(255, 255, 255, 0.03);
+      --cui-table-hover-bg: rgba(255, 255, 255, 0.05);
+
+      thead th {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: var(--cui-body-color);
+      }
+
+      tbody {
+        td {
+          background-color: var(--cui-body-bg);
+        }
+
+        tr:hover td {
+          background-color: rgba(255, 255, 255, 0.05);
+        }
+      }
+
+      // Footer in dark mode
+      tfoot tr td {
+        background-color: rgba(0, 0, 0, 0.4) !important;
+        color: #fff;
+      }
+
+      // Warning row in dark mode
+      tfoot tr.table-warning td {
+        background-color: rgba(255, 193, 7, 0.2) !important;
+        color: #ffc107;
+      }
+    }
+  }
+
+  // Matrix specific dark mode
+  .weekly-summary-matrix {
+    .table {
+      tbody td:first-child {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+      }
+
+      tfoot tr td:first-child {
+        background-color: rgba(0, 0, 0, 0.5) !important;
+      }
+    }
+  }
+
+  // Card backgrounds in dark mode
+  .card {
+    background-color: var(--cui-card-bg);
+    
+    .card-header {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+  }
+
+  // Alert info in dark mode
+  .alert-info {
+    background-color: rgba(13, 202, 240, 0.1);
+    color: #6edff6;
+    border-color: rgba(13, 202, 240, 0.3);
+  }
+}
+
+// Table container scrolling
+.table-scroll-container {
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: auto;
+  
+  // Custom scrollbar for dark mode
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: var(--cui-tertiary-bg);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--cui-secondary-color);
+    border-radius: 4px;
+    
+    &:hover {
+      background: var(--cui-primary);
+    }
+  }
+}
+
+// Collapse button styling
+.btn-collapse {
+  color: var(--cui-secondary-color);
+  
+  &:hover {
+    color: var(--cui-body-color);
+    background-color: var(--cui-tertiary-bg);
+  }
+}
+
+// Report header hero styling
+.report-hero-header {
+  background-color: var(--cui-card-cap-bg);
+  border-bottom: 1px solid var(--cui-border-color);
+  
+  .report-kicker {
+    color: var(--cui-body-color);
+    opacity: 0.7;
+  }
+
+  .report-title {
+    color: var(--cui-body-color);
+  }
+
+  .report-subtitle {
+    color: var(--cui-secondary-color);
+  }
+}
+
+// Section headers
+.weekly-section-header {
+  color: var(--cui-body-color);
+  border-bottom: 1px solid var(--cui-border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+// Export buttons
+.btn-export {
+  &.btn-danger {
+    background-color: var(--cui-danger);
+    border-color: var(--cui-danger);
+    color: #fff;
+    
+    &:hover {
+      background-color: var(--cui-danger-hover);
+      border-color: var(--cui-danger-hover);
+    }
+  }
+  
+  &.btn-success {
+    background-color: var(--cui-success);
+    border-color: var(--cui-success);
+    color: #fff;
+    
+    &:hover {
+      background-color: var(--cui-success-hover);
+      border-color: var(--cui-success-hover);
+    }
+  }
+}
+
+// Back button
+.btn-back {
+  color: var(--cui-secondary-color);
+  border-color: var(--cui-border-color);
+  
+  &:hover {
+    color: var(--cui-body-color);
+    background-color: var(--cui-tertiary-bg);
+  }
+}
+
+// Report summary card dark mode
+[data-coreui-theme="dark"] {
+  // Card styling
+  .weekly-report-card {
+    .card {
+      background-color: var(--cui-card-bg);
+      border-color: var(--cui-border-color);
+    }
+    
+    .card-header {
+      background-color: rgba(255, 255, 255, 0.03);
+      border-bottom-color: var(--cui-border-color);
+    }
+    
+    .card-footer {
+      background-color: rgba(255, 255, 255, 0.03);
+      border-top-color: var(--cui-border-color);
+    }
+  }
+  
+  // Section header text
+  h5.text-body-secondary {
+    color: var(--cui-secondary-color) !important;
+  }
+  
+  // Report title and subtitle
+  .report-hero-header {
+    background-color: rgba(255, 255, 255, 0.03);
+    
+    .text-body-secondary {
+      color: var(--cui-secondary-color) !important;
+    }
+  }
+}
+
