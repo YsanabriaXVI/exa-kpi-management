@@ -5,6 +5,8 @@ import { attachedScorecards, inputPeriods, monitoringPools, type InputPeriod } f
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
 import { MonitoringNoInformation, MonitoringPoolIdentity, MonitoringPoolSelector } from "./MonitoringPoolSelector";
 import { useMultiSelectVisibleCount } from "../../components/useMultiSelectVisibleCount";
+import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import "./monitoring-results.css";
 
 type ScheduleSortKey = "period" | "kpiLines" | "entered" | "missing" | "validation" | "status" | "closedAt";
@@ -27,7 +29,6 @@ function ScheduleMultiSelect({ placeholder, options, selected, onChange }: { pla
 }
 
 export function PoolInputSchedule() {
-  const pageSize = 6;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const pool = monitoringPools.find((item) => item.id === Number(searchParams.get("poolId"))) ?? monitoringPools[0];
@@ -37,6 +38,7 @@ export function PoolInputSchedule() {
   const [validationsSelected, setValidationsSelected] = useState<string[]>([]);
   const [entryStatusesSelected, setEntryStatusesSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<{ key: ScheduleSortKey; direction: SortDirection }>({ key: "period", direction: "asc" });
   const schedulePeriods = useMemo<InputPeriod[]>(() => {
     if (pool.generatedInputs <= inputPeriods.length) return inputPeriods.slice(0, pool.generatedInputs);
@@ -110,7 +112,7 @@ export function PoolInputSchedule() {
             <td><span className={`schedule-badge entry-${period.status.toLowerCase().replace(/ /g, "-")}`}>{period.status}</span></td><td>{period.closedAt || "—"}</td>
             <td>{period.status.startsWith("Closed") ? <button className="table-period-action" onClick={() => navigate(`/app/monitoring-results/detail?poolId=${pool.id}&period=${encodeURIComponent(period.shortLabel)}`)}><Eye size={14} />View</button> : period.status === "Validated" ? <button className="table-period-action close" onClick={() => navigate(`/app/monitoring-results/result-entry?poolId=${pool.id}&period=${encodeURIComponent(period.shortLabel)}&step=5`)}><Check size={14} />Close Period</button> : period.status === "Continue Entry" ? <button className="table-period-action continue" onClick={() => navigate(`/app/monitoring-results/result-entry?poolId=${pool.id}&period=${encodeURIComponent(period.shortLabel)}&step=2`)}><Play size={14} />Continue Entry</button> : <button className="table-period-action" onClick={() => navigate(`/app/monitoring-results/detail?poolId=${pool.id}&period=${encodeURIComponent(period.shortLabel)}`)}><Eye size={14} />View Details</button>}</td>
           </tr>)}</tbody>
-        </table>{!periods.length && <p className="schedule-no-results">No input periods match your search.</p>}<footer className="schedule-table-pagination"><span>{periods.length ? `Showing ${pageStart + 1}-${Math.min(pageStart + pageSize, periods.length)} of ${periods.length} periods` : "Showing 0 periods"}</span><div><button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} aria-label="Previous page"><ChevronLeft size={16}/></button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button type="button" className={pageNumber === currentPage ? "active" : ""} key={pageNumber} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}<button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} aria-label="Next page"><ChevronRight size={16}/></button></div></footer></div>
+        </table>{!periods.length && <p className="schedule-no-results">No input periods match your search.</p>}<footer className="schedule-table-pagination"><span>{periods.length ? `Showing ${pageStart + 1}-${Math.min(pageStart + pageSize, periods.length)} of ${periods.length} periods` : "Showing 0 periods"}</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={currentPage} totalPages={totalPages} onPage={setPage} label="Input periods pagination" className="schedule-pagination-controls" /></footer></div>
       </section>
       <button className="monitor-back schedule-bottom-back" onClick={() => navigate("/app/monitoring-results/overview")}><ArrowLeft size={16} />Back to Overview</button>
       </> : <MonitoringNoInformation/>}

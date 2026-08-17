@@ -27,6 +27,7 @@ import {
   type SortDirection,
 } from "../../components/SortableTableHeader";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import {
   attachedScorecards,
   kpiResults,
@@ -937,7 +938,7 @@ export function ResultEntry() {
                   <footer className="manual-entry-pagination">
                     <span>Showing <strong>{manualFilteredRows.length ? manualPageStart + 1 : 0}-{Math.min(manualPageStart + manualPageSize, manualFilteredRows.length)}</strong> of <strong>{manualFilteredRows.length}</strong> KPI results</span>
                     <RowsPerPageSelect value={manualPageSize} onChange={(value) => { setManualPageSize(value); setManualPage(1); }} />
-                    <div><button type="button" disabled={manualPage === 1} onClick={() => setManualPage((current) => current - 1)} aria-label="Previous page"><ChevronLeft size={16}/></button><strong className="current" aria-current="page">{manualPage}</strong><button type="button" disabled={manualPage === manualTotalPages} onClick={() => setManualPage((current) => current + 1)} aria-label="Next page"><ChevronRight size={16}/></button></div>
+                    <PaginationControls page={manualPage} totalPages={manualTotalPages} onPage={setManualPage} label="Manual results pagination" className="manual-pagination-controls" />
                   </footer>
                 </div>
               </div>
@@ -1293,7 +1294,7 @@ export function ResultEntry() {
                   <footer className="manual-entry-pagination">
                     <span>Showing <strong>{previewFilteredRows.length ? previewPageStart + 1 : 0}-{Math.min(previewPageStart + previewPageSize, previewFilteredRows.length)}</strong> of <strong>{previewFilteredRows.length}</strong> KPI results</span>
                     <RowsPerPageSelect value={previewPageSize} onChange={(value) => { setPreviewPageSize(value); setPreviewPage(1); }} />
-                    <div><button type="button" disabled={previewPage === 1} onClick={() => setPreviewPage((current) => current - 1)} aria-label="Previous page"><ChevronLeft size={16}/></button><strong className="current" aria-current="page">{previewPage}</strong><button type="button" disabled={previewPage === previewTotalPages} onClick={() => setPreviewPage((current) => current + 1)} aria-label="Next page"><ChevronRight size={16}/></button></div>
+                    <PaginationControls page={previewPage} totalPages={previewTotalPages} onPage={setPreviewPage} label="Preview results pagination" className="preview-pagination-controls" />
                   </footer>
                 </div>
               </div>
@@ -1372,7 +1373,7 @@ export function ResultEntry() {
                   <footer className="manual-entry-pagination">
                     <span>Showing <strong>{filteredScorecardRows.length ? scorecardPageStart + 1 : 0}-{Math.min(scorecardPageStart + scorecardPageSize, filteredScorecardRows.length)}</strong> of <strong>{filteredScorecardRows.length}</strong> ScoreCards</span>
                     <RowsPerPageSelect value={scorecardPageSize} onChange={(value) => { setScorecardPageSize(value); setScorecardPage(1); }} />
-                    <div><button type="button" disabled={scorecardPage === 1} onClick={() => setScorecardPage((current) => current - 1)} aria-label="Previous page"><ChevronLeft size={16}/></button><strong className="current" aria-current="page">{scorecardPage}</strong><button type="button" disabled={scorecardPage === scorecardTotalPages} onClick={() => setScorecardPage((current) => current + 1)} aria-label="Next page"><ChevronRight size={16}/></button></div>
+                    <PaginationControls page={scorecardPage} totalPages={scorecardTotalPages} onPage={setScorecardPage} label="ScoreCards pagination" className="scorecard-entry-pagination-controls" />
                   </footer>
                 </div>
               </div>

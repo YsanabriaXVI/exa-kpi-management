@@ -13,6 +13,7 @@ import type { ScorecardRecord } from "./scorecard.types";
 import { ActionToast } from "../../components/ActionToast";
 import "./scorecards.css";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 
 export function ScorecardOverview() {
   const [pageSize, setPageSize] = useState(10);
@@ -74,7 +75,7 @@ export function ScorecardOverview() {
       <button className="icon-button configure" title="Open ScoreCard Assignment" onClick={() => navigate(`/app/scorecards/assignment?scorecardId=${item.id}&selector=1&source=overview`)}><Settings2 size={15} /></button>
       <button className="icon-button view" title="View Detail" onClick={() => navigate(`/app/scorecards/detail?scorecardId=${item.id}`)}><Eye size={15} /></button>
     </div></td></tr>) : <tr><td colSpan={10} className="table-message">No ScoreCards match the selected filters.</td></tr>}</tbody></table>
-      <footer className="scorecard-results"><span>Showing <strong>{filtered.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filtered.length)}</strong> of <strong>{filtered.length}</strong> ScoreCards</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><div className="scorecard-pagination" aria-label="ScoreCard pagination"><button type="button" disabled={page === 1} onClick={() => setPage((current) => current - 1)} aria-label="Previous page"><ChevronLeft size={15} /></button><span className="current" aria-current="page">{page}</span><button type="button" disabled={page === totalPages} onClick={() => setPage((current) => current + 1)} aria-label="Next page"><ChevronRight size={15} /></button></div></footer>
+      <footer className="scorecard-results"><span>Showing <strong>{filtered.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filtered.length)}</strong> of <strong>{filtered.length}</strong> ScoreCards</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="ScoreCard pagination" className="scorecard-pagination" /></footer>
     </div>
   </main>;
 }

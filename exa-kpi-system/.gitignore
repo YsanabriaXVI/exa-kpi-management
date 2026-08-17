@@ -1,3 +1,10 @@
 node_modules/
 .env
 dist/
+~$alysis KPIs EXA Project.docx
+Analysis KPIs EXA Project.docx
+EXA_KPI_Estados_Propios_por_Modulo.docx
+.tmp-doc-render/
+.tmp-analysis/
+.tmp-analysis.zip
+exa-ems-ui.zip

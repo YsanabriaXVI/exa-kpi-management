@@ -12,6 +12,7 @@ import { kpiConfigService } from "./kpi-config.service";
 import { kpiPoolService } from "../kpi-pool/kpi-pool.service";
 import type { KpiConfigRecord, TrafficLightRanges } from "./kpi-config.types";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import { SendToPoolModal } from "./SendToPoolModal";
 import "./kpi-config.css";
 import { ActionToast } from "../../components/ActionToast";
@@ -142,11 +143,7 @@ export function KpiConfigOverview() {
             Showing <strong>{filtered.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filtered.length)}</strong> of <strong>{filtered.length}</strong> records
           </span>
           <RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
-          <div className="config-pagination" aria-label="KPI Config pagination">
-            <button type="button" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={page === 1} aria-label="Previous page"><ChevronLeft size={15} /></button>
-            <span className="current" title={`Page ${page} of ${totalPages}`} aria-current="page">{page}</span>
-            <button type="button" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={page === totalPages} aria-label="Next page"><ChevronRight size={15} /></button>
-          </div>
+          <PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="KPI Config pagination" className="config-pagination" />
         </footer>
       </div>
       {sendModalOpen && <SendToPoolModal configurations={selectedConfigurations} pools={poolsQuery.data ?? []} onClose={() => setSendModalOpen(false)} onAssigned={() => setSelectedConfigIds([])} />}

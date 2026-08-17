@@ -22,6 +22,7 @@ import {
 import { isMonitoringPeriodClosed } from "./monitoring-period-state";
 import "./monitoring-results.css";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 
 const statusLabels: Record<MonitoringStatus, string> = {
   ACTIVE: "Active",
@@ -751,34 +752,7 @@ export function MonitoringOverview() {
             : "Showing 0 Pools"}
         </span>
         <RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
-        <div>
-          <button
-            type="button"
-            disabled={currentPage === 1}
-            onClick={() => setPage(currentPage - 1)}
-          >
-            Previous
-          </button>
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-            (pageNumber) => (
-              <button
-                type="button"
-                className={pageNumber === currentPage ? "active" : ""}
-                key={pageNumber}
-                onClick={() => setPage(pageNumber)}
-              >
-                {pageNumber}
-              </button>
-            ),
-          )}
-          <button
-            type="button"
-            disabled={currentPage === totalPages}
-            onClick={() => setPage(currentPage + 1)}
-          >
-            Next
-          </button>
-        </div>
+        <PaginationControls page={currentPage} totalPages={totalPages} onPage={setPage} label="Monitoring Results pagination" className="monitor-pagination-controls" />
       </footer>
     </main>
   );

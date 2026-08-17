@@ -21,6 +21,8 @@ import {
   type SortDirection,
 } from "../../components/SortableTableHeader";
 import { useMultiSelectVisibleCount } from "../../components/useMultiSelectVisibleCount";
+import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import { MonitoringNoInformation, MonitoringPoolIdentity, MonitoringPoolSelector } from "./MonitoringPoolSelector";
 import "./monitoring-results.css";
 
@@ -101,7 +103,6 @@ function scorecardsForPeriod(scorecards: AttachedScorecard[], selectedPeriod: st
 }
 
 export function AttachedScorecards() {
-  const pageSize = 5;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const pool =
@@ -115,6 +116,7 @@ export function AttachedScorecards() {
   const [departmentsSelected, setDepartmentsSelected] = useState<string[]>([]);
   const [entryStatusesSelected, setEntryStatusesSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const tableRef = useRef<HTMLDivElement>(null);
   const previousDepartmentFilter = useRef(departmentsSelected.join("\u0000"));
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -527,7 +529,8 @@ export function AttachedScorecards() {
         </div>
         <footer className="monitor-pagination attached-table-pagination">
           <span>{rows.length ? `Showing ${firstVisibleIndex + 1}-${Math.min(firstVisibleIndex + pageSize, rows.length)} of ${rows.length} ScoreCards` : "Showing 0 ScoreCards"}</span>
-          <div><button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</button>{Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => <button type="button" className={pageNumber === currentPage ? "active" : ""} key={pageNumber} onClick={() => setPage(pageNumber)}>{pageNumber}</button>)}<button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>Next</button></div>
+          <RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
+          <PaginationControls page={currentPage} totalPages={totalPages} onPage={setPage} label="Attached ScoreCards pagination" className="attached-pagination-controls" />
         </footer>
         <button className="monitor-back schedule-bottom-back" onClick={() => navigate("/app/monitoring-results/overview")}><ArrowLeft size={16}/>Back to Overview</button>
       </section>

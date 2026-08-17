@@ -20,6 +20,8 @@ import {
   type SortDirection,
 } from "../../components/SortableTableHeader";
 import { useMultiSelectVisibleCount } from "../../components/useMultiSelectVisibleCount";
+import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import {
   kpiResults,
   monitoringPools,
@@ -51,8 +53,6 @@ type PreviewBarItem = {
 };
 type PreviewSummaryItem = { label: string; value: string };
 
-const KPI_PAGE_SIZE = 5;
-const ERROR_PAGE_SIZE = 1;
 const errorRows: ErrorRow[] = [
   {
     row: 5,
@@ -229,11 +229,13 @@ function Pagination({
   pageSize,
   total,
   onChange,
+  onPageSizeChange,
 }: {
   page: number;
   pageSize: number;
   total: number;
   onChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const start = total ? (page - 1) * pageSize + 1 : 0;
@@ -242,25 +244,8 @@ function Pagination({
       <span>
         Showing {start}–{Math.min(page * pageSize, total)} of {total} records
       </span>
-      <div>
-        <button
-          type="button"
-          disabled={page === 1}
-          onClick={() => onChange(page - 1)}
-          aria-label="Previous page"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <strong aria-label={`Page ${page} of ${pages}`}>{page}</strong>
-        <button
-          type="button"
-          disabled={page === pages}
-          onClick={() => onChange(page + 1)}
-          aria-label="Next page"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
+      <RowsPerPageSelect value={pageSize} onChange={(value) => { onPageSizeChange(value); onChange(1); }} />
+      <PaginationControls page={page} totalPages={pages} onPage={onChange} label="Result detail pagination" className="detail-pagination-controls" />
     </footer>
   );
 }
@@ -283,6 +268,8 @@ export function MonitoringResultsDetail() {
   const [previewMode, setPreviewMode] = useState<PreviewMode>("ENTRY");
   const [kpiPage, setKpiPage] = useState(1);
   const [errorPage, setErrorPage] = useState(1);
+  const [kpiPageSize, setKpiPageSize] = useState(10);
+  const [errorPageSize, setErrorPageSize] = useState(10);
   const [kpiSort, setKpiSort] = useState<{
     key: KpiSortKey;
     direction: SortDirection;
@@ -329,12 +316,12 @@ export function MonitoringResultsDetail() {
     [errorSort],
   );
   const paginatedRows = rows.slice(
-    (kpiPage - 1) * KPI_PAGE_SIZE,
-    kpiPage * KPI_PAGE_SIZE,
+    (kpiPage - 1) * kpiPageSize,
+    kpiPage * kpiPageSize,
   );
   const paginatedErrors = sortedErrors.slice(
-    (errorPage - 1) * ERROR_PAGE_SIZE,
-    errorPage * ERROR_PAGE_SIZE,
+    (errorPage - 1) * errorPageSize,
+    errorPage * errorPageSize,
   );
   const totalKpis = kpiResults.length;
   const enteredResults = kpiResults.filter(
@@ -878,9 +865,10 @@ export function MonitoringResultsDetail() {
         </div>
         <Pagination
           page={kpiPage}
-          pageSize={KPI_PAGE_SIZE}
+          pageSize={kpiPageSize}
           total={rows.length}
           onChange={setKpiPage}
+          onPageSizeChange={setKpiPageSize}
         />
       </section>
       {hasValidationIssues && (
@@ -936,9 +924,10 @@ export function MonitoringResultsDetail() {
           </div>
           <Pagination
             page={errorPage}
-            pageSize={ERROR_PAGE_SIZE}
+            pageSize={errorPageSize}
             total={sortedErrors.length}
             onChange={setErrorPage}
+            onPageSizeChange={setErrorPageSize}
           />
         </section>
       )}

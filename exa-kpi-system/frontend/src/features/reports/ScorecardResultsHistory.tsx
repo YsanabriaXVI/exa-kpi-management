@@ -4,6 +4,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { reportScorecards, scorecardHistory } from "./reports.data";
 import { useMultiSelectVisibleCount } from "../../components/useMultiSelectVisibleCount";
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
+import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import "./reports.css";
 import "./scorecard-results-history.css";
 import "./scorecard-results-history-overrides.css";
@@ -109,8 +111,8 @@ const availableYears = ["2024", "2025", "2026"];
 const values = (items: string[]) => items.map((value) => ({ value, label: value }));
 
 export function ScorecardResultsHistory() {
-  const pageSize = 5;
   const navigate = useNavigate();
+  const [pageSize, setPageSize] = useState(10);
   const [searchParams] = useSearchParams();
   const initialDepartments = useMemo(
     () => [...new Set(searchParams.getAll("department").filter(Boolean))],
@@ -333,7 +335,7 @@ export function ScorecardResultsHistory() {
           <td><strong>{item.average}%</strong></td><td><span className={`history-trend ${item.trend.toLowerCase()}`}>{item.trend === "Declined" ? <TrendingDown size={15}/> : <TrendingUp size={15}/>} {item.trend}</span></td><td><button className="history-view" onClick={() => openDetail(item.name)}><Eye size={15}/></button></td></tr>;
       })}</tbody></table></div>
       <footer className="history-period-slider">
-        <div className="history-record-summary"><span>Showing {visibleMonths.length} selected months · {rows.length} records</span><div className="history-record-pagination"><button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} aria-label="Previous records"><ChevronLeft size={15}/></button><strong>{currentPage}</strong><button type="button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} aria-label="Next records"><ChevronRight size={15}/></button></div></div>
+        <div className="history-record-summary"><span>Showing {rows.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, rows.length)} of {rows.length} records</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={currentPage} totalPages={totalPages} onPage={setPage} label="History records pagination" className="history-record-pagination" /></div>
         <label className="history-focus-control"><span>Focus Month</span><div className="history-slider-control"><output className={!focusMonth ? "empty" : ""} style={{ left: `${focusMonth && visibleMonths.length > 1 ? (focusIndex / (visibleMonths.length - 1)) * 100 : 0}%` }}>{focusMonth && visibleMonths.length ? `${visibleMonths[focusIndex]?.label} ${activeYear}` : "No selected"}</output><input type="range" min="0" max={Math.max(0, visibleMonths.length - 1)} value={focusIndex} disabled={!visibleMonths.length} style={{ background: `linear-gradient(to right, #7650a0 0 ${focusMonth && visibleMonths.length > 1 ? (focusIndex / (visibleMonths.length - 1)) * 100 : focusMonth ? 100 : 0}%, #c7ccd4 ${focusMonth && visibleMonths.length > 1 ? (focusIndex / (visibleMonths.length - 1)) * 100 : focusMonth ? 100 : 0}% 100%)` }} onChange={(event) => { const month = visibleMonths[Number(event.target.value)]; if (month) { setFocusClearedManually(false); setFocusMonth(month.value); } }}/></div></label>
         {years.length > 1 && <div className="history-year-navigation"><button type="button" disabled={activeYearIndex <= 0} onClick={() => setActiveYear(years[activeYearIndex - 1])}><ChevronLeft size={22}/>{years[activeYearIndex - 1] ?? String(Number(activeYear) - 1)}</button><strong key={activeYear}>{activeYear}</strong><button type="button" disabled={activeYearIndex >= years.length - 1} onClick={() => setActiveYear(years[activeYearIndex + 1])}>{years[activeYearIndex + 1] ?? String(Number(activeYear) + 1)}<ChevronRight size={22}/></button></div>}
       </footer></>}

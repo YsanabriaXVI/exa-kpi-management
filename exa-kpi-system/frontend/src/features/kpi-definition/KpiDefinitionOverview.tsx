@@ -1,11 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
   CirclePause,
-  ChevronLeft,
-  ChevronRight,
   Cog,
   FilePlus2,
   Eye,
@@ -22,12 +20,21 @@ import type {
   KpiDefinition,
   KpiDefinitionInput,
 } from "./kpi-definition.types";
+import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
+import {
+  compareSortValues,
+  SortableTableHeader,
+  type SortDirection,
+} from "../../components/SortableTableHeader";
 import "./kpi-definition.css";
 
 type Toast = {
   message: string;
   tone: "success" | "info";
 };
+
+type DefinitionSortKey = "code" | "name" | "objective" | "category" | "status";
 
 export function KpiDefinitionOverview() {
   const navigate = useNavigate();
@@ -39,6 +46,12 @@ export function KpiDefinitionOverview() {
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<KpiDefinition | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sort, setSort] = useState<{ key: DefinitionSortKey; direction: SortDirection }>({
+    key: "code",
+    direction: "asc",
+  });
 
   const definitionsQuery = useQuery({
     queryKey: ["kpi-definitions"],
@@ -104,6 +117,26 @@ export function KpiDefinitionOverview() {
       return matchesSearch && matchesStatus && matchesCategory;
     });
   }, [categoriesSelected, definitions, search, statuses]);
+  const sortedDefinitions = useMemo(
+    () => [...filteredDefinitions].sort((left, right) =>
+      compareSortValues(left[sort.key], right[sort.key], sort.direction),
+    ),
+    [filteredDefinitions, sort],
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredDefinitions.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const paginatedDefinitions = sortedDefinitions.slice(pageStart, pageStart + pageSize);
+  useEffect(() => setPage(1), [categoriesSelected, search, statuses]);
+  useEffect(() => setPage((current) => Math.min(current, totalPages)), [totalPages]);
+
+  const sortBy = (key: DefinitionSortKey) => {
+    setSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+    setPage(1);
+  };
 
   const filterBySummary = (nextStatuses: string[]) => {
     setStatuses(nextStatuses);
@@ -237,11 +270,11 @@ export function KpiDefinitionOverview() {
             </colgroup>
             <thead>
               <tr>
-                <th>KPI Code</th>
-                <th>KPI Name</th>
-                <th>Objective</th>
-                <th>Category</th>
-                <th>State</th>
+                <SortableTableHeader active={sort.key === "code"} direction={sort.direction} onSort={() => sortBy("code")}>KPI Code</SortableTableHeader>
+                <SortableTableHeader active={sort.key === "name"} direction={sort.direction} onSort={() => sortBy("name")}>KPI Name</SortableTableHeader>
+                <SortableTableHeader active={sort.key === "objective"} direction={sort.direction} onSort={() => sortBy("objective")}>Objective</SortableTableHeader>
+                <SortableTableHeader active={sort.key === "category"} direction={sort.direction} onSort={() => sortBy("category")}>Category</SortableTableHeader>
+                <SortableTableHeader active={sort.key === "status"} direction={sort.direction} onSort={() => sortBy("status")}>State</SortableTableHeader>
                 <th className="actions-heading">Actions</th>
               </tr>
             </thead>
@@ -252,8 +285,8 @@ export function KpiDefinitionOverview() {
                     Loading KPI Definitions...
                   </td>
                 </tr>
-              ) : filteredDefinitions.length ? (
-                filteredDefinitions.map((definition) => (
+              ) : paginatedDefinitions.length ? (
+                paginatedDefinitions.map((definition) => (
                   <tr key={definition.id}>
                     <td>
                       <span className="code-pill">{definition.code}</span>
@@ -327,18 +360,11 @@ export function KpiDefinitionOverview() {
 
         <footer className="kpi-table-footer">
           <span>
-            Showing <strong>{filteredDefinitions.length}</strong> of{" "}
-            <strong>{definitions.length}</strong> definitions
+            Showing <strong>{filteredDefinitions.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filteredDefinitions.length)}</strong> of{" "}
+            <strong>{filteredDefinitions.length}</strong> definitions
           </span>
-          <div className="pagination" aria-label="Pagination">
-            <button disabled aria-label="Previous page">
-              <ChevronLeft size={16} />
-            </button>
-            <button className="current">1</button>
-            <button disabled aria-label="Next page">
-              <ChevronRight size={16} />
-            </button>
-          </div>
+          <RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
+          <PaginationControls page={currentPage} totalPages={totalPages} onPage={setPage} label="KPI Definitions pagination" />
         </footer>
       </section>
 

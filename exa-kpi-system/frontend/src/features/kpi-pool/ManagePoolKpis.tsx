@@ -14,6 +14,8 @@ import type { ManageablePoolKpi, PoolKpiAvailability } from "./kpi-pool.types";
 import "./kpi-pool.css";
 import "./manage-pool-selector.css";
 import { ActionToast } from "../../components/ActionToast";
+import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 
 const availabilityCopy: Record<PoolKpiAvailability, string> = {
   AVAILABLE: "Available to Select",
@@ -22,7 +24,6 @@ const availabilityCopy: Record<PoolKpiAvailability, string> = {
 };
 
 export function ManagePoolKpis() {
-  const pageSize = 10;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -38,6 +39,7 @@ export function ManagePoolKpis() {
   const [measurementUnitsSelected, setMeasurementUnitsSelected] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<{ key: ManageSortKey; direction: SortDirection }>({ key: "configCode", direction: "asc" });
   const [showImporter, setShowImporter] = useState(false);
   const [importSelection, setImportSelection] = useState<string[]>([]);
@@ -248,11 +250,8 @@ export function ManagePoolKpis() {
           <div className="manage-table-footer">
             <footer className="manage-table-pagination">
               <span>Showing <strong>{filtered.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filtered.length)}</strong> of <strong>{filtered.length}</strong> records</span>
-              <div>
-                <button type="button" disabled={page === 1} onClick={() => setPage((current) => current - 1)} aria-label="Previous page"><ChevronLeft size={15} /></button>
-                <span className="current" title={`Page ${page} of ${totalPages}`} aria-current="page">{page}</span>
-                <button type="button" disabled={page === totalPages} onClick={() => setPage((current) => current + 1)} aria-label="Next page"><ChevronRight size={15} /></button>
-              </div>
+              <RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
+              <PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="Manage KPI Pool pagination" className="manage-pagination-controls" />
             </footer>
             <footer className="manage-actions">
               <span><strong>{selected.length}</strong> rows selected</span>

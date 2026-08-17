@@ -4,6 +4,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { reportScorecards } from "./reports.data";
 import { AnalysisMultiSelect } from "./AnalysisMultiSelect";
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
+import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import "./reports.css";
 import "./analysis-screens.css";
 import "./report-table-refresh.css";
@@ -18,8 +20,8 @@ export function ScorecardAnalysis() {
   const [showGraphs, setShowGraphs] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<{ key: ScorecardAnalysisSortKey; direction: SortDirection }>({ key: "code", direction: "asc" });
-  const pageSize = 5;
   const rows = useMemo(() => reportScorecards.filter((item) => (!selectedScorecards.length || selectedScorecards.includes(item.code)) && (!departments.length || item.departments.some((value) => departments.includes(value))) && (!statuses.length || statuses.includes(item.status)) && (!search || `${item.code} ${item.name}`.toLowerCase().includes(search.toLowerCase()))).map((item, index) => ({ ...item, comparedScore: Math.max(0, item.score + [-3.1, 2.4, -1.5, 4.2, -2.2, 1.1, -4.3, 2.8][index]) })).sort((left, right) => compareSortValues(scorecardAnalysisSortValue(left, sort.key), scorecardAnalysisSortValue(right, sort.key), sort.direction)), [departments, search, selectedScorecards, sort, statuses]);
   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, pages);
@@ -43,7 +45,7 @@ export function ScorecardAnalysis() {
         const difference = item.score - item.comparedScore;
         return <tr key={item.code}><td><strong>{item.code}</strong></td><td>{item.name}</td><td>{item.departments.join(", ")}</td><td>{period}</td><td><strong>{item.score.toFixed(2)}%</strong></td>{compare && <><td>{item.comparedScore.toFixed(2)}%</td><td className={difference >= 0 ? "positive-difference" : "negative-difference"}>{difference >= 0 ? "+" : ""}{difference.toFixed(2)}%</td><td><span className={`history-trend ${difference >= 0 ? "improved" : "declined"}`}>{difference >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{difference >= 0 ? "Improved" : "Declined"}</span></td></>}<td>{item.ownKpiWeight}%</td><td>{item.linkedWeight}%</td><td><span className={`report-status ${item.status.toLowerCase().replace(/ /g, "-")}`}><i />{item.status}</span></td><td><button className="history-view" onClick={() => navigate(`/app/reports/scorecard-result-detail?scorecardCode=${encodeURIComponent(item.code)}&from=analysis`)}><Eye size={14} /></button></td></tr>;
       })}</tbody></table></div>
-      <footer className="reports-pagination analysis-table-pagination"><span>Showing {rows.length ? pageStart + 1 : 0}–{Math.min(pageStart + pageSize, rows.length)} of {rows.length} records</span><div><button type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={17}/></button><strong className="analysis-page-number">{currentPage}</strong><button type="button" aria-label="Next page" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}><ChevronRight size={17}/></button></div></footer>
+      <footer className="reports-pagination analysis-table-pagination"><span>Showing {rows.length ? pageStart + 1 : 0}–{Math.min(pageStart + pageSize, rows.length)} of {rows.length} records</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={currentPage} totalPages={pages} onPage={setPage} label="ScoreCard analysis pagination" className="analysis-pagination-controls" /></footer>
     </section>
     <button type="button" className="report-page-back" onClick={() => navigate(-1)}><ArrowLeft size={17}/>Back</button>
   </main>;

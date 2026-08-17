@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../../../components/SortableTableHeader";
 import { RowsPerPageSelect } from "../../../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../../../components/PaginationControls";
 import type { RoleWithUserCount } from "../types/role.types";
 import { RoleStatusBadge } from "./RoleStatusBadge";
 
@@ -36,5 +37,5 @@ export function RolesTable({ roles }: { roles: RoleWithUserCount[] }) {
 
 function TableFooter({ page, pageSize, total, totalPages, label, onPage, onPageSize }: { page: number; pageSize: number; total: number; totalPages: number; label: string; onPage: React.Dispatch<React.SetStateAction<number>>; onPageSize: (size: number) => void }) {
   const start = (page - 1) * pageSize;
-  return <footer className="ru-table-footer"><span>Showing <strong>{total ? start + 1 : 0}-{Math.min(start + pageSize, total)}</strong> of <strong>{total}</strong> records</span><RowsPerPageSelect value={pageSize} onChange={(value) => { onPageSize(value); onPage(1); }} /><div className="ru-pagination" aria-label={`${label} pagination`}><button type="button" disabled={page === 1} onClick={() => onPage((current) => current - 1)} aria-label="Previous page"><ChevronLeft size={15} /></button><span className="current" aria-current="page">{page}</span><button type="button" disabled={page === totalPages} onClick={() => onPage((current) => current + 1)} aria-label="Next page"><ChevronRight size={15} /></button></div></footer>;
+  return <footer className="ru-table-footer"><span>Showing <strong>{total ? start + 1 : 0}-{Math.min(start + pageSize, total)}</strong> of <strong>{total}</strong> records</span><RowsPerPageSelect value={pageSize} onChange={(value) => { onPageSize(value); onPage(1); }} /><PaginationControls page={page} totalPages={totalPages} onPage={(nextPage) => onPage(nextPage)} label={`${label} pagination`} className="ru-pagination" /></footer>;
 }

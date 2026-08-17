@@ -78,5 +78,41 @@ button {
 }
 .rows-per-page-select{display:inline-flex!important;align-items:center!important;justify-content:center;gap:7px;color:var(--ems-muted);font-family:Arial,Calibri,sans-serif;font-size:12px;font-weight:600;white-space:nowrap}.rows-per-page-control{position:relative;display:inline-flex;align-items:center}.rows-per-page-select select{width:76px!important;height:32px!important;padding:0 27px 0 12px!important;border:1px solid var(--ems-border)!important;border-radius:6px!important;color:var(--ems-text)!important;cursor:pointer;text-align:center;text-align-last:center;background:var(--ems-surface)!important;box-shadow:none!important;font:inherit!important;font-weight:600!important;appearance:none!important;-webkit-appearance:none!important}.rows-per-page-control>svg{position:absolute;right:8px;color:var(--ems-muted);pointer-events:none;stroke-width:1.8}.rows-per-page-control:focus-within>svg{color:var(--ems-primary)}.rows-per-page-select select:focus{outline:2px solid color-mix(in srgb,var(--ems-primary) 25%,transparent);outline-offset:1px}
 :is(.pool-results,.config-results,.scorecard-results,.monitor-pagination,.kpi-table-footer,.manual-entry-pagination):has(>.rows-per-page-select){display:grid!important;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;align-items:center!important;gap:14px!important}:is(.pool-results,.config-results,.scorecard-results,.monitor-pagination,.kpi-table-footer,.manual-entry-pagination):has(>.rows-per-page-select)>:last-child{justify-self:end}@media(max-width:700px){:is(.pool-results,.config-results,.scorecard-results,.monitor-pagination,.kpi-table-footer,.manual-entry-pagination):has(>.rows-per-page-select){grid-template-columns:1fr!important}:is(.pool-results,.config-results,.scorecard-results,.monitor-pagination,.kpi-table-footer,.manual-entry-pagination):has(>.rows-per-page-select)>:last-child{justify-self:start}}
+
+/* Consistent interaction feedback for every pagination control. */
+:where([class*="pagination"]) button:not(:disabled) {
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+:where([class*="pagination"]) button:not(:disabled):hover {
+  color: #167da3;
+  border-color: #68b7d2;
+  background-color: #eaf7fb;
+}
+
+:where([class*="pagination"]) button:disabled {
+  cursor: not-allowed;
+}
+
+html[data-theme="dark"] :where([class*="pagination"]) button:not(:disabled):hover {
+  color: #e4c8f5;
+  border-color: #a978c8;
+  background-color: #3b2d49;
+}
+
+.pagination-controls {
+  min-width: 330px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.pagination-controls .pagination-ellipsis {
+  width: 26px;
+  text-align: center;
+  user-select: none;
+}
 .rows-per-page-control:focus-within>svg{color:var(--ems-muted)!important}.rows-per-page-select select:focus,.rows-per-page-select select:focus-visible{border-color:var(--ems-border)!important;outline:0!important;box-shadow:none!important}
 .rows-per-page-select select option{padding-inline:0;text-align:center}

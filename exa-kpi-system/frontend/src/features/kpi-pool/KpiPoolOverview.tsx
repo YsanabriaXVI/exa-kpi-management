@@ -11,6 +11,7 @@ import {
 } from "../../components/SortableTableHeader";
 import type { KpiPoolRecord } from "./kpi-pool.types";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
+import { PaginationControls } from "../../components/PaginationControls";
 import "./kpi-pool.css";
 
 export function KpiPoolOverview() {
@@ -106,11 +107,7 @@ export function KpiPoolOverview() {
         <footer className="pool-results">
           <span>Showing <strong>{filtered.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filtered.length)}</strong> of <strong>{filtered.length}</strong> pools</span>
           <RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />
-          <div className="pool-pagination" aria-label="KPI Pool pagination">
-            <button type="button" onClick={() => setPage((currentPage) => currentPage - 1)} disabled={page === 1} aria-label="Previous page"><ChevronLeft size={15} /></button>
-            <span className="current" title={`Page ${page} of ${totalPages}`} aria-current="page">{page}</span>
-            <button type="button" onClick={() => setPage((currentPage) => currentPage + 1)} disabled={page === totalPages} aria-label="Next page"><ChevronRight size={15} /></button>
-          </div>
+          <PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="KPI Pool pagination" className="pool-pagination" />
         </footer>
       </div>
     </main>
