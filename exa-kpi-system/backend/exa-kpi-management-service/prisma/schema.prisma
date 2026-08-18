@@ -1,0 +1,11 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Domain models will be translated from
+// databases/exa-kpi-management-service.mysql8.sql in the next database slice.

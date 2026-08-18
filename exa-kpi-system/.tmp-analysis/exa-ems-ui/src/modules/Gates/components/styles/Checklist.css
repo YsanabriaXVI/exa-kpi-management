@@ -1,9 +1,0 @@
-.accordion {
-    padding: 1.2%;
-}
-
-.info-alert {
-    background-color: rgba(var(--cui-primary-rgb), 0.30) !important;
-    color: rgba(var(--cui-primary-rgb), 0.90) !important;
-    border: 1 px solid rgba(var(--cui-primary-rgb), 0.50) !important;
-}

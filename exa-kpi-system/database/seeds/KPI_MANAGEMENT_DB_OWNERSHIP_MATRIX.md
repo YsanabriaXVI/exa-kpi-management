@@ -48,7 +48,8 @@ DIFFERENT MICROSERVICE
 | `kpi_configuration_statuses` | KPI Config catalog | KPI Management | `kpi_configuration_status_id` | — | created/updated user | No historical recalculation | KEEP / MySQL8 adapt |
 | `evaluation_types` | KPI Config catalog | KPI Management | `evaluation_type_id` | — | created/updated user | **Yes**: applied type must be snapshotted in Monitoring | KEEP / MySQL8 adapt |
 | `kpi_definitions` | KPI Definition | KPI Management | `kpi_definition_id` | `kpi_category_id` → `kpi_categories` | created/updated user | Monitoring may copy code/name | KEEP + add missing local FK |
-| `kpi_configurations` | KPI Configuration | KPI Management | `kpi_configuration_id` | definition, unit, frequency, source, status | created/updated user | Identifies stable config | MODIFY: target/evaluation removed from stable row |
+| `kpi_configurations` | KPI Configuration | KPI Management | `kpi_configuration_id` | definition, unit
+, frequency, source, status | created/updated user | Identifies stable config | MODIFY: target/evaluation removed from stable row |
 | `kpi_configuration_revisions` | KPI Configuration | KPI Management | `kpi_configuration_revision_id` | configuration, evaluation type | created/updated user | **Critical**: Monitoring stores revision ID + snapshot | **ADD** |
 | `kpi_configuration_revision_thresholds` | KPI Configuration | KPI Management | `kpi_configuration_revision_threshold_id` | revision, traffic light level | created/updated user | **Critical**: thresholds must be historical | **ADD** |
 | `kpi_configuration_thresholds` (old) | KPI Configuration | KPI Management | old PK | config, traffic light | user IDs | Historical problem | **REPLACE** by revision thresholds |
