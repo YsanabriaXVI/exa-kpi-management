@@ -45,9 +45,9 @@ export function KpiConfigDetail() {
   const config = detailQuery.data;
   const isUnconfigured = config?.status === "INCOMPLETE";
   const rangeRows = config ? [
-    { label: "Green", color: "green", from: config.ranges.greenFrom, to: config.ranges.greenTo, meaning: "Good" },
-    { label: "Yellow", color: "yellow", from: config.ranges.yellowFrom, to: config.ranges.yellowTo, meaning: "Warning" },
     { label: "Red", color: "red", from: config.ranges.redFrom, to: config.ranges.redTo, meaning: "Critical" },
+    { label: "Yellow", color: "yellow", from: config.ranges.yellowFrom, to: config.ranges.yellowTo, meaning: "Warning" },
+    { label: "Green", color: "green", from: config.ranges.greenFrom, to: config.ranges.greenTo, meaning: "Good" },
   ] : [];
 
   return (
@@ -108,7 +108,7 @@ export function KpiConfigDetail() {
               <div className="detail-traffic-bar no-data-bar"><span>No Data</span></div>
             ) : <>
               <div className="detail-traffic-bar">
-                {[...rangeRows].sort((left, right) => left.from - right.from).map((range) => (
+                {rangeRows.map((range) => (
                   <span
                     className={range.color}
                     key={range.color}
@@ -117,7 +117,7 @@ export function KpiConfigDetail() {
                 ))}
               </div>
               <div className="detail-traffic-labels">
-                {[...rangeRows].sort((left, right) => left.from - right.from).map((range) => (
+                {rangeRows.map((range) => (
                   <span
                     key={range.color}
                     style={{ width: `${Math.max(1, range.to - range.from + 1)}%` }}

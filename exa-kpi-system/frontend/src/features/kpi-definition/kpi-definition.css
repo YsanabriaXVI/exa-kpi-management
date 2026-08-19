@@ -186,9 +186,11 @@
 }
 
 .kpi-toolbar {
+  /* Shared multiselect.css renders State/Category at 42px. */
+  --kpi-filter-control-height: 42px;
   padding: 12px;
   display: grid;
-  grid-template-columns: minmax(230px, 350px) 165px 185px minmax(180px, 1fr);
+  grid-template-columns: minmax(390px, 1.35fr) minmax(220px, 0.75fr) minmax(260px, 0.9fr) minmax(180px, 0.65fr);
   gap: 9px;
   border-bottom: 0;
   border-radius: 9px;
@@ -198,13 +200,17 @@
 
 .toolbar-new-button {
   width: 180px;
-  height: 36px;
+  height: var(--kpi-filter-control-height);
+  box-sizing: border-box;
   justify-self: end;
   white-space: nowrap;
 }
 
 .search-control {
-  height: 36px;
+  width: 100%;
+  height: var(--kpi-filter-control-height);
+  min-width: 420px;
+  box-sizing: border-box;
   padding: 0 10px;
   display: flex;
   align-items: center;
@@ -261,11 +267,14 @@
 
 .checkbox-multiselect {
   position: relative;
+  height: var(--kpi-filter-control-height);
 }
 
 .checkbox-multiselect > button {
   width: 100%;
-  height: 36px;
+  height: var(--kpi-filter-control-height) !important;
+  min-height: var(--kpi-filter-control-height) !important;
+  box-sizing: border-box;
   padding: 0 10px;
   border: 1px solid #ced5de;
   border-radius: 7px;
@@ -276,6 +285,20 @@
   cursor: pointer;
   background: #fff;
   font-size: 12px;
+  outline: none;
+}
+
+.checkbox-multiselect > button:focus,
+.checkbox-multiselect > button:focus-visible {
+  outline: none;
+  border-color: #7c3fa3;
+  box-shadow: 0 0 0 3px rgba(124, 63, 163, 0.14);
+}
+
+.filter-chip-remove:focus,
+.filter-chip-remove:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .checkbox-multiselect > button > svg {
@@ -550,8 +573,19 @@
 }
 
 .icon-button.delete {
-  color: #bd4943;
-  background: #ffeded;
+  color: #fff;
+  border-color: #b93630;
+  background: #ce4940;
+}
+
+.icon-button.delete:hover {
+  background: #b93630;
+}
+
+.icon-button.activate {
+  color: #fff;
+  border-color: #166534;
+  background: #16803c;
 }
 
 .icon-button.configure {
@@ -989,6 +1023,11 @@
 .form-field input[readonly] {
   color: #6d7787;
   background: #f4f6f8;
+  cursor: not-allowed;
+}
+
+.category-status-row {
+  align-items: start;
 }
 
 .form-field [aria-invalid="true"] {
@@ -1165,6 +1204,33 @@
   box-shadow: 0 25px 70px rgba(12, 22, 38, 0.28);
 }
 
+.delete-confirmation-dialog {
+  position: relative;
+  width: min(520px, 100%);
+  padding: 34px 36px 32px;
+}
+
+.confirmation-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #667085;
+  background: transparent;
+  cursor: pointer;
+}
+
+.confirmation-dialog-close:hover {
+  color: #182235;
+  background: #f1f3f6;
+}
+
 .confirmation-dialog p {
   margin: 0 0 20px;
   color: #677285;
@@ -1235,6 +1301,7 @@
 
   .search-control {
     grid-column: 1 / -1;
+    min-width: 0;
   }
 }
 
@@ -1250,6 +1317,7 @@
 
   .search-control {
     grid-column: auto;
+    min-width: 0;
   }
 
   .kpi-page-header .button {
@@ -1733,6 +1801,20 @@ body .kpi-definition-page .icon-button.configure svg {
   padding: 11px 9px;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.kpi-definition-detail-page .detail-config-link {
+  padding: 0;
+  border: 0;
+  color: #187697;
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+}
+
+.kpi-definition-detail-page .detail-config-link:hover {
+  text-decoration: underline;
 }
 
 .kpi-definition-detail-page .config-status {

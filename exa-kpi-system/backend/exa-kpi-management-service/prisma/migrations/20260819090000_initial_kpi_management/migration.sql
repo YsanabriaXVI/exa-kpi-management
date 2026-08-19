@@ -1,0 +1,289 @@
+-- CreateTable
+CREATE TABLE `kpi_categories` (
+    `kpi_category_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(50) NOT NULL,
+    `name` VARCHAR(120) NOT NULL,
+    `description` TEXT NULL,
+    `is_active` BOOLEAN NOT NULL DEFAULT true,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_kpi_categories_code`(`code`),
+    PRIMARY KEY (`kpi_category_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `measurement_units` (
+    `measurement_unit_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(50) NOT NULL,
+    `symbol` VARCHAR(50) NOT NULL,
+    `name` VARCHAR(120) NOT NULL,
+    `description` TEXT NULL,
+    `decimal_places` SMALLINT NOT NULL DEFAULT 2,
+    `is_percentage` BOOLEAN NOT NULL DEFAULT false,
+    `is_active` BOOLEAN NOT NULL DEFAULT true,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_measurement_units_code`(`code`),
+    UNIQUE INDEX `uq_measurement_units_symbol`(`symbol`),
+    PRIMARY KEY (`measurement_unit_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `input_frequencies` (
+    `input_frequency_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(50) NOT NULL,
+    `name` VARCHAR(120) NOT NULL,
+    `description` TEXT NULL,
+    `months_per_period` SMALLINT NOT NULL,
+    `periods_per_year` SMALLINT NULL,
+    `is_active` BOOLEAN NOT NULL DEFAULT true,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_input_frequencies_code`(`code`),
+    PRIMARY KEY (`input_frequency_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `traffic_light_levels` (
+    `traffic_light_level_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(50) NOT NULL,
+    `name` VARCHAR(120) NOT NULL,
+    `description` TEXT NULL,
+    `severity_rank` SMALLINT NOT NULL,
+    `hex_color` VARCHAR(7) NULL,
+    `is_active` BOOLEAN NOT NULL DEFAULT true,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_traffic_light_levels_code`(`code`),
+    UNIQUE INDEX `uq_traffic_light_levels_severity_rank`(`severity_rank`),
+    PRIMARY KEY (`traffic_light_level_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `data_sources` (
+    `data_source_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(50) NOT NULL,
+    `name` VARCHAR(120) NOT NULL,
+    `description` TEXT NULL,
+    `source_type` VARCHAR(30) NOT NULL,
+    `is_external` BOOLEAN NOT NULL DEFAULT false,
+    `supports_automation` BOOLEAN NOT NULL DEFAULT false,
+    `is_active` BOOLEAN NOT NULL DEFAULT true,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_data_sources_code`(`code`),
+    INDEX `ix_data_sources_source_type`(`source_type`),
+    PRIMARY KEY (`data_source_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `kpi_configuration_statuses` (
+    `kpi_configuration_status_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(30) NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `description` TEXT NULL,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_kpi_configuration_statuses_code`(`code`),
+    PRIMARY KEY (`kpi_configuration_status_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `evaluation_types` (
+    `evaluation_type_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `code` VARCHAR(30) NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `description` TEXT NULL,
+    `display_order` SMALLINT NOT NULL DEFAULT 1,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_evaluation_types_code`(`code`),
+    PRIMARY KEY (`evaluation_type_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `kpi_definitions` (
+    `kpi_definition_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `kpi_code` VARCHAR(30) NOT NULL,
+    `kpi_name` VARCHAR(200) NOT NULL,
+    `description` TEXT NOT NULL,
+    `kpi_category_id` BIGINT NOT NULL,
+    `status_code` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    `is_active` BOOLEAN NOT NULL DEFAULT true,
+    `deleted_at` DATETIME(3) NULL,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_kpi_definitions_code`(`kpi_code`),
+    INDEX `ix_kpi_definitions_category`(`kpi_category_id`),
+    INDEX `ix_kpi_definitions_status`(`status_code`),
+    PRIMARY KEY (`kpi_definition_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `kpi_configurations` (
+    `kpi_configuration_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `kpi_definition_id` BIGINT NOT NULL,
+    `config_code` VARCHAR(40) NOT NULL,
+    `measurement_unit_id` BIGINT NOT NULL,
+    `input_frequency_id` BIGINT NOT NULL,
+    `primary_data_source_id` BIGINT NOT NULL,
+    `kpi_configuration_status_id` BIGINT NOT NULL,
+    `notes` TEXT NULL,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    UNIQUE INDEX `uq_kpi_configurations_code`(`config_code`),
+    INDEX `ix_kpi_configurations_definition`(`kpi_definition_id`),
+    INDEX `ix_kpi_configurations_measurement_unit`(`measurement_unit_id`),
+    INDEX `ix_kpi_configurations_input_frequency`(`input_frequency_id`),
+    INDEX `ix_kpi_configurations_primary_source`(`primary_data_source_id`),
+    INDEX `ix_kpi_configurations_status`(`kpi_configuration_status_id`),
+    PRIMARY KEY (`kpi_configuration_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `kpi_configuration_revisions` (
+    `kpi_configuration_revision_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `kpi_configuration_id` BIGINT NOT NULL,
+    `revision_number` INTEGER UNSIGNED NOT NULL,
+    `target_value` DECIMAL(20, 6) NULL,
+    `evaluation_type_id` BIGINT NOT NULL,
+    `effective_from` DATE NOT NULL,
+    `effective_to` DATE NULL,
+    `change_reason` VARCHAR(500) NULL,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    INDEX `ix_kpi_configuration_revisions_effective_lookup`(`kpi_configuration_id`, `effective_from`, `effective_to`),
+    INDEX `ix_kpi_configuration_revisions_evaluation_type`(`evaluation_type_id`),
+    UNIQUE INDEX `uq_kpi_configuration_revision_number`(`kpi_configuration_id`, `revision_number`),
+    PRIMARY KEY (`kpi_configuration_revision_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- CreateTable
+CREATE TABLE `kpi_configuration_revision_thresholds` (
+    `kpi_configuration_revision_threshold_id` BIGINT NOT NULL AUTO_INCREMENT,
+    `kpi_configuration_revision_id` BIGINT NOT NULL,
+    `traffic_light_level_id` BIGINT NOT NULL,
+    `range_min_percent` DECIMAL(9, 4) NOT NULL,
+    `range_max_percent` DECIMAL(9, 4) NOT NULL,
+    `includes_min` BOOLEAN NOT NULL DEFAULT true,
+    `includes_max` BOOLEAN NOT NULL DEFAULT false,
+    `display_order` SMALLINT NOT NULL DEFAULT 1,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `created_by_user_id` BIGINT NULL,
+    `updated_at` DATETIME(3) NULL,
+    `updated_by_user_id` BIGINT NULL,
+
+    INDEX `ix_kpi_configuration_revision_thresholds_traffic_light`(`traffic_light_level_id`),
+    UNIQUE INDEX `uq_kpi_configuration_revision_threshold_level`(`kpi_configuration_revision_id`, `traffic_light_level_id`),
+    UNIQUE INDEX `uq_kpi_configuration_revision_threshold_order`(`kpi_configuration_revision_id`, `display_order`),
+    PRIMARY KEY (`kpi_configuration_revision_threshold_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+-- AddForeignKey
+ALTER TABLE `kpi_definitions` ADD CONSTRAINT `fk_kpi_definitions_category` FOREIGN KEY (`kpi_category_id`) REFERENCES `kpi_categories`(`kpi_category_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_definition` FOREIGN KEY (`kpi_definition_id`) REFERENCES `kpi_definitions`(`kpi_definition_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_measurement_unit` FOREIGN KEY (`measurement_unit_id`) REFERENCES `measurement_units`(`measurement_unit_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_frequency` FOREIGN KEY (`input_frequency_id`) REFERENCES `input_frequencies`(`input_frequency_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_primary_source` FOREIGN KEY (`primary_data_source_id`) REFERENCES `data_sources`(`data_source_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_status` FOREIGN KEY (`kpi_configuration_status_id`) REFERENCES `kpi_configuration_statuses`(`kpi_configuration_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configuration_revisions` ADD CONSTRAINT `fk_kpi_configuration_revisions_configuration` FOREIGN KEY (`kpi_configuration_id`) REFERENCES `kpi_configurations`(`kpi_configuration_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configuration_revisions` ADD CONSTRAINT `fk_kpi_configuration_revisions_evaluation_type` FOREIGN KEY (`evaluation_type_id`) REFERENCES `evaluation_types`(`evaluation_type_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configuration_revision_thresholds` ADD CONSTRAINT `fk_kpi_configuration_revision_thresholds_revision` FOREIGN KEY (`kpi_configuration_revision_id`) REFERENCES `kpi_configuration_revisions`(`kpi_configuration_revision_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `kpi_configuration_revision_thresholds` ADD CONSTRAINT `fk_kpi_configuration_revision_thresholds_traffic_light` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels`(`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Prisma does not model MySQL CHECK constraints. Preserve the approved SQL rules here.
+ALTER TABLE `kpi_categories`
+  ADD CONSTRAINT `chk_kpi_categories_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`code`)) > 0),
+  ADD CONSTRAINT `chk_kpi_categories_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0);
+ALTER TABLE `measurement_units`
+  ADD CONSTRAINT `chk_measurement_units_decimal_places` CHECK (`decimal_places` BETWEEN 0 AND 8),
+  ADD CONSTRAINT `chk_measurement_units_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`code`)) > 0),
+  ADD CONSTRAINT `chk_measurement_units_symbol_not_blank` CHECK (CHAR_LENGTH(TRIM(`symbol`)) > 0),
+  ADD CONSTRAINT `chk_measurement_units_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0);
+ALTER TABLE `input_frequencies`
+  ADD CONSTRAINT `chk_input_frequencies_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`code`)) > 0),
+  ADD CONSTRAINT `chk_input_frequencies_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0),
+  ADD CONSTRAINT `chk_input_frequencies_months_range` CHECK (`months_per_period` BETWEEN 1 AND 12),
+  ADD CONSTRAINT `chk_input_frequencies_periods_range` CHECK (`periods_per_year` IS NULL OR `periods_per_year` BETWEEN 1 AND 12),
+  ADD CONSTRAINT `chk_input_frequencies_year_consistency` CHECK (`periods_per_year` IS NULL OR (`months_per_period` * `periods_per_year`) = 12);
+ALTER TABLE `traffic_light_levels`
+  ADD CONSTRAINT `chk_traffic_light_levels_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`code`)) > 0),
+  ADD CONSTRAINT `chk_traffic_light_levels_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0),
+  ADD CONSTRAINT `chk_traffic_light_levels_severity_rank` CHECK (`severity_rank` > 0),
+  ADD CONSTRAINT `chk_traffic_light_levels_hex_color` CHECK (`hex_color` IS NULL OR REGEXP_LIKE(`hex_color`, '^#[0-9A-Fa-f]{6}$'));
+ALTER TABLE `data_sources`
+  ADD CONSTRAINT `chk_data_sources_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`code`)) > 0),
+  ADD CONSTRAINT `chk_data_sources_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0),
+  ADD CONSTRAINT `chk_data_sources_source_type` CHECK (`source_type` IN ('DATABASE', 'API', 'FILE', 'MANUAL', 'OTHER'));
+ALTER TABLE `kpi_configuration_statuses`
+  ADD CONSTRAINT `chk_kpi_configuration_statuses_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`code`)) > 0),
+  ADD CONSTRAINT `chk_kpi_configuration_statuses_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0);
+ALTER TABLE `evaluation_types`
+  ADD CONSTRAINT `chk_evaluation_types_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`code`)) > 0),
+  ADD CONSTRAINT `chk_evaluation_types_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`name`)) > 0),
+  ADD CONSTRAINT `chk_evaluation_types_display_order` CHECK (`display_order` > 0);
+ALTER TABLE `kpi_definitions`
+  ADD CONSTRAINT `chk_kpi_definitions_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`kpi_code`)) > 0),
+  ADD CONSTRAINT `chk_kpi_definitions_name_not_blank` CHECK (CHAR_LENGTH(TRIM(`kpi_name`)) > 0),
+  ADD CONSTRAINT `chk_kpi_definitions_description_not_blank` CHECK (CHAR_LENGTH(TRIM(`description`)) > 0),
+  ADD CONSTRAINT `chk_kpi_definitions_status` CHECK (`status_code` IN ('ACTIVE', 'INACTIVE')),
+  ADD CONSTRAINT `chk_kpi_definitions_status_consistency` CHECK ((`status_code` = 'ACTIVE' AND `is_active` = TRUE) OR (`status_code` = 'INACTIVE' AND `is_active` = FALSE)),
+  ADD CONSTRAINT `chk_kpi_definitions_deleted_status` CHECK (`deleted_at` IS NULL OR `status_code` = 'INACTIVE');
+ALTER TABLE `kpi_configurations`
+  ADD CONSTRAINT `chk_kpi_configurations_code_not_blank` CHECK (CHAR_LENGTH(TRIM(`config_code`)) > 0);
+ALTER TABLE `kpi_configuration_revisions`
+  ADD CONSTRAINT `chk_kpi_configuration_revisions_revision_number` CHECK (`revision_number` > 0),
+  ADD CONSTRAINT `chk_kpi_configuration_revisions_effective_range` CHECK (`effective_to` IS NULL OR `effective_to` >= `effective_from`);
+ALTER TABLE `kpi_configuration_revision_thresholds`
+  ADD CONSTRAINT `chk_kpi_configuration_revision_thresholds_min_nonnegative` CHECK (`range_min_percent` >= 0),
+  ADD CONSTRAINT `chk_kpi_configuration_revision_thresholds_valid_range` CHECK (`range_max_percent` >= `range_min_percent`),
+  ADD CONSTRAINT `chk_kpi_configuration_revision_thresholds_display_order` CHECK (`display_order` > 0);
+

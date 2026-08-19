@@ -16,13 +16,38 @@ Before changing this service, read:
 ```bash
 npm install
 npm run prisma:generate
+npm run prisma:seed
 npm run typecheck
 npm test
 npm run dev
 ```
 
-The service defaults to port `4001`. The shared multi-service environment will be owned by `backend/compose.yaml` when it is implemented.
+The service defaults to port `4001`. The shared environment is orchestrated by `backend/docker-compose.yml`.
+
+API documentation is available at `GET /api/docs`. Business endpoints use the
+`/api/v1` base path, while health remains under `/api/health`.
+
+`TEMPORARY_ACTOR_USER_ID` is an optional development-only audit identity seam.
+When absent, nullable audit user IDs remain `null`. Replace the middleware with
+the future EXA/JWT identity resolver; clients cannot provide the actor through a
+public request header.
 
 ## Current scope
 
-This commit establishes the service boundary and a minimal health endpoint. Prisma domain models, migrations, catalog seeds, authentication, OpenAPI, and KPI business endpoints are intentionally subsequent vertical slices.
+The first functional slice implements KPI Definition and the active KPI Category
+lookup. Authentication, KPI Configuration, and official catalog seed values are
+intentionally outside this increment.
+
+## Initial KPI Definition data
+
+`npm run prisma:seed` imports the normalized KPI Definition development dataset
+audited from the current frontend mock service. It matches categories by `code`
+and definitions by `kpiCode`, creates missing records, and preserves existing
+records without overwriting API edits. The same importer can be run explicitly:
+
+```bash
+npm run prisma:import:kpi-definitions
+```
+
+See `context/KPI_DEFINITION_MOCK_AUDIT.md` for included, excluded, and conflicting
+mock fields. The frontend mocks remain in place until a later API-integration task.

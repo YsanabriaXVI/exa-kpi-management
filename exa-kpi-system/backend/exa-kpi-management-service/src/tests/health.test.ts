@@ -1,6 +1,9 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "../app.js";
+import { prisma } from "../config/database/prisma.js";
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("health routes", () => {
   it("returns the service liveness status", async () => {
@@ -17,5 +20,13 @@ describe("health routes", () => {
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe("ROUTE_NOT_FOUND");
+  });
+
+  it("returns 503 when the database dependency is unavailable", async () => {
+    vi.spyOn(prisma, "$queryRaw").mockRejectedValueOnce(new Error("unavailable"));
+    const response = await request(app).get("/api/health/ready");
+
+    expect(response.status).toBe(503);
+    expect(response.body.error.code).toBe("DATABASE_UNAVAILABLE");
   });
 });

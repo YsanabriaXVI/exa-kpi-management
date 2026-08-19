@@ -6,6 +6,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4001),
   CORS_ORIGIN: z.string().min(1).default("http://localhost:5173"),
   DATABASE_URL: z.string().min(1),
+  TEMPORARY_ACTOR_USER_ID: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().regex(/^[1-9]\d*$/).optional(),
+  ),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });
 

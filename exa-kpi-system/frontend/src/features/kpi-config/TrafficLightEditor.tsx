@@ -39,17 +39,20 @@ export function TrafficLightEditor({ value, onChange }: TrafficLightEditorProps)
     from: keyof TrafficLightRanges;
     to: keyof TrafficLightRanges;
   }> = [
-    { key: "green", label: "Green", from: "greenFrom", to: "greenTo" },
-    { key: "yellow", label: "Yellow", from: "yellowFrom", to: "yellowTo" },
     { key: "red", label: "Red", from: "redFrom", to: "redTo" },
+    { key: "yellow", label: "Yellow", from: "yellowFrom", to: "yellowTo" },
+    { key: "green", label: "Green", from: "greenFrom", to: "greenTo" },
   ];
 
   return (
     <section className="traffic-editor">
       <div className="traffic-heading">
-        <div>
-          <h2>Traffic Light</h2>
-          <p>Edit the six values or drag either handle on the visual range.</p>
+        <div className="traffic-heading-title">
+          <span className="step-number">3</span>
+          <div>
+            <h2>Traffic Light</h2>
+            <p>Edit the six values or drag either handle on the visual range.</p>
+          </div>
         </div>
         <span>Score scale: 0–100</span>
       </div>

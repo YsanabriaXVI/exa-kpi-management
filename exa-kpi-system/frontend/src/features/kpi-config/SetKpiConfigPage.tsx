@@ -1,12 +1,13 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, Plus, Search, ShieldAlert, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { kpiDefinitionService } from "../kpi-definition/kpi-definition.service";
-import type { KpiDefinition } from "../kpi-definition/kpi-definition.types";
+import { kpiDefinitionKeys, kpiDefinitionService } from "../kpi-definition/kpi-definition.service";
+import { ApiError } from "../../api/http-client";
+import type { LegacyKpiDefinitionOption } from "../kpi-definition/kpi-definition.types";
 import { kpiConfigService } from "./kpi-config.service";
 import { TrafficLightEditor } from "./TrafficLightEditor";
-import type { TrafficLightRanges } from "./kpi-config.types";
+import type { KpiConfigRecord, TrafficLightRanges } from "./kpi-config.types";
 import "./kpi-config.css";
 
 const defaultRanges: TrafficLightRanges = {
@@ -20,59 +21,81 @@ export function SetKpiConfigPage() {
   const definitionSearchRef = useRef<HTMLDivElement>(null);
   const initializedEditRef = useRef<number | null>(null);
   const openedFromDefinitionOverview = searchParams.get("from") === "definition-overview";
+  const requestedDefinitionId = searchParams.get("kpiDefinitionId") ?? "";
   const requestedConfigId = Number(searchParams.get("kpiConfigId"));
   const isEditing = Number.isFinite(requestedConfigId) && requestedConfigId > 0;
   const definitionLocked = openedFromDefinitionOverview || isEditing;
-  const [search, setSearch] = useState(() => definitionLocked ? "" : window.localStorage.getItem("exa:kpi-config-search-draft") ?? "");
+  const storedDefinitionId = window.localStorage.getItem("exa:kpi-config-selected-draft") ?? "";
+  const initialDefinitionId = requestedDefinitionId || (!openedFromDefinitionOverview ? storedDefinitionId : "");
+  const [searchTerm, setSearchTerm] = useState(() => definitionLocked ? "" : window.localStorage.getItem("exa:kpi-config-search-draft") ?? "");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  const [selected, setSelected] = useState<KpiDefinition | null>(null);
-  const [lastSelectedDefinitionId, setLastSelectedDefinitionId] = useState<number | null>(() => {
+  const [selected, setSelected] = useState<LegacyKpiDefinitionOption | null>(null);
+  const [lastSelectedDefinitionId, setLastSelectedDefinitionId] = useState<string | null>(() => {
     const stored = window.localStorage.getItem("exa:last-kpi-definition");
-    return stored ? Number(stored) : null;
+    return stored || null;
   });
   const [goal, setGoal] = useState("");
   const [measurementUnit, setMeasurementUnit] = useState("");
   const [dataSource, setDataSource] = useState("");
+  const [isActive, setIsActive] = useState(true);
   const [ranges, setRanges] = useState(defaultRanges);
   const [error, setError] = useState("");
   const [lockedDefinitionNotice, setLockedDefinitionNotice] = useState(false);
 
-  const definitionsQuery = useQuery({
-    queryKey: ["kpi-definitions"],
-    queryFn: kpiDefinitionService.list,
+  const requestedDefinitionQuery = useQuery({
+    queryKey: ["kpi-definitions", "detail", initialDefinitionId],
+    queryFn: () => kpiDefinitionService.get(initialDefinitionId),
+    enabled: !isEditing && Boolean(initialDefinitionId),
+  });
+  const selectedDefinitionLabel = selected ? `${selected.code} — ${selected.name}` : "";
+  const searchQueryTerm = autocompleteQueryTerm(debouncedSearchTerm, selectedDefinitionLabel);
+  const definitionsSearchQuery = useQuery({
+    queryKey: ["kpi-definitions", "search", searchQueryTerm],
+    queryFn: () => kpiDefinitionService.searchActiveOptions(searchQueryTerm),
+    enabled: !definitionLocked && suggestionsOpen,
+    staleTime: 60 * 1000,
   });
   const editConfigQuery = useQuery({
     queryKey: ["kpi-config-detail", requestedConfigId],
     queryFn: () => kpiConfigService.getDetail(requestedConfigId),
     enabled: isEditing,
+    staleTime: 30 * 1000,
   });
 
   useEffect(() => {
-    if (isEditing) return;
-    const requestedId = Number(searchParams.get("kpiDefinitionId"));
-    const draftId = Number(window.localStorage.getItem("exa:kpi-config-selected-draft"));
-    const definitionId = requestedId || (!openedFromDefinitionOverview ? draftId : 0);
-    const match = definitionsQuery.data?.find((definition) => definition.id === definitionId);
-    if (match && !selected) {
-      setSelected(match);
-      setSearch(`${match.code} — ${match.name}`);
-    }
-  }, [definitionsQuery.data, isEditing, openedFromDefinitionOverview, searchParams, selected]);
+    const definition = requestedDefinitionQuery.data;
+    if (isEditing || !definition?.isActive || selected) return;
+    const option: LegacyKpiDefinitionOption = { id: definition.id, code: definition.kpiCode, name: definition.kpiName, objective: definition.description, status: definition.status };
+    setSelected(option);
+    setSearchTerm(`${option.code} — ${option.name}`);
+  }, [isEditing, requestedDefinitionQuery.data, selected]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     const config = editConfigQuery.data;
     if (!isEditing || !config || initializedEditRef.current === config.id) return;
-    const definition = definitionsQuery.data?.find((item) => item.id === config.definitionId);
-    if (!definition) return;
+    const definition = {
+      id: String(config.definitionId),
+      code: config.definitionCode,
+      name: config.definitionName,
+      objective: "",
+      status: "ACTIVE" as const,
+    };
 
     initializedEditRef.current = config.id;
     setSelected(definition);
-    setSearch(`${definition.code} — ${definition.name}`);
+    setSearchTerm(`${definition.code} — ${definition.name}`);
     setGoal(String(config.goal));
     setMeasurementUnit(config.measurementUnit);
     setDataSource(config.dataSource);
+    setIsActive(config.isActive ?? config.status !== "INACTIVE");
     setRanges({ ...config.ranges });
-  }, [definitionsQuery.data, editConfigQuery.data, isEditing]);
+  }, [editConfigQuery.data, isEditing]);
 
   useEffect(() => {
     const closeSuggestions = () => {
@@ -95,28 +118,7 @@ export function SetKpiConfigPage() {
     };
   }, []);
 
-  const normalizeDefinitionText = (value: string) => value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[—–·-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const selectedDefinitionLabel = selected ? `${selected.code} — ${selected.name}` : "";
-  const normalizedSearch = normalizeDefinitionText(search);
-  const isExactSelectedLabel = Boolean(selectedDefinitionLabel)
-    && normalizedSearch === normalizeDefinitionText(selectedDefinitionLabel);
-  const suggestions = useMemo(() => {
-    if (!normalizedSearch || isExactSelectedLabel) return [];
-    return (definitionsQuery.data ?? [])
-      .filter((definition) =>
-        definition.status === "ACTIVE" &&
-        normalizeDefinitionText(`${definition.code} ${definition.name} ${definition.objective}`)
-          .includes(normalizedSearch),
-      )
-      .sort((a, b) => Number(b.id === lastSelectedDefinitionId) - Number(a.id === lastSelectedDefinitionId))
-      .slice(0, 6);
-  }, [definitionsQuery.data, isExactSelectedLabel, lastSelectedDefinitionId, normalizedSearch]);
+  const suggestions = definitionsSearchQuery.data ?? [];
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -129,6 +131,7 @@ export function SetKpiConfigPage() {
               measurementUnit,
               dataSource,
               ranges,
+              isActive,
             },
             { code: selected!.code, name: selected!.name },
           )
@@ -139,23 +142,34 @@ export function SetKpiConfigPage() {
               measurementUnit,
               dataSource,
               ranges,
+              isActive,
             },
             { code: selected!.code, name: selected!.name },
           ),
-    onSuccess: () => {
+    onSuccess: (savedConfiguration) => {
       window.localStorage.removeItem("exa:kpi-config-selected-draft");
       window.localStorage.removeItem("exa:kpi-config-search-draft");
-      queryClient.invalidateQueries({ queryKey: ["kpi-configurations"] });
-      navigate("/app/kpi-management/config/overview?created=1");
+      queryClient.setQueryData<KpiConfigRecord[]>(["kpi-configurations"], (current) => current
+        ? [savedConfiguration, ...current.filter((configuration) => configuration.id !== savedConfiguration.id)]
+        : [savedConfiguration]);
+      const createdQuery = new URLSearchParams({ created: String(savedConfiguration.id), createdCode: savedConfiguration.code });
+      navigate(`/app/kpi-management/config/overview?${createdQuery}`);
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["kpi-configurations"], refetchType: "active" }),
+        queryClient.invalidateQueries({ queryKey: kpiDefinitionKeys.configurations(selected!.id), refetchType: "active" }),
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(mutationError instanceof ApiError ? mutationError.message : "KPI Configuration could not be saved.");
     },
   });
 
-  const selectDefinition = (definition: KpiDefinition) => {
+  const selectDefinition = (definition: LegacyKpiDefinitionOption) => {
     setSelected(definition);
     setLastSelectedDefinitionId(definition.id);
     window.localStorage.setItem("exa:last-kpi-definition", String(definition.id));
     const selectedLabel = `${definition.code} — ${definition.name}`;
-    setSearch(selectedLabel);
+    setSearchTerm(selectedLabel);
     if (!definitionLocked) {
       window.localStorage.setItem("exa:kpi-config-selected-draft", String(definition.id));
       window.localStorage.setItem("exa:kpi-config-search-draft", selectedLabel);
@@ -179,7 +193,7 @@ export function SetKpiConfigPage() {
     window.localStorage.removeItem("exa:last-kpi-definition");
     window.localStorage.removeItem("exa:kpi-config-selected-draft");
     window.localStorage.removeItem("exa:kpi-config-search-draft");
-    setSearch("");
+    setSearchTerm("");
     setSuggestionsOpen(false);
     setError("");
   };
@@ -191,19 +205,22 @@ export function SetKpiConfigPage() {
       return;
     }
     const ordered =
+      ranges.redFrom === 0 &&
       ranges.redFrom <= ranges.redTo &&
-      ranges.redTo < ranges.yellowFrom &&
+      ranges.yellowFrom === ranges.redTo + 1 &&
       ranges.yellowFrom <= ranges.yellowTo &&
-      ranges.yellowTo < ranges.greenFrom &&
-      ranges.greenFrom <= ranges.greenTo;
+      ranges.greenFrom === ranges.yellowTo + 1 &&
+      ranges.greenFrom <= ranges.greenTo &&
+      ranges.greenTo === 100;
     if (!ordered) {
-      setError("Traffic light ranges must be ordered and cannot overlap.");
+      setError("Traffic light ranges must be continuous from Red 0 through Yellow to Green 100, without gaps or overlaps.");
       return;
     }
+    setError("");
     saveMutation.mutate();
   };
 
-  if (isEditing && (editConfigQuery.isLoading || definitionsQuery.isLoading)) {
+  if (isEditing && editConfigQuery.isLoading) {
     return (
       <main className="kpi-config-page set-kpi-config-page">
         <div className="config-edit-loading" role="status">Loading KPI Configuration…</div>
@@ -236,10 +253,11 @@ export function SetKpiConfigPage() {
           <div className="definition-autocomplete" ref={definitionSearchRef}>
             <Search size={17} />
             <input
-              value={search}
+              value={searchTerm}
               readOnly={definitionLocked}
               aria-readonly={definitionLocked}
               onFocus={() => { if (!definitionLocked) setSuggestionsOpen(true); }}
+              onClick={() => { if (definitionLocked) showLockedDefinitionNotice(); }}
               onKeyDown={(event) => {
                 if (selected && (event.key === "Backspace" || event.key === "Delete")) {
                   if (definitionLocked) {
@@ -254,13 +272,9 @@ export function SetKpiConfigPage() {
                   return;
                 }
                 const value = event.target.value;
-                setSearch(value);
+                setSearchTerm(value);
                 window.localStorage.setItem("exa:kpi-config-search-draft", value);
-                const selectedCode = normalizeDefinitionText(selected?.code ?? "");
-                const nextValue = normalizeDefinitionText(value);
-                const keepsSelectedCode = Boolean(selectedCode)
-                  && (nextValue === selectedCode || nextValue.startsWith(`${selectedCode} `));
-                if (selected && !keepsSelectedCode) {
+                if (selected && !isCompatibleWithSelection(value, selected)) {
                   setSelected(null);
                   window.localStorage.removeItem("exa:kpi-config-selected-draft");
                 }
@@ -280,12 +294,10 @@ export function SetKpiConfigPage() {
                 {definitionLocked ? <ShieldAlert size={16} /> : <X size={16} />}
               </button>
             )}
-            {suggestionsOpen && !isExactSelectedLabel && (
+            {suggestionsOpen && !definitionLocked && (!selected || searchTerm !== selectedDefinitionLabel) && (
               <div className="definition-suggestions">
-                {definitionsQuery.isLoading ? (
+                {definitionsSearchQuery.isFetching || debouncedSearchTerm !== searchTerm ? (
                   <div className="no-suggestions"><Search size={20} /><strong>Searching KPI Definitions...</strong></div>
-                ) : !normalizedSearch ? (
-                  <div className="no-suggestions"><Search size={20} /><strong>Type to see suggestions</strong><span>Search by KPI code, name or objective.</span></div>
                 ) : suggestions.length ? suggestions.map((definition) => (
                   <button type="button" key={definition.id} onClick={() => selectDefinition(definition)}>
                     <span className="suggestion-code">{definition.code}</span>
@@ -293,7 +305,7 @@ export function SetKpiConfigPage() {
                     {selected?.id === definition.id && <Check size={15} />}
                   </button>
                 )) : (
-                  <div className="no-suggestions"><Search size={20} /><strong>No KPI Definition Found</strong><span>Try another code or name.</span></div>
+                  <div className="no-suggestions"><Search size={20} /><strong>No matching active KPI Definitions</strong><span>Try another code, name or objective.</span></div>
                 )}
               </div>
             )}
@@ -317,6 +329,22 @@ export function SetKpiConfigPage() {
         </section>
 
         <section className="config-card"><TrafficLightEditor value={ranges} onChange={setRanges} /></section>
+        <section className="config-card configuration-status-card">
+          <div className="config-section-heading">
+            <span className="step-number">4</span>
+            <div><h2>Configuration Status</h2></div>
+          </div>
+          <div className="configuration-status-content">
+            <p>This configuration will be available for KPI Pools and Scorecards.</p>
+            <label className="configuration-status-toggle">
+              <span>Status</span>
+              <button type="button" className={`status-toggle ${isActive ? "active" : ""}`} role="switch" aria-checked={isActive} onClick={() => setIsActive((current) => !current)}>
+                <span className="toggle-track" aria-hidden="true"><i /></span>
+                <strong>{isActive ? "Active" : "Inactive"}</strong>
+              </button>
+            </label>
+          </div>
+        </section>
         {error && <div className="config-error">{error}</div>}
         <footer className="config-form-actions">
           <button type="button" className="button secondary" onClick={() => navigate("/app/kpi-management/config/overview")}><ArrowLeft size={15} /> Back to Overview</button>
@@ -335,4 +363,29 @@ export function SetKpiConfigPage() {
       )}
     </main>
   );
+}
+
+function normalizeAutocompleteText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[—–·._]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function autocompleteQueryTerm(value: string, selectedLabel: string) {
+  if (value === selectedLabel) return "";
+  const cleaned = value.trim().replace(/[.]+$/g, "").trim();
+  const separator = cleaned.search(/[—–]/);
+  if (separator >= 0) {
+    const namePart = cleaned.slice(separator + 1).trim();
+    if (namePart) return namePart;
+    return cleaned.slice(0, separator).trim();
+  }
+  return cleaned;
+}
+
+function isCompatibleWithSelection(value: string, definition: LegacyKpiDefinitionOption) {
+  const typed = normalizeAutocompleteText(value);
+  if (!typed) return false;
+  const label = normalizeAutocompleteText(`${definition.code} ${definition.name}`);
+  const code = normalizeAutocompleteText(definition.code);
+  const name = normalizeAutocompleteText(definition.name);
+  return label.startsWith(typed) || code.startsWith(typed) || name.startsWith(typed) || label.includes(typed);
 }

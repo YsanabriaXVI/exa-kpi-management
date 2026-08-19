@@ -30,7 +30,13 @@
 .action-toast.bottom { bottom: 24px; }
 .action-toast.success { --toast-accent: #27a765; }
 .action-toast.info { --toast-accent: #2782a7; }
-.action-toast.warning { --toast-accent: #c58a18; }
+.action-toast.warning {
+  --toast-accent: #c77b08;
+  border-width: 2px;
+  background: color-mix(in srgb, var(--toast-accent) 14%, var(--ems-surface));
+  box-shadow: 0 16px 38px rgb(146 88 4 / 28%);
+  font-weight: 750;
+}
 .action-toast.error { --toast-accent: #d34d4d; }
 .action-toast-icon { color: var(--toast-accent); }
 

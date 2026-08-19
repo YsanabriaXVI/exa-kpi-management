@@ -7,5 +7,213 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Domain models will be translated from
-// databases/exa-kpi-management-service.mysql8.sql in the next database slice.
+model KpiCategory {
+  id              BigInt          @id @default(autoincrement()) @map("kpi_category_id")
+  code            String          @unique(map: "uq_kpi_categories_code") @db.VarChar(50)
+  name            String          @db.VarChar(120)
+  description     String?         @db.Text
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?         @map("created_by_user_id")
+  updatedAt       DateTime?       @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?         @map("updated_by_user_id")
+  definitions     KpiDefinition[]
+
+  @@map("kpi_categories")
+}
+
+model MeasurementUnit {
+  id              BigInt             @id @default(autoincrement()) @map("measurement_unit_id")
+  code            String             @unique(map: "uq_measurement_units_code") @db.VarChar(50)
+  symbol          String             @unique(map: "uq_measurement_units_symbol") @db.VarChar(50)
+  name            String             @db.VarChar(120)
+  description     String?            @db.Text
+  decimalPlaces   Int                @default(2) @map("decimal_places") @db.SmallInt
+  isPercentage    Boolean            @default(false) @map("is_percentage")
+  isActive        Boolean            @default(true) @map("is_active")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?            @map("created_by_user_id")
+  updatedAt       DateTime?          @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?            @map("updated_by_user_id")
+  configurations  KpiConfiguration[]
+
+  @@map("measurement_units")
+}
+
+model InputFrequency {
+  id              BigInt             @id @default(autoincrement()) @map("input_frequency_id")
+  code            String             @unique(map: "uq_input_frequencies_code") @db.VarChar(50)
+  name            String             @db.VarChar(120)
+  description     String?            @db.Text
+  monthsPerPeriod Int                @map("months_per_period") @db.SmallInt
+  periodsPerYear  Int?               @map("periods_per_year") @db.SmallInt
+  isActive        Boolean            @default(true) @map("is_active")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?            @map("created_by_user_id")
+  updatedAt       DateTime?          @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?            @map("updated_by_user_id")
+  configurations  KpiConfiguration[]
+
+  @@map("input_frequencies")
+}
+
+model TrafficLightLevel {
+  id              BigInt                              @id @default(autoincrement()) @map("traffic_light_level_id")
+  code            String                              @unique(map: "uq_traffic_light_levels_code") @db.VarChar(50)
+  name            String                              @db.VarChar(120)
+  description     String?                             @db.Text
+  severityRank    Int                                 @unique(map: "uq_traffic_light_levels_severity_rank") @map("severity_rank") @db.SmallInt
+  hexColor        String?                             @map("hex_color") @db.VarChar(7)
+  isActive        Boolean                             @default(true) @map("is_active")
+  createdAt       DateTime                            @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?                             @map("created_by_user_id")
+  updatedAt       DateTime?                           @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?                             @map("updated_by_user_id")
+  thresholds      KpiConfigurationRevisionThreshold[]
+
+  @@map("traffic_light_levels")
+}
+
+model DataSource {
+  id                 BigInt             @id @default(autoincrement()) @map("data_source_id")
+  code               String             @unique(map: "uq_data_sources_code") @db.VarChar(50)
+  name               String             @db.VarChar(120)
+  description        String?            @db.Text
+  sourceType         String             @map("source_type") @db.VarChar(30)
+  isExternal         Boolean            @default(false) @map("is_external")
+  supportsAutomation Boolean            @default(false) @map("supports_automation")
+  isActive           Boolean            @default(true) @map("is_active")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId    BigInt?            @map("created_by_user_id")
+  updatedAt          DateTime?          @map("updated_at") @db.DateTime(3)
+  updatedByUserId    BigInt?            @map("updated_by_user_id")
+  configurations     KpiConfiguration[]
+
+  @@index([sourceType], map: "ix_data_sources_source_type")
+  @@map("data_sources")
+}
+
+model KpiConfigurationStatus {
+  id              BigInt             @id @default(autoincrement()) @map("kpi_configuration_status_id")
+  code            String             @unique(map: "uq_kpi_configuration_statuses_code") @db.VarChar(30)
+  name            String             @db.VarChar(100)
+  description     String?            @db.Text
+  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?            @map("created_by_user_id")
+  updatedAt       DateTime?          @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?            @map("updated_by_user_id")
+  configurations  KpiConfiguration[]
+
+  @@map("kpi_configuration_statuses")
+}
+
+model EvaluationType {
+  id              BigInt                     @id @default(autoincrement()) @map("evaluation_type_id")
+  code            String                     @unique(map: "uq_evaluation_types_code") @db.VarChar(30)
+  name            String                     @db.VarChar(100)
+  description     String?                    @db.Text
+  displayOrder    Int                        @default(1) @map("display_order") @db.SmallInt
+  createdAt       DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?                    @map("created_by_user_id")
+  updatedAt       DateTime?                  @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?                    @map("updated_by_user_id")
+  revisions       KpiConfigurationRevision[]
+
+  @@map("evaluation_types")
+}
+
+model KpiDefinition {
+  id              BigInt             @id @default(autoincrement()) @map("kpi_definition_id")
+  kpiCode         String             @unique(map: "uq_kpi_definitions_code") @map("kpi_code") @db.VarChar(30)
+  kpiName         String             @map("kpi_name") @db.VarChar(200)
+  description     String             @db.Text
+  kpiCategoryId   BigInt             @map("kpi_category_id")
+  statusCode      String             @default("ACTIVE") @map("status_code") @db.VarChar(20)
+  isActive        Boolean            @default(true) @map("is_active")
+  deletedAt       DateTime?          @map("deleted_at") @db.DateTime(3)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?            @map("created_by_user_id")
+  updatedAt       DateTime?          @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?            @map("updated_by_user_id")
+  category        KpiCategory        @relation(fields: [kpiCategoryId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_definitions_category")
+  configurations  KpiConfiguration[]
+
+  @@index([kpiCategoryId], map: "ix_kpi_definitions_category")
+  @@index([statusCode], map: "ix_kpi_definitions_status")
+  @@map("kpi_definitions")
+}
+
+model KpiConfiguration {
+  id                       BigInt                     @id @default(autoincrement()) @map("kpi_configuration_id")
+  kpiDefinitionId          BigInt                     @map("kpi_definition_id")
+  configCode               String                     @unique(map: "uq_kpi_configurations_code") @map("config_code") @db.VarChar(40)
+  measurementUnitId        BigInt                     @map("measurement_unit_id")
+  inputFrequencyId         BigInt                     @map("input_frequency_id")
+  primaryDataSourceId      BigInt                     @map("primary_data_source_id")
+  kpiConfigurationStatusId BigInt                     @map("kpi_configuration_status_id")
+  notes                    String?                    @db.Text
+  deletedAt                DateTime?                  @map("deleted_at") @db.DateTime(3)
+  createdAt                DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId          BigInt?                    @map("created_by_user_id")
+  updatedAt                DateTime?                  @map("updated_at") @db.DateTime(3)
+  updatedByUserId          BigInt?                    @map("updated_by_user_id")
+  definition               KpiDefinition              @relation(fields: [kpiDefinitionId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_definition")
+  measurementUnit          MeasurementUnit            @relation(fields: [measurementUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_measurement_unit")
+  inputFrequency           InputFrequency             @relation(fields: [inputFrequencyId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_frequency")
+  primaryDataSource        DataSource                 @relation(fields: [primaryDataSourceId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_primary_source")
+  status                   KpiConfigurationStatus     @relation(fields: [kpiConfigurationStatusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_status")
+  revisions                KpiConfigurationRevision[]
+
+  @@index([kpiDefinitionId], map: "ix_kpi_configurations_definition")
+  @@index([measurementUnitId], map: "ix_kpi_configurations_measurement_unit")
+  @@index([inputFrequencyId], map: "ix_kpi_configurations_input_frequency")
+  @@index([primaryDataSourceId], map: "ix_kpi_configurations_primary_source")
+  @@index([kpiConfigurationStatusId], map: "ix_kpi_configurations_status")
+  @@index([deletedAt], map: "ix_kpi_configurations_deleted_at")
+  @@map("kpi_configurations")
+}
+
+model KpiConfigurationRevision {
+  id                 BigInt                              @id @default(autoincrement()) @map("kpi_configuration_revision_id")
+  kpiConfigurationId BigInt                              @map("kpi_configuration_id")
+  revisionNumber     Int                                 @map("revision_number") @db.UnsignedInt
+  targetValue        Decimal?                            @map("target_value") @db.Decimal(20, 6)
+  evaluationTypeId   BigInt                              @map("evaluation_type_id")
+  effectiveFrom      DateTime                            @map("effective_from") @db.Date
+  effectiveTo        DateTime?                           @map("effective_to") @db.Date
+  changeReason       String?                             @map("change_reason") @db.VarChar(500)
+  createdAt          DateTime                            @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId    BigInt?                             @map("created_by_user_id")
+  updatedAt          DateTime?                           @map("updated_at") @db.DateTime(3)
+  updatedByUserId    BigInt?                             @map("updated_by_user_id")
+  configuration      KpiConfiguration                    @relation(fields: [kpiConfigurationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_configuration")
+  evaluationType     EvaluationType                      @relation(fields: [evaluationTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_evaluation_type")
+  thresholds         KpiConfigurationRevisionThreshold[]
+
+  @@unique([kpiConfigurationId, revisionNumber], map: "uq_kpi_configuration_revision_number")
+  @@index([kpiConfigurationId, effectiveFrom, effectiveTo], map: "ix_kpi_configuration_revisions_effective_lookup")
+  @@index([evaluationTypeId], map: "ix_kpi_configuration_revisions_evaluation_type")
+  @@map("kpi_configuration_revisions")
+}
+
+model KpiConfigurationRevisionThreshold {
+  id                         BigInt                   @id @default(autoincrement()) @map("kpi_configuration_revision_threshold_id")
+  kpiConfigurationRevisionId BigInt                   @map("kpi_configuration_revision_id")
+  trafficLightLevelId        BigInt                   @map("traffic_light_level_id")
+  rangeMinPercent            Decimal                  @map("range_min_percent") @db.Decimal(9, 4)
+  rangeMaxPercent            Decimal                  @map("range_max_percent") @db.Decimal(9, 4)
+  includesMin                Boolean                  @default(true) @map("includes_min")
+  includesMax                Boolean                  @default(false) @map("includes_max")
+  displayOrder               Int                      @default(1) @map("display_order") @db.SmallInt
+  createdAt                  DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId            BigInt?                  @map("created_by_user_id")
+  updatedAt                  DateTime?                @map("updated_at") @db.DateTime(3)
+  updatedByUserId            BigInt?                  @map("updated_by_user_id")
+  revision                   KpiConfigurationRevision @relation(fields: [kpiConfigurationRevisionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_configuration_revision_thresholds_revision")
+  trafficLightLevel          TrafficLightLevel        @relation(fields: [trafficLightLevelId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revision_thresholds_traffic_light")
+
+  @@unique([kpiConfigurationRevisionId, trafficLightLevelId], map: "uq_kpi_configuration_revision_threshold_level")
+  @@unique([kpiConfigurationRevisionId, displayOrder], map: "uq_kpi_configuration_revision_threshold_order")
+  @@index([trafficLightLevelId], map: "ix_kpi_configuration_revision_thresholds_traffic_light")
+  @@map("kpi_configuration_revision_thresholds")
+}

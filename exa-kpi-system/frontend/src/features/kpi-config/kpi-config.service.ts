@@ -1,5 +1,6 @@
 import type { KpiConfigInput, KpiConfigRecord } from "./kpi-config.types";
 import { kpiResults } from "../monitoring-results/monitoring-results.data";
+import { apiRequest } from "../../api/http-client";
 
 let configurations: KpiConfigRecord[] = [
   {
@@ -69,7 +70,7 @@ let configurations: KpiConfigRecord[] = [
     measurementUnit: "Incidents",
     evaluationType: "Lower is better",
     dataSource: "Manual Entry",
-    ranges: { redFrom: 66, redTo: 100, yellowFrom: 31, yellowTo: 65, greenFrom: 0, greenTo: 30 },
+    ranges: { redFrom: 0, redTo: 30, yellowFrom: 31, yellowTo: 65, greenFrom: 66, greenTo: 100 },
     usedIn: 1,
     status: "CONFIGURED",
     createdAt: "2026-03-09T11:50:00",
@@ -97,7 +98,7 @@ configurations = [
       evaluationType: lowerIsBetter ? "Lower is better" : "Higher is better",
       dataSource: kpi.dataSource,
       ranges: lowerIsBetter
-        ? { redFrom: 66, redTo: 100, yellowFrom: 31, yellowTo: 65, greenFrom: 0, greenTo: 30 }
+        ? { redFrom: 0, redTo: 30, yellowFrom: 31, yellowTo: 65, greenFrom: 66, greenTo: 100 }
         : { redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100 },
       usedIn: 1 + (definitionId % 3),
       status: "CONFIGURED",
@@ -119,7 +120,7 @@ const determineEvaluationType = (name: string) => {
     : "Higher is better";
 };
 
-export const kpiConfigService = {
+export const kpiConfigMockService = {
   async list() {
     await wait();
     return configurations.map((config) => ({ ...config, ranges: { ...config.ranges } }));
@@ -209,5 +210,27 @@ export const kpiConfigService = {
         updatedBy: "Carlos Gomez",
       };
     });
+  },
+};
+
+const envelope = <T>(path: string, init?: RequestInit) => apiRequest<{ data: T }>(path, init).then((response) => response.data);
+
+export const kpiConfigService = {
+  async list(): Promise<KpiConfigRecord[]> {
+    const response = await apiRequest<{ data: KpiConfigRecord[] }>("/v1/kpi-configurations?page=1&pageSize=100");
+    return response.data;
+  },
+  getDetail(id: number) { return envelope<KpiConfigRecord>(`/v1/kpi-configurations/${id}`); },
+  create(input: KpiConfigInput, _definition: { code: string; name: string }) {
+    return envelope<KpiConfigRecord>("/v1/kpi-configurations", { method: "POST", body: JSON.stringify(input) });
+  },
+  update(id: number, input: KpiConfigInput, _definition: { code: string; name: string }) {
+    return envelope<KpiConfigRecord>(`/v1/kpi-configurations/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+  },
+  deactivate(id: number) { return envelope<KpiConfigRecord>(`/v1/kpi-configurations/${id}/deactivate`, { method: "PATCH" }); },
+  softDelete(id: number) { return envelope<KpiConfigRecord>(`/v1/kpi-configurations/${id}`, { method: "DELETE" }); },
+  markAssignedToPool(ids: number[], poolName: string) {
+    // Transitional compatibility for KPI Pool, which remains mock-backed.
+    return kpiConfigMockService.markAssignedToPool(ids, poolName);
   },
 };

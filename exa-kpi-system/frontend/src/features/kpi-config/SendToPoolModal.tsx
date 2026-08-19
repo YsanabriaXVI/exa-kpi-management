@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Check, Layers3, Plus, Search, Send, X } from "lucide-react";
+import { ArrowLeft, Ban, Check, Layers3, Plus, Search, Send, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { kpiPoolService } from "../kpi-pool/kpi-pool.service";
 import type { KpiPoolRecord } from "../kpi-pool/kpi-pool.types";
@@ -62,6 +62,11 @@ export function SendToPoolModal({ configurations, pools, onClose, onAssigned }: 
       setError("Select a KPI Pool to continue.");
       return;
     }
+    const conflict = findDefinitionConflict(pool, items);
+    if (conflict) {
+      setError(`${conflict.definitionCode} is already represented in this Pool. Select only one configuration per KPI Definition.`);
+      return;
+    }
     setError("");
     assignMutation.mutate(pool);
   };
@@ -111,9 +116,10 @@ export function SendToPoolModal({ configurations, pools, onClose, onAssigned }: 
             <div className="send-pool-options" role="radiogroup" aria-label="Available KPI Pools">
               {activePools.length ? activePools.map((pool) => {
                 const alreadyIncluded = items.filter((config) => pool.kpis.some((kpi) => kpi.configCode === config.code)).length;
-                return <button type="button" role="radio" aria-checked={selectedPoolId === pool.id} className={selectedPoolId === pool.id ? "selected" : ""} key={pool.id} onClick={() => { setSelectedPoolId(pool.id); setError(""); }}>
-                  <i>{selectedPoolId === pool.id && <Check size={13} />}</i>
-                  <span><strong>{pool.name}</strong><small>{pool.code} · {pool.companies.join(", ")} · {pool.kpis.length} KPIs{alreadyIncluded ? ` · ${alreadyIncluded} already included` : ""}</small></span>
+                const conflict = findDefinitionConflict(pool, items);
+                return <button type="button" role="radio" aria-checked={selectedPoolId === pool.id} aria-disabled={Boolean(conflict)} className={`${selectedPoolId === pool.id ? "selected" : ""} ${conflict ? "definition-conflict" : ""}`} key={pool.id} onClick={() => { if (conflict) { setError(`${conflict.definitionCode} is already represented in ${pool.name}.`); return; } setSelectedPoolId(pool.id); setError(""); }}>
+                  <i>{conflict ? <Ban size={20} /> : selectedPoolId === pool.id && <Check size={13} />}</i>
+                  <span><strong>{pool.name}</strong><small>{pool.code} · {pool.companies.join(", ")} · {pool.kpis.length} KPIs{alreadyIncluded && !conflict ? ` · ${alreadyIncluded} already included` : ""}</small>{conflict && <em className="pool-definition-conflict-message">{conflict.definitionCode} already has a KPI Configuration in this Pool</em>}</span>
                 </button>;
               }) : <div className="send-pool-empty"><Layers3 size={25} /><strong>No active KPI Pools found</strong><span>Create one and the selected KPIs will be added automatically.</span></div>}
             </div>
@@ -133,4 +139,15 @@ export function SendToPoolModal({ configurations, pools, onClose, onAssigned }: 
       </section>
     </div>
   );
+}
+
+function findDefinitionConflict(pool: KpiPoolRecord, configurations: KpiConfigRecord[]) {
+  const assignedDefinitionIds = new Set(pool.kpis.map((kpi) => kpi.definitionId));
+  const incomingDefinitionIds = new Set<string>();
+  return configurations.find((configuration) => {
+    const definitionId = String(configuration.definitionId);
+    if (assignedDefinitionIds.has(definitionId) || incomingDefinitionIds.has(definitionId)) return true;
+    incomingDefinitionIds.add(definitionId);
+    return false;
+  });
 }

@@ -1,6 +1,7 @@
 export type PoolStatus = "ACTIVE" | "INACTIVE";
 
 export type PoolKpi = {
+  definitionId: string;
   configCode: string;
   kpiCode: string;
   name: string;

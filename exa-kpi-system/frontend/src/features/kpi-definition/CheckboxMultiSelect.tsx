@@ -27,8 +27,18 @@ export function CheckboxMultiSelect({
     const closeOutside = (event: MouseEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
     };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        containerRef.current?.querySelector<HTMLButtonElement>(":scope > button")?.focus();
+      }
+    };
     document.addEventListener("mousedown", closeOutside);
-    return () => document.removeEventListener("mousedown", closeOutside);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOutside);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
   }, []);
 
   const toggle = (value: string) => {

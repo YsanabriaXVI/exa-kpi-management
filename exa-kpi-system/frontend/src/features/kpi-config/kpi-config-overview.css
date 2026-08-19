@@ -21,7 +21,7 @@
 
 .kpi-config-page .config-overview-toolbar {
   padding: 12px;
-  grid-template-columns: minmax(320px, 380px) repeat(4, minmax(185px, 205px));
+  grid-template-columns: minmax(320px, 380px) minmax(260px, 1fr) repeat(3, minmax(185px, 205px));
   align-items: start;
   justify-content: start;
   gap: 10px;
@@ -370,8 +370,10 @@ html[data-theme="dark"] .config-bulk-bar{color:var(--ems-text);border-color:#356
 
 /* Larger, draggable Send to Pool modal. */
 .send-pool-modal>header{cursor:grab;user-select:none;touch-action:none}.send-pool-modal.dragging>header{cursor:grabbing}.send-pool-modal>header h2{font-size:23px}.send-pool-modal>header p{font-size:14px}.send-pool-selected-summary{font-size:14px}.send-pool-search input{font-size:13.5px}.send-pool-options strong{font-size:16px}.send-pool-options small{margin-top:5px;font-size:13.5px;line-height:1.45}.send-pool-options>button{padding:14px 13px;grid-template-columns:21px 1fr;gap:11px}.send-pool-options>button>i{width:20px;height:20px}.send-pool-create-link{font-size:14px}.send-pool-empty strong{font-size:15px}.send-pool-empty span{font-size:13px}
+.send-pool-options>button.definition-conflict{border-color:#efb5b5;background:#fff7f7;cursor:not-allowed}.send-pool-options>button.definition-conflict:hover{border-color:#e58b8b;background:#fff1f1}.send-pool-options>button.definition-conflict>i{border:0;color:#dc3f3f;background:transparent}.pool-definition-conflict-message{display:block;margin-top:7px;color:#bc2929;font-size:14px;font-style:normal;font-weight:850;line-height:1.35}
 
 html[data-theme="dark"] .config-bulk-bar{color:var(--ems-text);border-color:#465567;background:#273444;box-shadow:none}html[data-theme="dark"] .config-bulk-count>span{color:#cfe6ee;background:#3a5260}html[data-theme="dark"] .button.config-send-pool-button{color:#d9edf4;border-color:#496777;background:#344c59}
+html[data-theme="dark"] .send-pool-options>button.definition-conflict{border-color:#8f4549;background:#3b292e}html[data-theme="dark"] .send-pool-options>button.definition-conflict:hover{border-color:#b75b60;background:#452b31}html[data-theme="dark"] .pool-definition-conflict-message{color:#ff9297}
 
 @media(max-width:650px){.config-bulk-bar{width:100%}.send-pool-modal{transform:none!important}.send-pool-modal>header{cursor:default}}
 

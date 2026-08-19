@@ -3,28 +3,28 @@ import type { ScorecardRecord } from "../scorecards/scorecard.types";
 import type { KpiPoolInput, KpiPoolRecord, ManageablePoolKpi, PoolKpi, PoolScorecard } from "./kpi-pool.types";
 
 const sampleKpis: PoolKpi[] = [
-  { configCode: "KPC-049-01", kpiCode: "KPI-049", name: "Reduce operating costs", category: "Financial", goal: "Reduce 20%", measurementUnit: "%", dataSource: "EMS - SAP Integration", status: "ACTIVE" },
-  { configCode: "KPC-050-01", kpiCode: "KPI-050", name: "Productivity kms/head", category: "Financial", goal: "3,700 kms", measurementUnit: "$/km", dataSource: "EMS - GPS Integration", status: "ACTIVE" },
-  { configCode: "KPC-051-01", kpiCode: "KPI-051", name: "Increase container sales", category: "Financial", goal: "+100", measurementUnit: "$", dataSource: "Depot - EMS", status: "ACTIVE" },
-  { configCode: "KPC-052-01", kpiCode: "KPI-052", name: "Transport damage", category: "Quality", goal: "0 damage", measurementUnit: "Count", dataSource: "EMS", status: "ACTIVE" },
-  { configCode: "KPC-053-01", kpiCode: "KPI-053", name: "Increase Genset sales", category: "Quality", goal: "+5%", measurementUnit: "$", dataSource: "Depot - EMS", status: "ACTIVE" },
+  { definitionId: "3", configCode: "KPC-049-01", kpiCode: "KPI-049", name: "Reduce operating costs", category: "Financial", goal: "Reduce 20%", measurementUnit: "%", dataSource: "EMS - SAP Integration", status: "ACTIVE" },
+  { definitionId: "4", configCode: "KPC-050-01", kpiCode: "KPI-050", name: "Productivity kms/head", category: "Financial", goal: "3,700 kms", measurementUnit: "$/km", dataSource: "EMS - GPS Integration", status: "ACTIVE" },
+  { definitionId: "2", configCode: "KPC-051-01", kpiCode: "KPI-051", name: "Increase container sales", category: "Financial", goal: "+100", measurementUnit: "$", dataSource: "Depot - EMS", status: "ACTIVE" },
+  { definitionId: "5", configCode: "KPC-052-01", kpiCode: "KPI-052", name: "Transport damage", category: "Quality", goal: "0 damage", measurementUnit: "Count", dataSource: "EMS", status: "ACTIVE" },
+  { definitionId: "6", configCode: "KPC-053-01", kpiCode: "KPI-053", name: "Increase Genset sales", category: "Quality", goal: "+5%", measurementUnit: "$", dataSource: "Depot - EMS", status: "ACTIVE" },
 ];
 
 let kpiCatalog: PoolKpi[] = [
   ...sampleKpis,
-  { configCode: "KPC-052-02", kpiCode: "KPI-058", name: "On-time delivery without service incidents", category: "Operations", goal: "100%", measurementUnit: "%", dataSource: "EMS", status: "ACTIVE" },
-  { configCode: "KPC-054-01", kpiCode: "KPI-054", name: "Fleet availability", category: "Operations", goal: "95%", measurementUnit: "%", dataSource: "GPS Integration", status: "ACTIVE" },
-  { configCode: "KPC-055-01", kpiCode: "KPI-055", name: "Customer claim resolution", category: "Quality", goal: "48 hours", measurementUnit: "Hours", dataSource: "CRM", status: "INACTIVE" },
+  { definitionId: "legacy:58", configCode: "KPC-052-02", kpiCode: "KPI-058", name: "On-time delivery without service incidents", category: "Operations", goal: "100%", measurementUnit: "%", dataSource: "EMS", status: "ACTIVE" },
+  { definitionId: "7", configCode: "KPC-054-01", kpiCode: "KPI-054", name: "Fleet availability", category: "Operations", goal: "95%", measurementUnit: "%", dataSource: "GPS Integration", status: "ACTIVE" },
+  { definitionId: "legacy:55", configCode: "KPC-055-01", kpiCode: "KPI-055", name: "Customer claim resolution", category: "Quality", goal: "48 hours", measurementUnit: "Hours", dataSource: "CRM", status: "INACTIVE" },
 ];
 
 const hiddenKpisByPool = new Map<number, Set<string>>();
 
 const importableKpis: PoolKpi[] = [
-  { configCode: "KPC-056-01", kpiCode: "KPI-056", name: "Fuel efficiency per route", category: "Operations", goal: "8.5 km/L", measurementUnit: "km/L", dataSource: "GPS Integration", status: "ACTIVE" },
-  { configCode: "KPC-057-01", kpiCode: "KPI-057", name: "Invoice collection cycle", category: "Financial", goal: "30 days", measurementUnit: "Days", dataSource: "SAP", status: "ACTIVE" },
-  { configCode: "KPC-059-01", kpiCode: "KPI-059", name: "Preventive maintenance compliance", category: "Quality", goal: "98%", measurementUnit: "%", dataSource: "EMS", status: "ACTIVE" },
-  { configCode: "KPC-060-01", kpiCode: "KPI-060", name: "Legacy fuel variance control", category: "Operations", goal: "5%", measurementUnit: "%", dataSource: "Legacy GPS", status: "INACTIVE" },
-  { configCode: "KPC-061-01", kpiCode: "KPI-061", name: "Manual invoice exception rate", category: "Financial", goal: "2%", measurementUnit: "%", dataSource: "Excel Import", status: "INACTIVE" },
+  { definitionId: "legacy:56", configCode: "KPC-056-01", kpiCode: "KPI-056", name: "Fuel efficiency per route", category: "Operations", goal: "8.5 km/L", measurementUnit: "km/L", dataSource: "GPS Integration", status: "ACTIVE" },
+  { definitionId: "legacy:57", configCode: "KPC-057-01", kpiCode: "KPI-057", name: "Invoice collection cycle", category: "Financial", goal: "30 days", measurementUnit: "Days", dataSource: "SAP", status: "ACTIVE" },
+  { definitionId: "legacy:59", configCode: "KPC-059-01", kpiCode: "KPI-059", name: "Preventive maintenance compliance", category: "Quality", goal: "98%", measurementUnit: "%", dataSource: "EMS", status: "ACTIVE" },
+  { definitionId: "legacy:60", configCode: "KPC-060-01", kpiCode: "KPI-060", name: "Legacy fuel variance control", category: "Operations", goal: "5%", measurementUnit: "%", dataSource: "Legacy GPS", status: "INACTIVE" },
+  { definitionId: "8", configCode: "KPC-061-01", kpiCode: "KPI-061", name: "Manual invoice exception rate", category: "Financial", goal: "2%", measurementUnit: "%", dataSource: "Excel Import", status: "INACTIVE" },
 ];
 
 const sampleScorecards: PoolScorecard[] = [
@@ -124,7 +124,7 @@ export const kpiPoolService = {
     return {
       id: Number(kpi.configCode.replace(/\D/g, "")) || 0,
       code: kpi.configCode,
-      definitionId: Number(kpi.kpiCode.replace(/\D/g, "")) || 0,
+      definitionId: kpi.definitionId,
       definitionCode: kpi.kpiCode,
       definitionName: kpi.name,
       goal: numericGoal,
@@ -184,7 +184,9 @@ export const kpiPoolService = {
     const pool = pools.find((item) => item.id === poolId);
     if (!pool) throw new Error("KPI Pool not found.");
     const current = new Set(pool.kpis.map((kpi) => kpi.configCode));
-    const additions = kpiCatalog.filter((kpi) => configCodes.includes(kpi.configCode) && kpi.status === "ACTIVE" && !current.has(kpi.configCode));
+    const candidates = kpiCatalog.filter((kpi) => configCodes.includes(kpi.configCode) && kpi.status === "ACTIVE" && !current.has(kpi.configCode));
+    assertUniqueDefinitions(pool, candidates);
+    const additions = candidates;
     pool.kpis = [...pool.kpis, ...additions.map((kpi) => ({ ...kpi }))];
     return clone(pool);
   },
@@ -195,6 +197,7 @@ export const kpiPoolService = {
 
     const eligible = configurations.filter((config) => config.status === "CONFIGURED");
     const incoming: PoolKpi[] = eligible.map((config) => ({
+      definitionId: String(config.definitionId),
       configCode: config.code,
       kpiCode: config.definitionCode,
       name: config.definitionName,
@@ -204,14 +207,14 @@ export const kpiPoolService = {
       dataSource: config.dataSource,
       status: "ACTIVE",
     }));
+    const currentCodes = new Set(pool.kpis.map((kpi) => kpi.configCode));
+    const additions = incoming.filter((kpi) => !currentCodes.has(kpi.configCode));
+    assertUniqueDefinitions(pool, additions);
     const catalogCodes = new Set(kpiCatalog.map((kpi) => kpi.configCode));
     kpiCatalog = [
       ...kpiCatalog,
       ...incoming.filter((kpi) => !catalogCodes.has(kpi.configCode)).map((kpi) => ({ ...kpi })),
     ];
-
-    const currentCodes = new Set(pool.kpis.map((kpi) => kpi.configCode));
-    const additions = incoming.filter((kpi) => !currentCodes.has(kpi.configCode));
     pool.kpis = [...pool.kpis, ...additions.map((kpi) => ({ ...kpi }))];
     return { pool: clone(pool), addedCount: additions.length };
   },
@@ -241,3 +244,13 @@ export const kpiPoolService = {
     return { ...current, status: "INACTIVE" as const };
   },
 };
+
+function assertUniqueDefinitions(pool: KpiPoolRecord, additions: PoolKpi[]) {
+  const assignedDefinitionIds = new Set(pool.kpis.map((kpi) => kpi.definitionId));
+  for (const addition of additions) {
+    if (assignedDefinitionIds.has(addition.definitionId)) {
+      throw new Error(`KPI_DEFINITION_ALREADY_ASSIGNED: ${addition.kpiCode} is already represented in this Pool.`);
+    }
+    assignedDefinitionIds.add(addition.definitionId);
+  }
+}

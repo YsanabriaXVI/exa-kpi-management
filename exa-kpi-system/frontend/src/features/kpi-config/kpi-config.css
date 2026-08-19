@@ -370,6 +370,134 @@ html[data-theme="dark"] .set-kpi-config-page .dual-range input::-moz-range-thumb
   background: #86c9e0;
 }
 
+.set-kpi-config-page .definition-search-row {
+  max-width: 1080px;
+}
+
+.set-kpi-config-page .traffic-heading-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.set-kpi-config-page .configuration-status-content {
+  min-width: 150px;
+  padding-left: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 44px;
+}
+
+.set-kpi-config-page .configuration-status-toggle > span {
+  display: block;
+  margin-bottom: 0;
+  color: #596477;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.set-kpi-config-page .configuration-status-toggle {
+  min-width: 125px;
+  display: grid;
+}
+
+.set-kpi-config-page .configuration-status-content p {
+  margin: 0;
+  color: #818b99;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.set-kpi-config-page .configuration-status-toggle > button {
+  min-height: 30px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #687386;
+  cursor: pointer;
+  text-align: left;
+  background: transparent;
+  font: inherit;
+}
+
+.set-kpi-config-page .configuration-status-toggle .toggle-track {
+  position: relative;
+  width: 46px;
+  height: 25px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #aeb5bf;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.set-kpi-config-page .configuration-status-toggle .toggle-track i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(23, 32, 51, 0.25);
+  transition: transform 180ms ease;
+}
+
+.set-kpi-config-page .configuration-status-toggle > button strong {
+  min-width: 58px;
+  font-size: 14px;
+}
+
+.set-kpi-config-page .configuration-status-toggle > button.active {
+  color: #21804c;
+}
+
+.set-kpi-config-page .configuration-status-toggle > button.active .toggle-track {
+  background: #21aa66;
+}
+
+.set-kpi-config-page .configuration-status-toggle > button.active .toggle-track i {
+  transform: translateX(21px);
+}
+
+.set-kpi-config-page .configuration-status-toggle > button:focus-visible .toggle-track {
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(33, 170, 102, 0.2);
+}
+
+html[data-theme="dark"] .set-kpi-config-page .configuration-status-toggle > button {
+  color: #c6cfdb;
+  background: transparent;
+}
+
+html[data-theme="dark"] .set-kpi-config-page .configuration-status-toggle > button.active {
+  color: #75dda5;
+}
+
+html[data-theme="dark"] .set-kpi-config-page .configuration-status-toggle > span {
+  color: #e8edf5;
+}
+
+html[data-theme="dark"] .set-kpi-config-page .configuration-status-content p {
+  color: #aeb9c8;
+}
+
+@media (max-width: 650px) {
+  .set-kpi-config-page .configuration-status-content {
+    padding-left: 0;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .set-kpi-config-page .configuration-status-content p {
+    white-space: normal;
+  }
+}
+
 html[data-theme="dark"] .set-kpi-config-page .config-fields-grid label > span,
 html[data-theme="dark"] .set-kpi-config-page .range-input-labels,
 html[data-theme="dark"] .set-kpi-config-page .range-name,

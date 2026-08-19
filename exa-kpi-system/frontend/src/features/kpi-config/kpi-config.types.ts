@@ -12,7 +12,7 @@ export type TrafficLightRanges = {
 export type KpiConfigRecord = {
   id: number;
   code: string;
-  definitionId: number;
+  definitionId: string | number;
   definitionCode: string;
   definitionName: string;
   goal: number;
@@ -22,6 +22,7 @@ export type KpiConfigRecord = {
   ranges: TrafficLightRanges;
   usedIn: number;
   status: KpiConfigStatus;
+  isActive?: boolean;
   createdAt: string;
   createdBy: string;
   updatedAt: string;
@@ -29,18 +30,11 @@ export type KpiConfigRecord = {
   poolNames: string[];
 };
 
-export type KpiConfigInput = Omit<
-  KpiConfigRecord,
-  | "id"
-  | "code"
-  | "definitionCode"
-  | "definitionName"
-  | "evaluationType"
-  | "usedIn"
-  | "status"
-  | "createdAt"
-  | "createdBy"
-  | "updatedAt"
-  | "updatedBy"
-  | "poolNames"
->;
+export type KpiConfigInput = {
+  definitionId: string | number;
+  goal: number;
+  measurementUnit: string;
+  dataSource: string;
+  ranges: TrafficLightRanges;
+  isActive: boolean;
+};

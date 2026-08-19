@@ -90,7 +90,11 @@ export function ManagePoolKpis() {
       queryClient.invalidateQueries({ queryKey: ["kpi-pools"] }),
     ]);
   };
-  const addMutation = useMutation({ mutationFn: (codes: string[]) => kpiPoolService.addKpis(poolId, codes), onSuccess: async (_, codes) => { setNotice(codes.length === 1 ? `${codes[0]} was linked to this Pool.` : `${codes.length} KPI Configurations were linked to this Pool.`); await refresh(); } });
+  const addMutation = useMutation({
+    mutationFn: (codes: string[]) => kpiPoolService.addKpis(poolId, codes),
+    onSuccess: async (_, codes) => { setNoticeTone("success"); setNotice(codes.length === 1 ? `${codes[0]} was linked to this Pool.` : `${codes.length} KPI Configurations were linked to this Pool.`); await refresh(); },
+    onError: (mutationError) => { setNoticeTone("warning"); setNotice(mutationError instanceof Error ? mutationError.message.replace("KPI_DEFINITION_ALREADY_ASSIGNED: ", "") : "The selected KPI Configurations could not be linked."); },
+  });
   const removeMutation = useMutation({ mutationFn: (codes: string[]) => kpiPoolService.removeKpis(poolId, codes), onSuccess: async (_, codes) => { setNotice(codes.length === 1 ? `${codes[0]} was unlinked from this Pool.` : `${codes.length} KPI Configurations were unlinked from this Pool.`); await refresh(); } });
   const hideMutation = useMutation({
     mutationFn: (codes: string[]) => kpiPoolService.hideKpisFromPool(poolId, codes),
@@ -165,7 +169,19 @@ export function ManagePoolKpis() {
     setSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" }));
     setPage(1);
   };
-  const toggle = (code: string) => setSelected((current) => current.includes(code) ? current.filter((item) => item !== code) : [...current, code]);
+  const toggle = (code: string) => setSelected((current) => {
+    if (current.includes(code)) return current.filter((item) => item !== code);
+    const candidate = records.find((item) => item.configCode === code);
+    if (!candidate) return current;
+    const alreadyInPool = (poolQuery.data?.kpis ?? []).some((item) => item.definitionId === candidate.definitionId && item.configCode !== code);
+    const alreadySelected = current.some((selectedCode) => records.find((item) => item.configCode === selectedCode)?.definitionId === candidate.definitionId);
+    if (alreadyInPool || alreadySelected) {
+      setNoticeTone("warning");
+      setNotice(`${candidate.kpiCode} is already represented in this Pool. Select only one configuration per KPI Definition.`);
+      return current;
+    }
+    return [...current, code];
+  });
   const selectedAvailable = selected.filter((code) => records.find((item) => item.configCode === code)?.availability === "AVAILABLE");
   const selectedIncluded = selected.filter((code) => records.find((item) => item.configCode === code)?.availability === "IN_POOL");
   return (

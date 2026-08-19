@@ -1,0 +1,72 @@
+name: exa-kpi-backend
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: exa-kpi-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-exa_root_dev}
+      MYSQL_DATABASE: exa_kpi_management
+      MYSQL_USER: ${MYSQL_USER:-exa_kpi_management}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-exa_kpi_dev}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infrastructure/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - exa-kpi-network
+
+  exa-kpi-management-service:
+    build:
+      context: ./exa-kpi-management-service
+      dockerfile: Dockerfile.dev
+    container_name: exa-kpi-management-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4001
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      DATABASE_URL: mysql://${MYSQL_USER:-exa_kpi_management}:${MYSQL_PASSWORD:-exa_kpi_dev}@mysql:3306/exa_kpi_management
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TEMPORARY_ACTOR_USER_ID: ${TEMPORARY_ACTOR_USER_ID:-}
+    ports:
+      - "${KPI_MANAGEMENT_PORT:-4001}:4001"
+    command: ["sh", "-c", "npm run prisma:migrate:deploy && npm run prisma:seed && npm run dev"]
+    volumes:
+      - ./exa-kpi-management-service:/app
+      - kpi_management_node_modules:/app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - exa-kpi-network
+
+  adminer:
+    image: adminer:latest
+    container_name: exa-kpi-adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - exa-kpi-network
+    profiles: ["tools"]
+
+volumes:
+  mysql_data:
+  kpi_management_node_modules:
+
+networks:
+  exa-kpi-network:
+    name: exa-kpi-network
+    driver: bridge
