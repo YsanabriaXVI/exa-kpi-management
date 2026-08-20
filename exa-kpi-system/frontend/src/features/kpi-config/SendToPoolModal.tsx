@@ -49,6 +49,7 @@ export function SendToPoolModal({ configurations, pools, onClose, onAssigned }: 
       setStep("success");
       onAssigned();
       queryClient.invalidateQueries({ queryKey: ["kpi-configurations"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-pool-configuration-usage"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-pools"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-pool", assignment.pool.id] });
     },

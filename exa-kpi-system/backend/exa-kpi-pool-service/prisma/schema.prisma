@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model PoolArea {
+  id              BigInt        @id @default(autoincrement()) @map("pool_area_id")
+  code            String        @unique(map: "uq_pool_areas_code") @db.VarChar(20)
+  name            String        @db.VarChar(120)
+  description     String?       @db.Text
+  displayOrder    Int           @default(1) @map("display_order") @db.SmallInt
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId BigInt?       @map("created_by_user_id")
+  updatedAt       DateTime?     @map("updated_at") @db.DateTime(3)
+  updatedByUserId BigInt?       @map("updated_by_user_id")
+  pools           KpiPoolArea[]
+
+  @@index([isActive, displayOrder, code], map: "ix_pool_areas_lookup")
+  @@map("pool_areas")
+}
+
+model CompanyReference {
+  externalCompanyId BigInt           @id @map("external_company_id")
+  code              String           @unique(map: "uq_company_references_code") @db.VarChar(30)
+  name              String           @db.VarChar(150)
+  displayOrder      Int              @default(1) @map("display_order") @db.SmallInt
+  isActive          Boolean          @default(true) @map("is_active")
+  sourceVersion     BigInt?          @map("source_version")
+  sourceUpdatedAt   DateTime?        @map("source_updated_at") @db.DateTime(3)
+  syncedAt          DateTime         @default(now()) @map("synced_at") @db.DateTime(3)
+  pools             KpiPoolCompany[]
+
+  @@index([isActive, displayOrder, code], map: "ix_company_references_lookup")
+  @@map("company_references")
+}
+
+model InputFrequencyReference {
+  externalInputFrequencyId BigInt    @id @map("external_input_frequency_id")
+  code                     String    @unique(map: "uq_input_frequency_references_code") @db.VarChar(50)
+  name                     String    @db.VarChar(120)
+  monthsPerPeriod          Int       @map("months_per_period") @db.SmallInt
+  periodsPerYear           Int?      @map("periods_per_year") @db.SmallInt
+  displayOrder             Int       @default(1) @map("display_order") @db.SmallInt
+  isActive                 Boolean   @default(true) @map("is_active")
+  sourceVersion            BigInt?   @map("source_version")
+  sourceUpdatedAt          DateTime? @map("source_updated_at") @db.DateTime(3)
+  syncedAt                 DateTime  @default(now()) @map("synced_at") @db.DateTime(3)
+
+  @@index([isActive, displayOrder, code], map: "ix_input_frequency_references_lookup")
+  @@map("input_frequency_references")
+}
+
+model KpiPoolCodeSequence {
+  id           BigInt   @id @default(autoincrement()) @map("kpi_pool_code_sequence_id")
+  areaScopeKey String   @map("area_scope_key") @db.VarChar(255)
+  issueYear    Int      @map("issue_year") @db.SmallInt
+  lastSequence Int      @default(0) @map("last_sequence") @db.UnsignedInt
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.DateTime(3)
+
+  @@unique([areaScopeKey, issueYear], map: "uq_kpi_pool_code_sequence_scope")
+  @@map("kpi_pool_code_sequences")
+}
+
+model KpiPool {
+  id                       BigInt           @id @default(autoincrement()) @map("kpi_pool_id")
+  poolCode                 String           @unique(map: "uq_kpi_pools_code") @map("pool_code") @db.VarChar(500)
+  poolSequence             Int              @map("pool_sequence") @db.UnsignedInt
+  issueYear                Int              @map("issue_year") @db.SmallInt
+  areaScopeKey             String           @map("area_scope_key") @db.VarChar(255)
+  poolName                 String           @map("pool_name") @db.VarChar(200)
+  description              String?          @db.Text
+  notes                    String?          @db.Text
+  inputFrequencyExternalId BigInt           @map("input_frequency_external_id")
+  inputFrequencyCode       String           @map("input_frequency_code") @db.VarChar(50)
+  validFrom                DateTime         @map("valid_from") @db.Date
+  validTo                  DateTime         @map("valid_to") @db.Date
+  statusCode               String           @default("DRAFT") @map("status_code") @db.VarChar(20)
+  aggregateVersion         Int              @default(1) @map("aggregate_version") @db.UnsignedInt
+  deletedAt                DateTime?        @map("deleted_at") @db.DateTime(3)
+  createdAt                DateTime         @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId          BigInt?          @map("created_by_user_id")
+  updatedAt                DateTime?        @map("updated_at") @db.DateTime(3)
+  updatedByUserId          BigInt?          @map("updated_by_user_id")
+  areas                    KpiPoolArea[]
+  companies                KpiPoolCompany[]
+  kpis                     KpiPoolKpi[]
+  periodCompositions       KpiPoolPeriodComposition[]
+
+  @@unique([areaScopeKey, issueYear, poolSequence], map: "uq_kpi_pools_business_scope_sequence")
+  @@index([statusCode, deletedAt], map: "ix_kpi_pools_status")
+  @@index([validFrom, validTo], map: "ix_kpi_pools_validity")
+  @@index([inputFrequencyExternalId], map: "ix_kpi_pools_input_frequency_external")
+  @@map("kpi_pools")
+}
+
+model KpiPoolPeriodComposition {
+  id                BigInt   @id @default(autoincrement()) @map("kpi_pool_period_composition_id")
+  kpiPoolId         BigInt   @map("kpi_pool_id")
+  periodStart       DateTime @map("period_start") @db.Date
+  periodEnd         DateTime @map("period_end") @db.Date
+  statusCode        String   @default("POOL_COMPOSITION_LOCKED") @map("status_code") @db.VarChar(32)
+  kpiCountSnapshot  Int      @map("kpi_count_snapshot") @db.UnsignedInt
+  finalizedAt       DateTime @default(now()) @map("finalized_at") @db.DateTime(3)
+  finalizedByUserId BigInt?  @map("finalized_by_user_id")
+  pool              KpiPool  @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_period_compositions_pool")
+
+  @@unique([kpiPoolId, periodStart], map: "uq_kpi_pool_period_composition")
+  @@index([kpiPoolId, statusCode, periodStart], map: "ix_kpi_pool_period_compositions_status")
+  @@map("kpi_pool_period_compositions")
+}
+
+model KpiPoolArea {
+  id               BigInt   @id @default(autoincrement()) @map("kpi_pool_area_id")
+  kpiPoolId        BigInt   @map("kpi_pool_id")
+  poolAreaId       BigInt   @map("pool_area_id")
+  displayOrder     Int      @map("display_order") @db.SmallInt
+  areaCodeSnapshot String   @map("area_code_snapshot") @db.VarChar(20)
+  areaNameSnapshot String   @map("area_name_snapshot") @db.VarChar(120)
+  createdAt        DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId  BigInt?  @map("created_by_user_id")
+  pool             KpiPool  @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_areas_pool")
+  area             PoolArea @relation(fields: [poolAreaId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_pool_areas_area")
+
+  @@unique([kpiPoolId, poolAreaId], map: "uq_kpi_pool_area")
+  @@unique([kpiPoolId, displayOrder], map: "uq_kpi_pool_area_order")
+  @@index([poolAreaId], map: "ix_kpi_pool_areas_area")
+  @@map("kpi_pool_areas")
+}
+
+model KpiPoolCompany {
+  id                  BigInt           @id @default(autoincrement()) @map("kpi_pool_company_id")
+  kpiPoolId           BigInt           @map("kpi_pool_id")
+  externalCompanyId   BigInt           @map("external_company_id")
+  displayOrder        Int              @map("display_order") @db.SmallInt
+  companyCodeSnapshot String           @map("company_code_snapshot") @db.VarChar(30)
+  companyNameSnapshot String           @map("company_name_snapshot") @db.VarChar(150)
+  createdAt           DateTime         @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId     BigInt?          @map("created_by_user_id")
+  pool                KpiPool          @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_companies_pool")
+  companyReference    CompanyReference @relation(fields: [externalCompanyId], references: [externalCompanyId], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_pool_companies_company_reference")
+
+  @@unique([kpiPoolId, externalCompanyId], map: "uq_kpi_pool_company")
+  @@unique([kpiPoolId, displayOrder], map: "uq_kpi_pool_company_order")
+  @@index([externalCompanyId], map: "ix_kpi_pool_companies_external_company")
+  @@map("kpi_pool_companies")
+}
+
+model KpiPoolKpi {
+  id                               BigInt   @id @default(autoincrement()) @map("kpi_pool_kpi_id")
+  kpiPoolId                        BigInt   @map("kpi_pool_id")
+  kpiDefinitionExternalId          BigInt   @map("kpi_definition_external_id")
+  kpiConfigurationExternalId       BigInt   @map("kpi_configuration_external_id")
+  definitionCodeSnapshot           String   @map("definition_code_snapshot") @db.VarChar(30)
+  definitionNameSnapshot           String   @map("definition_name_snapshot") @db.VarChar(200)
+  configurationCodeSnapshot        String   @map("configuration_code_snapshot") @db.VarChar(40)
+  inputFrequencyExternalIdSnapshot BigInt   @map("input_frequency_external_id_snapshot")
+  inputFrequencyCodeSnapshot       String   @map("input_frequency_code_snapshot") @db.VarChar(50)
+  displayOrder                     Int      @map("display_order") @db.UnsignedInt
+  isRequired                       Boolean  @default(true) @map("is_required")
+  effectiveFrom                    DateTime @map("effective_from") @db.Date
+  effectiveTo                      DateTime? @map("effective_to") @db.Date
+  createdAt                        DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId                  BigInt?  @map("created_by_user_id")
+  updatedAt                        DateTime? @map("updated_at") @db.DateTime(3)
+  updatedByUserId                  BigInt?  @map("updated_by_user_id")
+  pool                             KpiPool  @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_kpis_pool")
+
+  @@index([kpiPoolId, kpiDefinitionExternalId, effectiveFrom, effectiveTo], map: "ix_kpi_pool_kpis_definition_effective")
+  @@index([kpiPoolId, kpiConfigurationExternalId, effectiveFrom, effectiveTo], map: "ix_kpi_pool_kpis_configuration_effective")
+  @@index([kpiPoolId, effectiveFrom, effectiveTo], map: "ix_kpi_pool_kpis_effective")
+  @@map("kpi_pool_kpis")
+}
+
+model OutboxEvent {
+  id               BigInt    @id @default(autoincrement()) @map("outbox_event_id")
+  eventId          String    @unique(map: "uq_outbox_events_event_id") @map("event_id") @db.Char(36)
+  eventType        String    @map("event_type") @db.VarChar(120)
+  aggregateType    String    @map("aggregate_type") @db.VarChar(80)
+  aggregateId      String    @map("aggregate_id") @db.VarChar(100)
+  aggregateVersion Int       @map("aggregate_version") @db.UnsignedInt
+  subject          String    @db.VarChar(200)
+  payload          Json
+  occurredAt       DateTime  @map("occurred_at") @db.DateTime(3)
+  status           String    @default("PENDING") @db.VarChar(20)
+  attemptCount     Int       @default(0) @map("attempt_count") @db.UnsignedInt
+  nextAttemptAt    DateTime? @map("next_attempt_at") @db.DateTime(3)
+  lastError        String?   @map("last_error") @db.Text
+  publishedAt      DateTime? @map("published_at") @db.DateTime(3)
+  lockedAt         DateTime? @map("locked_at") @db.DateTime(3)
+  lockedBy         String?   @map("locked_by") @db.VarChar(100)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime? @map("updated_at") @db.DateTime(3)
+
+  @@index([status, nextAttemptAt, occurredAt], map: "ix_outbox_events_pending")
+  @@index([status, lockedAt], map: "ix_outbox_events_claim")
+  @@index([aggregateType, aggregateId, aggregateVersion], map: "ix_outbox_events_aggregate")
+  @@map("outbox_events")
+}

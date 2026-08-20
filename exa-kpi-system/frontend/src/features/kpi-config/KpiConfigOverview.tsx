@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, CirclePause, Eye, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ConfigMultiSelect } from "./ConfigMultiSelect";
 import {
@@ -16,6 +16,7 @@ import { PaginationControls } from "../../components/PaginationControls";
 import { SendToPoolModal } from "./SendToPoolModal";
 import "./kpi-config.css";
 import { ActionToast } from "../../components/ActionToast";
+import { OverviewDeleteConfirmation } from "../../components/OverviewDeleteConfirmation";
 import "./kpi-config-overview.css";
 
 export function KpiConfigOverview() {
@@ -31,6 +32,7 @@ export function KpiConfigOverview() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedConfigIds, setSelectedConfigIds] = useState<number[]>([]);
   const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [configToDelete, setConfigToDelete] = useState<KpiConfigRecord | null>(null);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<{ key: ConfigSortKey; direction: SortDirection }>({
     key: "code",
@@ -38,21 +40,32 @@ export function KpiConfigOverview() {
   });
   const configsQuery = useQuery({ queryKey: ["kpi-configurations"], queryFn: kpiConfigService.list });
   const poolsQuery = useQuery({ queryKey: ["kpi-pools"], queryFn: kpiPoolService.list });
+  const usageIds = (configsQuery.data ?? []).filter((configuration) => configuration.id > 0 && configuration.status !== "INCOMPLETE").map((configuration) => String(configuration.id));
+  const usageQuery = useQuery({ queryKey: ["kpi-pool-configuration-usage", usageIds.join(",")], queryFn: () => kpiPoolService.getConfigurationUsage(usageIds), enabled: usageIds.length > 0 });
   const deleteMutation = useMutation({
     mutationFn: kpiConfigService.softDelete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["kpi-configurations"] });
+      setConfigToDelete(null);
       setActionToast({ message: "KPI Configuration was removed from the active overview. Its historical data was preserved.", tone: "info" });
     },
   });
   const configurations = useMemo(() => (configsQuery.data ?? []).map((configuration) => {
-    const owningPools = (poolsQuery.data ?? []).filter((pool) => pool.kpis.some((kpi) => kpi.configCode === configuration.code));
-    return { ...configuration, usedIn: owningPools.length, poolNames: owningPools.map((pool) => pool.name) };
-  }), [configsQuery.data, poolsQuery.data]);
+    const usage = (usageQuery.data ?? []).find((value) => value.configurationId === String(configuration.id));
+    return { ...configuration, usedIn: usage?.usedIn ?? 0, poolNames: usage?.pools.map((pool) => pool.name) ?? [] };
+  }), [configsQuery.data, usageQuery.data]);
   const kpiOptions = useMemo(() => [...new Map(configurations.map((config) => [String(config.definitionId), { value: String(config.definitionId), label: config.definitionCode, description: config.definitionName }])).values()], [configurations]);
   const unitOptions = useMemo(() => [...new Set(configurations.map((config) => config.measurementUnit).filter(Boolean))].sort().map((unit) => ({ value: unit, label: unit })), [configurations]);
   const dataSourceOptions = useMemo(() => [...new Set(configurations.map((config) => config.dataSource).filter(Boolean))].sort().map((dataSource) => ({ value: dataSource, label: dataSource })), [configurations]);
-  const statusOptions = useMemo(() => [...new Set(configurations.map((config) => config.status))].sort().map((status) => ({ value: status, label: formatStatus(status) })), [configurations]);
+  const statusOptions = useMemo(() => ([
+    { value: "CONFIGURED", label: "Configured" },
+    { value: "INACTIVE", label: "Inactive" },
+    { value: "INCOMPLETE", label: "Incomplete" },
+  ]), []);
+  const statusCounts = useMemo(() => configurations.reduce((counts, configuration) => {
+    counts[configuration.status] += 1;
+    return counts;
+  }, { CONFIGURED: 0, INACTIVE: 0, INCOMPLETE: 0 }), [configurations]);
   const filtered = useMemo(() => configurations.filter((config) => {
     const term = normalizeConfigSearch(search);
     return (!term || configurationSearchText(config).includes(term)) &&
@@ -60,7 +73,7 @@ export function KpiConfigOverview() {
       (!selectedUnits.length || selectedUnits.includes(config.measurementUnit)) &&
       (!selectedDataSources.length || selectedDataSources.includes(config.dataSource)) &&
       (!selectedStatuses.length || selectedStatuses.includes(config.status));
-  }).sort((left, right) => compareSortValues(configSortValue(left, sort.key), configSortValue(right, sort.key), sort.direction)), [configurations, search, selectedDataSources, selectedKpis, selectedStatuses, selectedUnits, sort]);
+  }).sort((left, right) => statusRank(left.status) - statusRank(right.status) || compareSortValues(configSortValue(left, sort.key), configSortValue(right, sort.key), sort.direction)), [configurations, search, selectedDataSources, selectedKpis, selectedStatuses, selectedUnits, sort]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageStart = (page - 1) * pageSize;
   const paginated = filtered.slice(pageStart, pageStart + pageSize);
@@ -120,6 +133,17 @@ export function KpiConfigOverview() {
         <ConfigMultiSelect label="Data Source" options={dataSourceOptions} selected={selectedDataSources} onChange={setSelectedDataSources} />
         <ConfigMultiSelect label="All statuses" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
       </section>
+      <section className="config-status-cards" aria-label="KPI Configuration status summary">
+        <button type="button" className={`configured ${selectedStatuses.length === 1 && selectedStatuses[0] === "CONFIGURED" ? "active" : ""}`} onClick={() => { setSelectedStatuses((current) => current.length === 1 && current[0] === "CONFIGURED" ? [] : ["CONFIGURED"]); setPage(1); }} aria-pressed={selectedStatuses.length === 1 && selectedStatuses[0] === "CONFIGURED"}>
+          <span><CheckCircle2 size={21} /></span><span><small>Configured</small><strong>{statusCounts.CONFIGURED}</strong><em>Ready to use in KPI Pools</em></span>
+        </button>
+        <button type="button" className={`inactive ${selectedStatuses.length === 1 && selectedStatuses[0] === "INACTIVE" ? "active" : ""}`} onClick={() => { setSelectedStatuses((current) => current.length === 1 && current[0] === "INACTIVE" ? [] : ["INACTIVE"]); setPage(1); }} aria-pressed={selectedStatuses.length === 1 && selectedStatuses[0] === "INACTIVE"}>
+          <span><CirclePause size={21} /></span><span><small>Inactive</small><strong>{statusCounts.INACTIVE}</strong><em>Unavailable for assignments</em></span>
+        </button>
+        <button type="button" className={`incomplete ${selectedStatuses.length === 1 && selectedStatuses[0] === "INCOMPLETE" ? "active" : ""}`} onClick={() => { setSelectedStatuses((current) => current.length === 1 && current[0] === "INCOMPLETE" ? [] : ["INCOMPLETE"]); setPage(1); }} aria-pressed={selectedStatuses.length === 1 && selectedStatuses[0] === "INCOMPLETE"}>
+          <span><AlertCircle size={21} /></span><span><small>Incomplete</small><strong>{statusCounts.INCOMPLETE}</strong><em>Awaiting KPI configuration</em></span>
+        </button>
+      </section>
       {selectedConfigurations.length > 0 && <section className="config-bulk-bar" aria-live="polite">
         <div className="config-bulk-count"><span><Check size={15} /></span><strong>{selectedConfigurations.length}</strong> {selectedConfigurations.length === 1 ? "KPI Configuration selected" : "KPI Configurations selected"}</div>
         <div>
@@ -151,8 +175,16 @@ export function KpiConfigOverview() {
               <td>{config.dataSource || <span className="pending-value">Pending</span>}</td>
               <td>{config.status === "INCOMPLETE" ? <span className="pending-value">Not configured</span> : <TrafficDots ranges={config.ranges} />}</td>
               <td>{config.usedIn} {config.usedIn === 1 ? "Pool" : "Pools"}</td>
-              <td><span className={`config-status ${config.status.toLowerCase()}`}>{formatStatus(config.status)}</span></td>
-              <td><div className="table-actions"><button className="icon-button edit" title="Edit" onClick={(event) => { event.stopPropagation(); navigate(`/app/kpi-management/config/set?kpiConfigId=${config.id}`); }}><Pencil size={14} /></button><button className="icon-button view" title="View details" onClick={(event) => { event.stopPropagation(); navigate(`/app/kpi-management/config/detail-record?kpiConfigId=${config.id}`); }}><Eye size={14} /></button><button className="icon-button delete" title="Delete" aria-label={`Delete ${config.code}`} disabled={deleteMutation.isPending} onClick={(event) => { event.stopPropagation(); deleteMutation.mutate(config.id); }}><Trash2 size={14} /></button></div></td>
+              <td><span className="config-status-cell"><span className={`config-status ${config.status.toLowerCase()}`}>{formatStatus(config.status)}</span>{config.status === "INCOMPLETE" && <span className="incomplete-help" tabIndex={0} aria-label="Why this KPI is incomplete"><CircleHelp size={15} /><span role="tooltip">This active KPI Definition does not have a KPI Configuration yet. Select Configure KPI to define its goal, unit, data source and traffic-light ranges.</span></span>}</span></td>
+              <td><div className="table-actions">
+                <button className="icon-button edit" title={config.status === "INCOMPLETE" ? "Configure KPI" : "Edit KPI"} onClick={(event) => {
+                  event.stopPropagation();
+                  navigate(config.status === "INCOMPLETE"
+                    ? `/app/kpi-management/config/set?kpiDefinitionId=${config.definitionId}&from=config-overview`
+                    : `/app/kpi-management/config/set?kpiConfigId=${config.id}`);
+                }}><Pencil size={14} /></button>
+                {config.status !== "INCOMPLETE" && <><button className="icon-button view" title="View details" onClick={(event) => { event.stopPropagation(); navigate(`/app/kpi-management/config/detail-record?kpiConfigId=${config.id}`); }}><Eye size={14} /></button><button className="icon-button delete" title="Delete" aria-label={`Delete ${config.code}`} disabled={deleteMutation.isPending} onClick={(event) => { event.stopPropagation(); setConfigToDelete(config); }}><Trash2 size={14} /></button></>}
+              </div></td>
             </tr>
           )) : <tr><td colSpan={10} className="table-message">No KPI Configurations found.</td></tr>}</tbody>
         </table>
@@ -165,6 +197,7 @@ export function KpiConfigOverview() {
         </footer>
       </div>
       {sendModalOpen && <SendToPoolModal configurations={selectedConfigurations} pools={poolsQuery.data ?? []} onClose={() => setSendModalOpen(false)} onAssigned={() => setSelectedConfigIds([])} />}
+      {configToDelete && <OverviewDeleteConfirmation title="Remove KPI Configuration?" message={`${configToDelete.code} will disappear from the active Overview. Its historical data will remain preserved.`} pending={deleteMutation.isPending} onAccept={() => deleteMutation.mutate(configToDelete.id)} onCancel={() => setConfigToDelete(null)} />}
     </main>
   );
 }
@@ -181,6 +214,10 @@ function findDuplicatedDefinitions(configurations: KpiConfigRecord[]) {
 }
 
 type ConfigSortKey = "code" | "definition" | "unit" | "goal" | "dataSource" | "trafficLight" | "usedIn" | "status";
+
+function statusRank(status: KpiConfigRecord["status"]) {
+  return { CONFIGURED: 0, INACTIVE: 1, INCOMPLETE: 2 }[status];
+}
 
 function configSortValue(config: KpiConfigRecord, key: ConfigSortKey) {
   switch (key) {

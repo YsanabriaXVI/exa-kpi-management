@@ -24,7 +24,7 @@ export function SetKpiConfigPage() {
   const requestedDefinitionId = searchParams.get("kpiDefinitionId") ?? "";
   const requestedConfigId = Number(searchParams.get("kpiConfigId"));
   const isEditing = Number.isFinite(requestedConfigId) && requestedConfigId > 0;
-  const definitionLocked = openedFromDefinitionOverview || isEditing;
+  const definitionLocked = Boolean(requestedDefinitionId) || isEditing;
   const storedDefinitionId = window.localStorage.getItem("exa:kpi-config-selected-draft") ?? "";
   const initialDefinitionId = requestedDefinitionId || (!openedFromDefinitionOverview ? storedDefinitionId : "");
   const [searchTerm, setSearchTerm] = useState(() => definitionLocked ? "" : window.localStorage.getItem("exa:kpi-config-search-draft") ?? "");

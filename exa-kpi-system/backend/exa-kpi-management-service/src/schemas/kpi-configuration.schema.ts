@@ -11,10 +11,18 @@ export const kpiConfigurationRangesSchema = z.object({ redFrom: score, redTo: sc
   if (value.redTo >= value.yellowFrom || value.yellowTo >= value.greenFrom) context.addIssue({ code: z.ZodIssueCode.custom, message: "Traffic light ranges cannot overlap" });
 });
 export const kpiConfigurationIdParamsSchema = z.object({ id }).strict();
+export const batchLookupKpiConfigurationsBodySchema = z.object({
+  ids: z.array(id).min(1).max(100),
+}).strict().transform(({ ids }) => ({ ids: [...new Set(ids)] }));
 export const listKpiConfigurationsQuerySchema = paginationSchema.extend({ search: z.string().trim().max(200).optional() }).strict();
+export const internalKpiConfigurationCatalogQuerySchema = paginationSchema.extend({
+  search: z.string().trim().max(200).optional(),
+}).strict();
 export const kpiConfigurationBodySchema = z.object({
   definitionId: z.union([id, z.number().int().positive().transform(String)]), goal: z.number().finite(),
   measurementUnit: z.string().trim().min(1).max(50), dataSource: z.string().trim().min(1).max(120), ranges: kpiConfigurationRangesSchema,
   isActive: z.boolean().default(true),
 }).strict();
 export type KpiConfigurationBody = z.infer<typeof kpiConfigurationBodySchema>;
+export type BatchLookupKpiConfigurationsBody = z.infer<typeof batchLookupKpiConfigurationsBodySchema>;
+export type InternalKpiConfigurationCatalogQuery = z.infer<typeof internalKpiConfigurationCatalogQuerySchema>;

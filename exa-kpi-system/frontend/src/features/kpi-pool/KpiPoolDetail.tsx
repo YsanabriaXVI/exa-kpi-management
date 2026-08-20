@@ -17,7 +17,10 @@ import { kpiPoolService } from "./kpi-pool.service";
 import { PoolOverviewMultiSelect } from "./PoolOverviewMultiSelect";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
+import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
 import "./kpi-pool.css";
+import "./period-workflow.css";
+import "./pool-detail-period-select.css";
 
 export function KpiPoolDetail() {
   const navigate = useNavigate();
@@ -30,6 +33,7 @@ export function KpiPoolDetail() {
   const [kpiStatuses, setKpiStatuses] = useState<string[]>([]);
   const [kpiPage, setKpiPage] = useState(1);
   const [kpiPageSize, setKpiPageSize] = useState(10);
+  const [kpiSort, setKpiSort] = useState<{ key: "configCode" | "kpiCode" | "name" | "category" | "goal" | "measurementUnit" | "dataSource" | "status"; direction: SortDirection }>({ key: "configCode", direction: "asc" });
   const [scorecardSearch, setScorecardSearch] = useState("");
   const [scorecardCompanies, setScorecardCompanies] = useState<string[]>([]);
   const [scorecardFrequencies, setScorecardFrequencies] = useState<string[]>(
@@ -38,15 +42,22 @@ export function KpiPoolDetail() {
   const [scorecardStatuses, setScorecardStatuses] = useState<string[]>([]);
   const [scorecardPage, setScorecardPage] = useState(1);
   const [scorecardPageSize, setScorecardPageSize] = useState(10);
+  const [scorecardSort, setScorecardSort] = useState<{ key: "code" | "name" | "company" | "duration" | "frequency" | "selectedKpis" | "expectedInputs" | "status"; direction: SortDirection }>({ key: "code", direction: "asc" });
+  const [viewingPeriod, setViewingPeriod] = useState("");
   const poolQuery = useQuery({
     queryKey: ["kpi-pool", id],
     queryFn: () => kpiPoolService.get(id),
     enabled: id > 0,
   });
   const pool = poolQuery.data;
+  const periodsQuery = useQuery({ queryKey: ["kpi-pool-periods", id], queryFn: () => kpiPoolService.getInputPeriods(id), enabled: id > 0 });
+  useEffect(() => { if (!viewingPeriod && periodsQuery.data) setViewingPeriod(periodsQuery.data.meta.defaultPeriodStart ?? periodsQuery.data.data[periodsQuery.data.data.length - 1]?.start ?? ""); }, [periodsQuery.data, viewingPeriod]);
+  const selectedPeriod = periodsQuery.data?.data.find((period) => period.start === viewingPeriod);
+  const compositionQuery = useQuery({ queryKey: ["kpi-pool-composition", id, viewingPeriod], queryFn: () => kpiPoolService.getComposition(id, viewingPeriod), enabled: id > 0 && Boolean(viewingPeriod) && selectedPeriod?.workflowStatus !== "FUTURE" });
+  const compositionKpis = compositionQuery.data ?? [];
   const kpis = useMemo(
     () =>
-      (pool?.kpis ?? []).filter(
+      compositionKpis.filter(
         (kpi) =>
           (!kpiSearch ||
             `${kpi.kpiCode} ${kpi.name}`
@@ -56,8 +67,8 @@ export function KpiPoolDetail() {
           (!kpiDataSources.length || kpiDataSources.includes(kpi.dataSource)) &&
           (!kpiUnits.length || kpiUnits.includes(kpi.measurementUnit)) &&
           (!kpiStatuses.length || kpiStatuses.includes(kpi.status)),
-      ),
-    [kpiCategories, kpiDataSources, kpiSearch, kpiStatuses, kpiUnits, pool],
+      ).sort((left, right) => compareSortValues(left[kpiSort.key], right[kpiSort.key], kpiSort.direction)),
+    [compositionKpis, kpiCategories, kpiDataSources, kpiSearch, kpiSort, kpiStatuses, kpiUnits],
   );
   const scorecards = useMemo(
     () =>
@@ -73,15 +84,18 @@ export function KpiPoolDetail() {
             scorecardFrequencies.includes(scorecard.frequency)) &&
           (!scorecardStatuses.length ||
             scorecardStatuses.includes(scorecard.status)),
-      ),
+      ).sort((left, right) => compareSortValues(left[scorecardSort.key], right[scorecardSort.key], scorecardSort.direction)),
     [
       pool,
       scorecardCompanies,
       scorecardFrequencies,
       scorecardSearch,
+      scorecardSort,
       scorecardStatuses,
     ],
   );
+  const sortKpis = (key: typeof kpiSort.key) => setKpiSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" }));
+  const sortScorecards = (key: typeof scorecardSort.key) => setScorecardSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" }));
   const kpiTotalPages = Math.max(1, Math.ceil(kpis.length / kpiPageSize));
   const scorecardTotalPages = Math.max(
     1,
@@ -154,6 +168,7 @@ export function KpiPoolDetail() {
         </div>
         <button
           className="button secondary"
+          disabled={pool.status !== "DRAFT"}
           onClick={() =>
             navigate(`/app/pool-kpis/create-pool-info?poolId=${pool.id}`)
           }
@@ -185,7 +200,7 @@ export function KpiPoolDetail() {
           </div>
           <div>
             <dt>KPIs Included</dt>
-            <dd className="summary-number">{pool.kpis.length}</dd>
+            <dd className="summary-number">{compositionKpis.length}</dd>
           </div>
           <div>
             <dt>Pool Name</dt>
@@ -206,25 +221,26 @@ export function KpiPoolDetail() {
       </section>
 
       <section className="pool-detail-section">
-        <div className="pool-detail-section-header">
+        <div className="pool-detail-section-header pool-composition-header">
           <div>
             <div className="pool-table-title">
-              <h2>KPI Configurations Included</h2>
+              <h2>Pool Composition for {viewingPeriod ? formatFullMonth(viewingPeriod) : "Selected Period"}</h2>
               <span>
-                {pool.kpis.length} {pool.kpis.length === 1 ? "KPI" : "KPIs"} in
-                this Pool
+                {compositionKpis.length} {compositionKpis.length === 1 ? "KPI active" : "KPIs active"} in this period
               </span>
             </div>
-            <p>Configured KPIs currently attached to this Pool.</p>
+            <p>Configurations effective during the selected Input Period.</p>
           </div>
-          <button
-            className="button pool-dark-button"
-            onClick={() =>
-              navigate(`/app/pool-kpis/manage-kpis?poolId=${pool.id}`)
-            }
-          >
-            <Settings2 size={15} /> Manage KPIs in Pool
-          </button>
+          <div className="pool-detail-period-actions">
+            <label><span>View Pool records for</span><div className="pool-period-single-select"><select value={viewingPeriod} onChange={(event) => { setViewingPeriod(event.target.value); setKpiPage(1); }}>{(periodsQuery.data?.data ?? []).map((period) => <option value={period.start} key={period.start}>{formatPeriodOption(period.start)}</option>)}</select><strong className={`pool-period-option-status ${selectedPeriod?.workflowStatus.toLowerCase() ?? "future"}`}>{toTitleCase(selectedPeriod?.workflowStatus ?? "FUTURE")}</strong></div></label>
+            <button
+              className="button pool-dark-button"
+              disabled={pool.status === "INACTIVE" || selectedPeriod?.configurationStatus !== "EDITABLE"}
+              onClick={() => navigate(`/app/pool-kpis/manage-kpis?poolId=${pool.id}`)}
+            >
+              <Settings2 size={15} /> Manage KPIs in Pool
+            </button>
+          </div>
         </div>
         <div className="pool-detail-filters kpi-detail-filter-grid">
           <label className="pool-search">
@@ -237,7 +253,7 @@ export function KpiPoolDetail() {
           </label>
           <PoolOverviewMultiSelect
             label="All categories"
-            options={[...new Set(pool.kpis.map((kpi) => kpi.category))].map(
+            options={[...new Set(compositionKpis.map((kpi) => kpi.category))].map(
               (item) => ({ value: item, label: item }),
             )}
             selected={kpiCategories}
@@ -245,7 +261,7 @@ export function KpiPoolDetail() {
           />
           <PoolOverviewMultiSelect
             label="All data sources"
-            options={[...new Set(pool.kpis.map((kpi) => kpi.dataSource))].map(
+            options={[...new Set(compositionKpis.map((kpi) => kpi.dataSource))].map(
               (item) => ({ value: item, label: item }),
             )}
             selected={kpiDataSources}
@@ -254,7 +270,7 @@ export function KpiPoolDetail() {
           <PoolOverviewMultiSelect
             label="Measurement Unit"
             options={[
-              ...new Set(pool.kpis.map((kpi) => kpi.measurementUnit)),
+              ...new Set(compositionKpis.map((kpi) => kpi.measurementUnit)),
             ].map((item) => ({
               value: item,
               label: formatMeasurementUnit(item),
@@ -276,14 +292,14 @@ export function KpiPoolDetail() {
           <table className="kpi-table">
             <thead>
               <tr>
-                <th>Config Code</th>
-                <th>KPI Code</th>
-                <th>KPI Name</th>
-                <th>Category</th>
-                <th>Goal</th>
-                <th>M. Unit</th>
-                <th>Data Source</th>
-                <th>State</th>
+                <SortableTableHeader active={kpiSort.key === "configCode"} direction={kpiSort.direction} onSort={() => sortKpis("configCode")}>Config Code</SortableTableHeader>
+                <SortableTableHeader active={kpiSort.key === "kpiCode"} direction={kpiSort.direction} onSort={() => sortKpis("kpiCode")}>KPI Code</SortableTableHeader>
+                <SortableTableHeader active={kpiSort.key === "name"} direction={kpiSort.direction} onSort={() => sortKpis("name")}>KPI Name</SortableTableHeader>
+                <SortableTableHeader active={kpiSort.key === "category"} direction={kpiSort.direction} onSort={() => sortKpis("category")}>Category</SortableTableHeader>
+                <SortableTableHeader active={kpiSort.key === "goal"} direction={kpiSort.direction} onSort={() => sortKpis("goal")}>Goal</SortableTableHeader>
+                <SortableTableHeader active={kpiSort.key === "measurementUnit"} direction={kpiSort.direction} onSort={() => sortKpis("measurementUnit")}>Measurement Unit</SortableTableHeader>
+                <SortableTableHeader active={kpiSort.key === "dataSource"} direction={kpiSort.direction} onSort={() => sortKpis("dataSource")}>Data Source</SortableTableHeader>
+                <SortableTableHeader active={kpiSort.key === "status"} direction={kpiSort.direction} onSort={() => sortKpis("status")}>State</SortableTableHeader>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -415,14 +431,14 @@ export function KpiPoolDetail() {
           <table className="kpi-table">
             <thead>
               <tr>
-                <th>ScoreCard Code</th>
-                <th>ScoreCard</th>
-                <th>Company</th>
-                <th>Duration</th>
-                <th>Suggested Frequency</th>
-                <th>Selected KPIs</th>
-                <th>Expected Inputs</th>
-                <th>State</th>
+                <SortableTableHeader active={scorecardSort.key === "code"} direction={scorecardSort.direction} onSort={() => sortScorecards("code")}>ScoreCard Code</SortableTableHeader>
+                <SortableTableHeader active={scorecardSort.key === "name"} direction={scorecardSort.direction} onSort={() => sortScorecards("name")}>ScoreCard</SortableTableHeader>
+                <SortableTableHeader active={scorecardSort.key === "company"} direction={scorecardSort.direction} onSort={() => sortScorecards("company")}>Company</SortableTableHeader>
+                <SortableTableHeader active={scorecardSort.key === "duration"} direction={scorecardSort.direction} onSort={() => sortScorecards("duration")}>Duration</SortableTableHeader>
+                <SortableTableHeader active={scorecardSort.key === "frequency"} direction={scorecardSort.direction} onSort={() => sortScorecards("frequency")}>Suggested Frequency</SortableTableHeader>
+                <SortableTableHeader active={scorecardSort.key === "selectedKpis"} direction={scorecardSort.direction} onSort={() => sortScorecards("selectedKpis")}>Selected KPIs</SortableTableHeader>
+                <SortableTableHeader active={scorecardSort.key === "expectedInputs"} direction={scorecardSort.direction} onSort={() => sortScorecards("expectedInputs")}>Expected Inputs</SortableTableHeader>
+                <SortableTableHeader active={scorecardSort.key === "status"} direction={scorecardSort.direction} onSort={() => sortScorecards("status")}>State</SortableTableHeader>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -535,6 +551,25 @@ function formatMonth(value: string) {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(value));
+}
+
+function formatFullMonth(value: string) {
+  return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(value));
+}
+
+function formatPeriodOption(value: string) {
+  const date = new Date(value);
+  const month = new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(date);
+  return `${month} ${date.getUTCFullYear()}`;
+}
+
+function toTitleCase(value: string) {
+  return value.toLowerCase().replace(/(^|_)([a-z])/g, (_match, prefix: string, letter: string) => `${prefix ? " " : ""}${letter.toUpperCase()}`);
+}
+
+function isDateWithinToday(start: string, end: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  return start <= today && today <= end;
 }
 
 function formatMeasurementUnit(unit: string) {

@@ -24,6 +24,25 @@ services:
     networks:
       - exa-kpi-network
 
+  nats:
+    image: nats:2.10-alpine
+    container_name: exa-kpi-nats
+    restart: unless-stopped
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_MONITOR_PORT:-8222}:8222"
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8222/healthz | grep -q ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks:
+      - exa-kpi-network
+
   exa-kpi-management-service:
     build:
       context: ./exa-kpi-management-service
@@ -49,6 +68,42 @@ services:
     networks:
       - exa-kpi-network
 
+  exa-kpi-pool-service:
+    build:
+      context: ./exa-kpi-pool-service
+      dockerfile: Dockerfile.dev
+    container_name: exa-kpi-pool-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4002
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      DATABASE_URL: mysql://${KPI_POOL_MYSQL_USER:-exa_kpi_pool}:${KPI_POOL_MYSQL_PASSWORD:-exa_pool_dev}@mysql:3306/exa_kpi_pool
+      KPI_MANAGEMENT_BASE_URL: http://exa-kpi-management-service:4001
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TEMPORARY_ACTOR_USER_ID: ${TEMPORARY_ACTOR_USER_ID:-1}
+      NATS_ENABLED: "true"
+      NATS_URL: nats://nats:4222
+      NATS_NAME: exa-kpi-pool-service
+      NATS_STREAM: EXA_KPI_POOL_EVENTS
+      NATS_SUBJECTS: kpi.pool.>
+      OUTBOX_PROCESSOR_ENABLED: "true"
+      OUTBOX_POLL_INTERVAL_MS: 2000
+      OUTBOX_BATCH_SIZE: 20
+    ports:
+      - "${KPI_POOL_PORT:-4002}:4002"
+    command: ["sh", "-c", "npm run prisma:migrate:deploy && npm run dev"]
+    volumes:
+      - ./exa-kpi-pool-service:/app
+      - kpi_pool_node_modules:/app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - exa-kpi-network
+
   adminer:
     image: adminer:latest
     container_name: exa-kpi-adminer
@@ -64,7 +119,9 @@ services:
 
 volumes:
   mysql_data:
+  nats_data:
   kpi_management_node_modules:
+  kpi_pool_node_modules:
 
 networks:
   exa-kpi-network:

@@ -62,6 +62,9 @@ export const openApiDocument = {
     "/api/health/live": { get: { tags: ["Health"], responses: { "200": { description: "Service is alive" } } } },
     "/api/health/ready": { get: { tags: ["Health"], responses: { "200": { description: "Database is reachable" }, "503": { description: "Database unavailable" } } } },
     "/api/v1/kpi-categories": { get: { tags: ["KPI Categories"], summary: "List active categories", responses: { "200": { description: "Active category lookup" } } } },
+    "/api/v1/internal/input-frequencies": { get: { tags: ["Internal Catalogs"], summary: "List input frequencies for service projections", responses: { "200": { description: "Input-frequency projection contract; IDs are strings" } } } },
+    "/api/v1/kpi-configurations/batch-lookup": { post: { tags: ["KPI Configurations"], summary: "Resolve multiple KPI Configurations for service-to-service validation", description: "Accepts 1–100 string IDs, deduplicates them and resolves the batch with one database query. Soft-deleted or unknown IDs are returned in notFoundIds.", responses: { "200": { description: "Resolved configurations in requested order and missing IDs" }, "400": { description: "Invalid or oversized batch" } } } },
+    "/api/v1/internal/kpi-configurations": { get: { tags: ["Internal"], summary: "Discover KPI Configurations for service consumers", description: "Paginated temporary service-to-service catalog used by KPI Pool.", responses: { "200": { description: "Paginated configuration catalog" } } } },
     "/api/v1/kpi-definitions": {
       get: {
         tags: ["KPI Definitions"], summary: "List KPI definitions",

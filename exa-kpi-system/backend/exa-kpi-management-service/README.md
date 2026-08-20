@@ -34,6 +34,12 @@ public request header.
 
 ## Current scope
 
+The read-only internal contract `GET /api/v1/internal/input-frequencies` supplies the Pool Service projection. It returns BigInt IDs as strings, does not transfer catalog ownership, and will later require server-to-server authentication.
+
+`POST /api/v1/kpi-configurations/batch-lookup` is the read-only batch contract used by Pool membership and activation validation. It avoids N+1 service calls and does not create or modify membership.
+
+`GET /api/v1/internal/kpi-configurations` is the paginated discovery contract used by Pool availability. React does not call this internal route directly; production server-to-server authentication remains pending.
+
 The first functional slice implements KPI Definition and the active KPI Category
 lookup. Authentication, KPI Configuration, and official catalog seed values are
 intentionally outside this increment.

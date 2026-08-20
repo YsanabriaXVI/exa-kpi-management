@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/database/prisma.js";
-import type { KpiConfigurationBody } from "../schemas/kpi-configuration.schema.js";
+import type { BatchLookupKpiConfigurationsBody, InternalKpiConfigurationCatalogQuery, KpiConfigurationBody } from "../schemas/kpi-configuration.schema.js";
 import { AppError } from "../utils/app-error.js";
 import { toKpiConfigurationDto } from "../utils/kpi-configuration.dto.js";
 
@@ -20,21 +20,151 @@ async function writeThresholds(tx: Prisma.TransactionClient, revisionId: bigint,
   const values: Record<string, [number, number]> = { RED: [input.ranges.redFrom, input.ranges.redTo], YELLOW: [input.ranges.yellowFrom, input.ranges.yellowTo], GREEN: [input.ranges.greenFrom, input.ranges.greenTo] };
   await tx.kpiConfigurationRevisionThreshold.createMany({ data: ["RED", "YELLOW", "GREEN"].map((code, index) => { const range = values[code]!; return { kpiConfigurationRevisionId: revisionId, trafficLightLevelId: levels.find((level) => level.code === code)!.id, rangeMinPercent: range[0], rangeMaxPercent: range[1], includesMin: true, includesMax: true, displayOrder: index + 1 }; }) });
 }
-async function writeRevision(tx: Prisma.TransactionClient, configurationId: bigint, revisionNumber: number, input: KpiConfigurationBody, evaluationId: bigint, levels: { id: bigint; code: string }[]) {
-  const revision = await tx.kpiConfigurationRevision.create({ data: { kpiConfigurationId: configurationId, revisionNumber, targetValue: input.goal, evaluationTypeId: evaluationId, effectiveFrom: new Date(), changeReason: revisionNumber === 1 ? "Initial configuration" : "Configuration updated" } });
+async function writeRevision(tx: Prisma.TransactionClient, configurationId: bigint, revisionNumber: number, input: KpiConfigurationBody, evaluationId: bigint, levels: { id: bigint; code: string }[], effectiveFrom = new Date()) {
+  const revision = await tx.kpiConfigurationRevision.create({ data: { kpiConfigurationId: configurationId, revisionNumber, targetValue: input.goal, evaluationTypeId: evaluationId, effectiveFrom, changeReason: revisionNumber === 1 ? "Initial configuration" : "Configuration updated for next Input Period" } });
   await writeThresholds(tx, revision.id, input, levels);
 }
+function nextPeriodStart(today: Date, monthsPerPeriod: number) {
+  const periodStartMonth = Math.floor(today.getUTCMonth() / monthsPerPeriod) * monthsPerPeriod;
+  return new Date(Date.UTC(today.getUTCFullYear(), periodStartMonth + monthsPerPeriod, 1));
+}
 async function nextConfigCode(tx: Prisma.TransactionClient, definitionId: bigint, definitionCode: string) {
-  const numericCode = definitionCode.replace(/\D/g, "");
+  const definitionNumber = definitionCode.replace(/\D/g, "").padStart(3, "0");
   const siblings = await tx.kpiConfiguration.findMany({ where: { kpiDefinitionId: definitionId }, select: { configCode: true } });
   const highestSuffix = siblings.reduce((highest, sibling) => {
-    const match = new RegExp(`^KPC-${numericCode}-(\\d+)$`).exec(sibling.configCode);
+    const match = new RegExp(`^KPC-${definitionNumber}-(\\d+)$`).exec(sibling.configCode);
     return match ? Math.max(highest, Number(match[1])) : highest;
   }, 0);
-  return `KPC-${numericCode}-${String(highestSuffix + 1).padStart(2, "0")}`;
+  return `KPC-${definitionNumber}-${String(highestSuffix + 1).padStart(2, "0")}`;
 }
 export const kpiConfigurationService = {
-  async list(query: { page: number; pageSize: number; search?: string }) { const where: Prisma.KpiConfigurationWhereInput = { deletedAt: null, ...(query.search ? { OR: [{ configCode: { contains: query.search } }, { definition: { is: { kpiCode: { contains: query.search } } } }, { definition: { is: { kpiName: { contains: query.search } } } }] } : {}) }; const [items,totalItems] = await Promise.all([prisma.kpiConfiguration.findMany({ where, include, orderBy: { createdAt: "desc" }, skip: (query.page-1)*query.pageSize, take: query.pageSize }), prisma.kpiConfiguration.count({ where })]); return { data: items.map(toKpiConfigurationDto), meta: { page: query.page, pageSize: query.pageSize, totalItems, totalPages: Math.ceil(totalItems/query.pageSize) } }; },
+  async internalCatalog(query: InternalKpiConfigurationCatalogQuery) {
+    const where: Prisma.KpiConfigurationWhereInput = {
+      deletedAt: null,
+      ...(query.search ? { OR: [
+        { configCode: { contains: query.search } },
+        { definition: { is: { kpiCode: { contains: query.search } } } },
+        { definition: { is: { kpiName: { contains: query.search } } } },
+      ] } : {}),
+    };
+    const [records, totalItems] = await prisma.$transaction([
+      prisma.kpiConfiguration.findMany({
+        where,
+        orderBy: [{ configCode: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        select: {
+          id: true, configCode: true, kpiDefinitionId: true, inputFrequencyId: true,
+          status: { select: { code: true } },
+          definition: { select: { kpiCode: true, kpiName: true, isActive: true, statusCode: true, deletedAt: true, category: { select: { name: true } } } },
+          inputFrequency: { select: { code: true, name: true, isActive: true } },
+          measurementUnit: { select: { symbol: true, name: true } },
+          primaryDataSource: { select: { name: true } },
+          revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true } },
+        },
+      }),
+      prisma.kpiConfiguration.count({ where }),
+    ]);
+    return {
+      data: records.map((record) => ({
+        id: record.id.toString(), configCode: record.configCode,
+        definitionId: record.kpiDefinitionId.toString(), definitionCode: record.definition.kpiCode,
+        definitionName: record.definition.kpiName, definitionIsActive: record.definition.isActive && record.definition.statusCode === "ACTIVE" && record.definition.deletedAt === null,
+        categoryName: record.definition.category.name,
+        inputFrequencyId: record.inputFrequencyId.toString(), inputFrequencyCode: record.inputFrequency.code,
+        inputFrequencyName: record.inputFrequency.name, inputFrequencyIsActive: record.inputFrequency.isActive,
+        measurementUnit: record.measurementUnit.symbol || record.measurementUnit.name,
+        dataSource: record.primaryDataSource.name,
+        goal: record.revisions[0]?.targetValue?.toString() ?? null,
+        status: record.status.code, isActive: record.status.code === "CONFIGURED",
+      })),
+      meta: { page: query.page, pageSize: query.pageSize, totalItems, totalPages: Math.ceil(totalItems / query.pageSize) },
+    };
+  },
+  async batchLookup(input: BatchLookupKpiConfigurationsBody) {
+    const requestedIds = input.ids.map(BigInt);
+    const records = await prisma.kpiConfiguration.findMany({
+      where: { id: { in: requestedIds }, deletedAt: null },
+      select: {
+        id: true,
+        configCode: true,
+        kpiDefinitionId: true,
+        inputFrequencyId: true,
+        status: { select: { code: true } },
+        definition: { select: { kpiCode: true, kpiName: true, isActive: true, statusCode: true, deletedAt: true, category: { select: { name: true } } } },
+        inputFrequency: { select: { code: true, name: true, isActive: true } },
+        measurementUnit: { select: { symbol: true, name: true } },
+        primaryDataSource: { select: { name: true } },
+        revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true } },
+      },
+    });
+    const byId = new Map(records.map((record) => [record.id.toString(), record]));
+    return {
+      data: input.ids.flatMap((id) => {
+        const record = byId.get(id);
+        return record ? [{
+          id,
+          configCode: record.configCode,
+          definitionId: record.kpiDefinitionId.toString(),
+          definitionCode: record.definition.kpiCode,
+          definitionName: record.definition.kpiName,
+          categoryName: record.definition.category?.name ?? "Not specified",
+          definitionIsActive: record.definition.isActive && record.definition.statusCode === "ACTIVE" && record.definition.deletedAt === null,
+          inputFrequencyId: record.inputFrequencyId.toString(),
+          inputFrequencyCode: record.inputFrequency.code,
+          inputFrequencyName: record.inputFrequency.name,
+          inputFrequencyIsActive: record.inputFrequency.isActive,
+          measurementUnit: record.measurementUnit?.symbol || record.measurementUnit?.name || "Not specified",
+          dataSource: record.primaryDataSource?.name ?? "Not specified",
+          goal: record.revisions?.[0]?.targetValue?.toString() ?? null,
+          status: record.status.code,
+          isActive: record.status.code === "CONFIGURED",
+        }] : [];
+      }),
+      notFoundIds: input.ids.filter((id) => !byId.has(id)),
+    };
+  },
+  async list(query: { page: number; pageSize: number; search?: string }) {
+    const configurationWhere: Prisma.KpiConfigurationWhereInput = {
+      deletedAt: null,
+      ...(query.search ? { OR: [{ configCode: { contains: query.search } }, { definition: { is: { kpiCode: { contains: query.search } } } }, { definition: { is: { kpiName: { contains: query.search } } } }] } : {}),
+    };
+    const definitionWhere: Prisma.KpiDefinitionWhereInput = {
+      deletedAt: null,
+      isActive: true,
+      statusCode: "ACTIVE",
+      configurations: { none: { deletedAt: null } },
+      ...(query.search ? { OR: [{ kpiCode: { contains: query.search } }, { kpiName: { contains: query.search } }] } : {}),
+    };
+    const [configured, incompleteDefinitions] = await Promise.all([
+      prisma.kpiConfiguration.findMany({ where: configurationWhere, include, orderBy: { createdAt: "desc" } }),
+      prisma.kpiDefinition.findMany({ where: definitionWhere, orderBy: { createdAt: "desc" } }),
+    ]);
+    const incomplete = incompleteDefinitions.map((definition) => ({
+      id: -Number(definition.id),
+      code: "",
+      definitionId: Number(definition.id),
+      definitionCode: definition.kpiCode,
+      definitionName: definition.kpiName,
+      goal: 0,
+      measurementUnit: "",
+      evaluationType: "",
+      dataSource: "",
+      ranges: { redFrom: 0, redTo: 0, yellowFrom: 0, yellowTo: 0, greenFrom: 0, greenTo: 0 },
+      usedIn: 0,
+      status: "INCOMPLETE",
+      isActive: true,
+      createdAt: definition.createdAt.toISOString(),
+      createdBy: "System",
+      updatedAt: (definition.updatedAt ?? definition.createdAt).toISOString(),
+      updatedBy: "System",
+      poolNames: [],
+    }));
+    const allItems = [...incomplete, ...configured.map(toKpiConfigurationDto)];
+    const start = (query.page - 1) * query.pageSize;
+    const data = allItems.slice(start, start + query.pageSize);
+    return { data, meta: { page: query.page, pageSize: query.pageSize, totalItems: allItems.length, totalPages: Math.ceil(allItems.length / query.pageSize) } };
+  },
   async get(id: bigint) { return toKpiConfigurationDto(await existing(id)); },
   async create(input: KpiConfigurationBody, actor: bigint|null) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -55,7 +185,26 @@ export const kpiConfigurationService = {
     }
     throw new AppError("KPI Configuration code could not be generated", 409, "KPI_CONFIGURATION_CODE_CONFLICT");
   },
-  async update(id: bigint,input:KpiConfigurationBody,actor:bigint|null){ await existing(id); return prisma.$transaction(async tx=>{ const definition=await tx.kpiDefinition.findFirst({where:{id:BigInt(input.definitionId),deletedAt:null}}); if(!definition) throw new AppError("KPI Definition not found",422,"KPI_DEFINITION_NOT_AVAILABLE"); const c=await catalogs(tx,input,definition.kpiName); const latest=await tx.kpiConfigurationRevision.findFirst({where:{kpiConfigurationId:id},orderBy:{revisionNumber:"desc"}}); await tx.kpiConfiguration.update({where:{id},data:{measurementUnitId:c.unit.id,primaryDataSourceId:c.source.id,kpiConfigurationStatusId:c.status.id,updatedAt:new Date(),updatedByUserId:actor}}); const today=new Date();today.setUTCHours(0,0,0,0); if(latest&&latest.effectiveFrom.getTime()===today.getTime()){await tx.kpiConfigurationRevision.update({where:{id:latest.id},data:{targetValue:input.goal,evaluationTypeId:c.evaluation.id,changeReason:"Configuration updated before becoming historical",updatedAt:new Date(),updatedByUserId:actor}});await tx.kpiConfigurationRevisionThreshold.deleteMany({where:{kpiConfigurationRevisionId:latest.id}});await writeThresholds(tx,latest.id,input,c.levels);}else{if(latest&&!latest.effectiveTo){const yesterday=new Date(today);yesterday.setUTCDate(yesterday.getUTCDate()-1);await tx.kpiConfigurationRevision.update({where:{id:latest.id},data:{effectiveTo:yesterday}});}await writeRevision(tx,id,(latest?.revisionNumber??0)+1,input,c.evaluation.id,c.levels);} return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({where:{id},include})); }); },
+  async update(id: bigint, input: KpiConfigurationBody, actor: bigint | null) {
+    await existing(id);
+    return prisma.$transaction(async (tx) => {
+      const definition = await tx.kpiDefinition.findFirst({ where: { id: BigInt(input.definitionId), deletedAt: null } });
+      if (!definition) throw new AppError("KPI Definition not found", 422, "KPI_DEFINITION_NOT_AVAILABLE");
+      const c = await catalogs(tx, input, definition.kpiName);
+      const latest = await tx.kpiConfigurationRevision.findFirst({ where: { kpiConfigurationId: id }, orderBy: { revisionNumber: "desc" } });
+      await tx.kpiConfiguration.update({ where: { id }, data: { measurementUnitId: c.unit.id, primaryDataSourceId: c.source.id, kpiConfigurationStatusId: c.status.id, updatedAt: new Date(), updatedByUserId: actor } });
+      const effectiveFrom = nextPeriodStart(new Date(), c.frequency.monthsPerPeriod);
+      if (latest?.effectiveFrom.getTime() === effectiveFrom.getTime()) {
+        await tx.kpiConfigurationRevision.update({ where: { id: latest.id }, data: { targetValue: input.goal, evaluationTypeId: c.evaluation.id, changeReason: "Scheduled revision updated before becoming effective", updatedAt: new Date(), updatedByUserId: actor } });
+        await tx.kpiConfigurationRevisionThreshold.deleteMany({ where: { kpiConfigurationRevisionId: latest.id } });
+        await writeThresholds(tx, latest.id, input, c.levels);
+      } else {
+        if (latest && !latest.effectiveTo) await tx.kpiConfigurationRevision.update({ where: { id: latest.id }, data: { effectiveTo: new Date(effectiveFrom.getTime() - 86_400_000) } });
+        await writeRevision(tx, id, (latest?.revisionNumber ?? 0) + 1, input, c.evaluation.id, c.levels, effectiveFrom);
+      }
+      return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({ where: { id }, include }));
+    });
+  },
   async deactivate(id:bigint,actor:bigint|null){await existing(id);const status=await prisma.kpiConfigurationStatus.findUnique({where:{code:"INACTIVE"}});if(!status)throw new AppError("Inactive status unavailable",422,"KPI_CONFIGURATION_CATALOG_UNAVAILABLE");return toKpiConfigurationDto(await prisma.kpiConfiguration.update({where:{id},data:{kpiConfigurationStatusId:status.id,updatedAt:new Date(),updatedByUserId:actor},include}));},
   async softDelete(id:bigint,actor:bigint|null){await existing(id);return toKpiConfigurationDto(await prisma.kpiConfiguration.update({where:{id},data:{deletedAt:new Date(),updatedAt:new Date(),updatedByUserId:actor},include}));}
 };

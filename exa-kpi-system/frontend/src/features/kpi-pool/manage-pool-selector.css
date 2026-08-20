@@ -61,6 +61,36 @@
   animation: manage-pool-enter .58s cubic-bezier(.22, .78, .3, 1) both;
 }
 
+.manage-pool-identity-card {
+  width: 100%;
+  min-height: 104px;
+  margin-bottom: 14px;
+  padding: 22px 26px;
+  border: 1px solid var(--ems-border);
+  border-radius: 11px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  background: var(--ems-surface);
+  box-shadow: 0 4px 14px rgb(30 48 66 / 6%);
+}
+
+.manage-pool-identity-card > span {
+  color: var(--ems-muted);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.manage-pool-identity-card > strong {
+  color: var(--ems-text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 @keyframes manage-pool-spin {
   to { transform: rotate(360deg); }
 }

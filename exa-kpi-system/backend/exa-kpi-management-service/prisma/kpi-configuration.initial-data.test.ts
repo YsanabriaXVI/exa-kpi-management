@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { initialKpiConfigurations } from "./kpi-configuration.initial-data.js";
 
 describe("KPI Configuration initial Traffic Light data", () => {
+  it("does not persist synthetic PENDING configurations", () => {
+    expect(initialKpiConfigurations.some((configuration) => configuration.configCode === "PENDING")).toBe(false);
+  });
+
   it.each([
     { redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100 },
     { redFrom: 0, redTo: 30, yellowFrom: 31, yellowTo: 65, greenFrom: 66, greenTo: 100 },

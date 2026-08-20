@@ -4,25 +4,6 @@ import { apiRequest } from "../../api/http-client";
 
 let configurations: KpiConfigRecord[] = [
   {
-    id: 4,
-    code: "PENDING",
-    definitionId: 51,
-    definitionCode: "KPI-051",
-    definitionName: "Rendimiento de combustible",
-    goal: 0,
-    measurementUnit: "",
-    evaluationType: "",
-    dataSource: "",
-    ranges: { redFrom: 0, redTo: 0, yellowFrom: 0, yellowTo: 0, greenFrom: 0, greenTo: 0 },
-    usedIn: 0,
-    status: "INCOMPLETE",
-    createdAt: "2026-07-28T09:00:00",
-    createdBy: "Carlos Gomez",
-    updatedAt: "2026-07-28T09:00:00",
-    updatedBy: "Carlos Gomez",
-    poolNames: [],
-  },
-  {
     id: 1,
     code: "KPC-049-01",
     definitionId: 49,
@@ -82,7 +63,6 @@ let configurations: KpiConfigRecord[] = [
 ];
 
 configurations = [
-  configurations[0],
   ...kpiResults.map((kpi): KpiConfigRecord => {
     const definitionId = Number(kpi.code.replace(/\D/g, ""));
     const numericGoal = Number(kpi.goal.replace(/[^0-9.-]/g, "")) || 0;
@@ -138,15 +118,12 @@ export const kpiConfigMockService = {
     definition: { code: string; name: string },
   ) {
     await wait();
-    const siblingCount = configurations.filter(
-      (config) => config.definitionId === input.definitionId,
-    ).length;
-    const numericCode = definition.code.replace(/\D/g, "");
+    const nextId = Math.max(0, ...configurations.map((config) => config.id)) + 1;
     const created: KpiConfigRecord = {
       ...input,
       evaluationType: determineEvaluationType(definition.name),
-      id: Math.max(0, ...configurations.map((config) => config.id)) + 1,
-      code: `KPC-${numericCode}-${String(siblingCount + 1).padStart(2, "0")}`,
+      id: nextId,
+      code: `KPC-${String(input.definitionId).padStart(3, "0")}-${String(nextId).padStart(3, "0")}`,
       definitionCode: definition.code,
       definitionName: definition.name,
       usedIn: 0,

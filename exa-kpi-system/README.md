@@ -1,78 +1,58 @@
 # EXA KPI System
 
-Proyecto base con:
+Sistema modular de KPIs construido con React, TypeScript y microservicios Express.
 
-- Frontend: React + TypeScript + Vite
-- Backend: Express + TypeScript
-- Sidebar inicial basado en el documento `21-Jul-2026- KPIS EXA Project Structure.docx`
-- Backend demo con una ruta `GET /api/demo` y `POST /api/demo`
+## Estructura vigente
 
-## Estructura
-
-```txt
+```text
 exa-kpi-system/
-├── frontend/
-├── backend/
-├── docker-compose.yml
-├── AGENTS.md
-└── README.md
+|-- frontend/
+|-- backend/
+|   |-- exa-kpi-management-service/
+|   |-- infrastructure/
+|   |-- docker-compose.yml
+|   `-- BACKEND_CONTEXT.md
+|-- database/
+`-- PROJECT_CONTEXT.md
 ```
 
-## Ejecutar sin Docker
+El backend genérico de demostración fue retirado. Cada dominio debe implementarse
+como un microservicio independiente dentro de `backend/`.
 
-### Backend
+## Ejecutar infraestructura y KPI Management
 
-```bash
+```powershell
 cd backend
-npm install
-npm run dev
+docker compose up -d --build
 ```
 
-Servidor backend:
+Servicios disponibles:
 
-```txt
-http://localhost:4000
+```text
+KPI Management: http://localhost:4001
+Swagger:        http://localhost:4001/api/docs
+MySQL:          localhost:3306
+Adminer:        http://localhost:8080 (perfil tools)
 ```
 
-Endpoints demo:
+Para levantar también Adminer:
 
-```txt
-GET  http://localhost:4000/api/demo
-POST http://localhost:4000/api/demo
+```powershell
+docker compose --profile tools up -d
 ```
 
-### Frontend
+## Ejecutar el frontend
 
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Frontend:
+Frontend: `http://localhost:5173`
 
-```txt
-http://localhost:5173
-```
+## Documentación
 
-## Ejecutar con Docker
-
-```bash
-docker compose up --build
-```
-
-Servicios:
-
-```txt
-Frontend: http://localhost:5173
-Backend:  http://localhost:4000
-MySQL:    localhost:3306
-Adminer:  http://localhost:8080
-```
-
-## Próximo paso sugerido
-
-1. Conectar frontend con backend usando `src/shared/api/http-client.ts`.
-2. Crear módulo real de `KPI Definition`.
-3. Crear migraciones SQL y seeders.
-4. Agregar auth básica.
+- `PROJECT_CONTEXT.md`: contexto funcional y estado general del frontend.
+- `backend/BACKEND_CONTEXT.md`: arquitectura y reglas compartidas de microservicios.
+- `backend/exa-kpi-management-service/README.md`: operación de KPI Management.

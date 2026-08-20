@@ -2,7 +2,7 @@ export type InitialKpiConfiguration = {
   definitionCode: string; configCode: string; goal: number; measurementUnit: string;
   evaluationType: "HIGHER_IS_BETTER" | "LOWER_IS_BETTER"; dataSource: string;
   ranges: { redFrom: number; redTo: number; yellowFrom: number; yellowTo: number; greenFrom: number; greenTo: number };
-  status: "CONFIGURED" | "INCOMPLETE";
+  status: "CONFIGURED";
 };
 
 const base = [
@@ -25,7 +25,6 @@ const generated = Array.from({ length: 44 }, (_, index) => ({
 
 const lower = (name: string) => /(reduce|damage|cost|time|claim|emission|error|variance)/i.test(name);
 export const initialKpiConfigurations: InitialKpiConfiguration[] = [
-  { definitionCode: "KPI-051", configCode: "PENDING", goal: 0, measurementUnit: "", evaluationType: "HIGHER_IS_BETTER", dataSource: "", ranges: { redFrom: 0, redTo: 0, yellowFrom: 0, yellowTo: 0, greenFrom: 0, greenTo: 0 }, status: "INCOMPLETE" },
   ...[...base, ...generated].map((item) => {
     const number = item.code.replace(/\D/g, "");
     const isLower = lower(item.name);

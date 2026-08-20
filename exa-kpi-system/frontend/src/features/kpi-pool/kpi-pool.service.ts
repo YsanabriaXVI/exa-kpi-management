@@ -1,6 +1,39 @@
 import type { KpiConfigRecord } from "../kpi-config/kpi-config.types";
 import type { ScorecardRecord } from "../scorecards/scorecard.types";
-import type { KpiPoolInput, KpiPoolRecord, ManageablePoolKpi, PoolKpi, PoolScorecard } from "./kpi-pool.types";
+import { poolApiRequest } from "../../api/pool-http-client";
+import type { KpiPoolInput, KpiPoolRecord, ManageablePoolKpi, PoolInputPeriods, PoolKpi, PoolListParams, PoolLookups, PoolScorecard } from "./kpi-pool.types";
+
+type PoolApiRecord = {
+  id: string; poolCode: string; poolName: string; description: string | null; status: "DRAFT" | "ACTIVE" | "INACTIVE";
+  validFrom: string; validTo: string; inputFrequency: { id: string; code: string };
+  areas: Array<{ id: string; code: string; name: string }>;
+  companies: Array<{ id: string; code: string; name: string }>;
+  kpiCount: number; scorecardCount: number;
+};
+
+type PoolListResponse = { data: PoolApiRecord[]; meta: { page: number; pageSize: number; totalItems: number; totalPages: number } };
+type AvailabilityApiRecord = {
+  id: string; configCode: string; definitionId: string; definitionCode: string; definitionName: string;
+  categoryName: string; goal: string | null; measurementUnit: string; dataSource: string; isActive: boolean;
+  availability: "AVAILABLE_TO_ADD" | "ALREADY_IN_POOL" | "NOT_AVAILABLE"; reasonCode: string | null; conflictingConfigurationCode?: string | null;
+};
+type MembershipApiRecord = { configurationId: string; definitionId: string; configCode: string; definitionCode: string; definitionName: string; inputFrequencyCode: string; effectiveFrom: string; effectiveTo: string | null; categoryName: string | null; goal: string | null; measurementUnit: string | null; dataSource: string | null; isActive: boolean };
+
+const frequencyName = (code: string) => code.toLowerCase().replace(/(^|_)([a-z])/g, (_, prefix: string, letter: string) => `${prefix ? " " : ""}${letter.toUpperCase()}`);
+const fromApi = (value: PoolApiRecord): KpiPoolRecord => ({
+  id: Number(value.id), code: value.poolCode, name: value.poolName,
+  companies: value.companies.map((company) => company.name), companyIds: value.companies.map((company) => company.id),
+  areas: value.areas.map((area) => area.name), areaIds: value.areas.map((area) => area.id),
+  frequency: frequencyName(value.inputFrequency.code), inputFrequencyId: value.inputFrequency.id,
+  validFrom: value.validFrom, validTo: value.validTo, description: value.description ?? "", status: value.status,
+  kpiCount: value.kpiCount, scorecardCount: value.scorecardCount,
+  kpis: [], scorecards: [],
+});
+
+function cachePool(pool: KpiPoolRecord) {
+  pools = [pool, ...pools.filter((item) => item.id !== pool.id)];
+  return pool;
+}
 
 const sampleKpis: PoolKpi[] = [
   { definitionId: "3", configCode: "KPC-049-01", kpiCode: "KPI-049", name: "Reduce operating costs", category: "Financial", goal: "Reduce 20%", measurementUnit: "%", dataSource: "EMS - SAP Integration", status: "ACTIVE" },
@@ -57,53 +90,86 @@ const clone = (pool: KpiPoolRecord): KpiPoolRecord => ({
 
 export const kpiPoolService = {
   async list() {
-    await wait();
-    return pools.map(clone);
+    const response = await this.listPage({ page: 1, pageSize: 100, sortBy: "createdAt", sortOrder: "desc" });
+    return response.data;
+  },
+  async listPage(params: PoolListParams) {
+    const query = new URLSearchParams({ page: String(params.page), pageSize: String(params.pageSize), sortBy: params.sortBy, sortOrder: params.sortOrder });
+    if (params.search) query.set("search", params.search);
+    params.status?.forEach((value) => query.append("status", value));
+    params.companyId?.forEach((value) => query.append("companyId", value));
+    params.inputFrequencyId?.forEach((value) => query.append("inputFrequencyId", value));
+    params.issueYear?.forEach((value) => query.append("issueYear", value));
+    const response = await poolApiRequest<PoolListResponse>(`/v1/kpi-pools?${query}`);
+    return { ...response, data: response.data.map((value) => clone(cachePool(fromApi(value)))) };
   },
   async get(id: number) {
-    await wait();
-    const pool = pools.find((item) => item.id === id);
-    if (!pool) throw new Error("KPI Pool not found.");
-    return clone(pool);
+    const response = await poolApiRequest<{ data: PoolApiRecord }>(`/v1/kpi-pools/${id}`);
+    const pool = fromApi(response.data);
+    const periods = await this.getInputPeriods(id);
+    const manageable = periods.meta.defaultPeriodStart ? await this.getManageableKpis(id, periods.meta.defaultPeriodStart) : [];
+    pool.kpis = manageable.filter((item) => item.availability === "IN_POOL").map(({ availability: _availability, reasonCode: _reasonCode, ...item }) => item);
+    return clone(cachePool(pool));
   },
   async save(input: KpiPoolInput, id?: number) {
-    await wait();
-    if (id) {
-      const current = pools.find((pool) => pool.id === id);
-      if (!current) throw new Error("KPI Pool not found.");
-      const updated = { ...current, ...input };
-      pools = pools.map((pool) => pool.id === id ? updated : pool);
-      return clone(updated);
-    }
-    const nextId = Math.max(0, ...pools.map((pool) => pool.id)) + 1;
-    const created: KpiPoolRecord = {
-      ...input,
-      id: nextId,
-      code: `PL-${String(nextId).padStart(3, "0")}`,
-      kpis: [],
-      scorecards: [],
-    };
-    pools = [created, ...pools];
-    return clone(created);
+    const body = JSON.stringify({
+      poolName: input.name, poolAreaIds: input.poolAreaIds, companyIds: input.companyIds,
+      inputFrequencyId: input.inputFrequencyId, validFrom: input.validFrom, validTo: input.validTo,
+      description: input.description || null,
+    });
+    const response = await poolApiRequest<{ data: PoolApiRecord }>(id ? `/v1/kpi-pools/${id}` : "/v1/kpi-pools", { method: id ? "PATCH" : "POST", body });
+    return clone(cachePool(fromApi(response.data)));
   },
+  async lookups() { return poolApiRequest<{ data: PoolLookups }>("/v1/kpi-pools/lookups").then((response) => response.data); },
   async deactivate(id: number) {
-    await wait();
-    pools = pools.map((pool) => pool.id === id ? { ...pool, status: "INACTIVE" } : pool);
+    return poolApiRequest(`/v1/kpi-pools/${id}/deactivate`, { method: "POST" });
   },
-  async getManageableKpis(poolId: number): Promise<ManageablePoolKpi[]> {
-    await wait();
-    const pool = pools.find((item) => item.id === poolId);
-    if (!pool) throw new Error("KPI Pool not found.");
-    const included = new Set(pool.kpis.map((kpi) => kpi.configCode));
-    const hidden = hiddenKpisByPool.get(poolId) ?? new Set<string>();
-    return kpiCatalog.filter((kpi) => !hidden.has(kpi.configCode)).map((kpi) => ({
-      ...kpi,
-      availability: included.has(kpi.configCode)
-        ? "IN_POOL"
-        : kpi.status === "INACTIVE"
-          ? "NOT_AVAILABLE"
-          : "AVAILABLE",
+  async activationReadiness(id: number) {
+    return poolApiRequest<{ data: { poolId: string; status: string; ready: boolean; checks: Array<{ code: string; passed: boolean; message: string }> } }>(`/v1/kpi-pools/${id}/activation-readiness`).then((response) => response.data);
+  },
+  async activate(id: number) {
+    return poolApiRequest(`/v1/kpi-pools/${id}/activate`, { method: "POST" });
+  },
+  async getManageableKpis(poolId: number, periodStart?: string): Promise<ManageablePoolKpi[]> {
+    const query = new URLSearchParams({ page: "1", pageSize: "100" });
+    if (periodStart) query.set("periodStart", periodStart);
+    const response = await poolApiRequest<{ data: AvailabilityApiRecord[] }>(`/v1/kpi-pools/${poolId}/available-kpi-configurations?${query}`);
+    return response.data.map((value) => ({
+      configurationId: value.id, definitionId: value.definitionId, configCode: value.configCode,
+      kpiCode: value.definitionCode, name: value.definitionName, category: value.categoryName,
+      goal: value.goal ?? "—", measurementUnit: value.measurementUnit, dataSource: value.dataSource,
+      status: value.isActive ? "ACTIVE" : "INACTIVE",
+      availability: value.availability === "AVAILABLE_TO_ADD" ? "AVAILABLE" : value.availability === "ALREADY_IN_POOL" ? "IN_POOL" : "NOT_AVAILABLE",
+      reasonCode: value.reasonCode,
+      conflictingConfigurationCode: value.conflictingConfigurationCode ?? null,
     }));
+  },
+  async getInputPeriods(poolId: number) { return poolApiRequest<PoolInputPeriods>(`/v1/kpi-pools/${poolId}/input-periods`); },
+  async finalizePeriodComposition(poolId: number, periodStart: string) {
+    return poolApiRequest<{ data: { poolId: string; periodStart: string; periodEnd: string; status: "POOL_COMPOSITION_LOCKED"; kpiCount: number } }>(`/v1/kpi-pools/${poolId}/input-periods/finalize`, { method: "POST", body: JSON.stringify({ periodStart }) });
+  },
+  async getComposition(poolId: number, periodStart: string): Promise<PoolKpi[]> {
+    const response = await poolApiRequest<{ data: MembershipApiRecord[] }>(`/v1/kpi-pools/${poolId}/kpi-configurations?periodStart=${encodeURIComponent(periodStart)}`);
+    return response.data.map((value) => ({
+      configurationId: value.configurationId,
+      definitionId: value.definitionId,
+      configCode: value.configCode,
+      kpiCode: value.definitionCode,
+      name: value.definitionName,
+      category: value.categoryName ?? "Not specified",
+      goal: value.goal ?? "Not specified",
+      measurementUnit: value.measurementUnit ?? "Not specified",
+      dataSource: value.dataSource ?? "Not specified",
+      status: value.isActive ? "ACTIVE" : "INACTIVE",
+    }));
+  },
+  async getManageableComposition(poolId: number, periodStart: string): Promise<ManageablePoolKpi[]> {
+    return (await this.getComposition(poolId, periodStart)).map((kpi) => ({ ...kpi, availability: "IN_POOL", reasonCode: "POOL_PERIOD_LOCKED", conflictingConfigurationCode: null }));
+  },
+  async getConfigurationUsage(configurationIds: string[]) {
+    if (!configurationIds.length) return [];
+    const response = await poolApiRequest<{ data: Array<{ configurationId: string; usedIn: number; pools: Array<{ id: string; code: string; name: string; status: string }> }> }>("/v1/kpi-pools/kpi-configuration-usage", { method: "POST", body: JSON.stringify({ configurationIds }) });
+    return response.data;
   },
   async getImportableKpis(search: string, recentOnly = false) {
     await wait();
@@ -179,16 +245,11 @@ export const kpiPoolService = {
     kpiCatalog = [...kpiCatalog, ...imported.filter((item) => !existing.has(item.configCode)).map((item) => ({ ...item }))];
     return imported.map((item) => ({ ...item }));
   },
-  async addKpis(poolId: number, configCodes: string[]) {
-    await wait();
-    const pool = pools.find((item) => item.id === poolId);
-    if (!pool) throw new Error("KPI Pool not found.");
-    const current = new Set(pool.kpis.map((kpi) => kpi.configCode));
-    const candidates = kpiCatalog.filter((kpi) => configCodes.includes(kpi.configCode) && kpi.status === "ACTIVE" && !current.has(kpi.configCode));
-    assertUniqueDefinitions(pool, candidates);
-    const additions = candidates;
-    pool.kpis = [...pool.kpis, ...additions.map((kpi) => ({ ...kpi }))];
-    return clone(pool);
+  async addKpis(poolId: number, configCodes: string[], periodStart?: string) {
+    const catalog = await this.getManageableKpis(poolId, periodStart);
+    const configurationIds = catalog.filter((item) => configCodes.includes(item.configCode)).map((item) => item.configurationId!).filter(Boolean);
+    if (configurationIds.length !== configCodes.length) throw new Error("One or more KPI Configurations were not found.");
+    return poolApiRequest(`/v1/kpi-pools/${poolId}/kpi-configurations`, { method: "POST", body: JSON.stringify({ configurationIds, effectiveFromPeriod: periodStart }) });
   },
   async addConfigurations(poolId: number, configurations: KpiConfigRecord[]) {
     await wait();
@@ -218,12 +279,16 @@ export const kpiPoolService = {
     pool.kpis = [...pool.kpis, ...additions.map((kpi) => ({ ...kpi }))];
     return { pool: clone(pool), addedCount: additions.length };
   },
-  async removeKpis(poolId: number, configCodes: string[]) {
-    await wait();
-    const pool = pools.find((item) => item.id === poolId);
-    if (!pool) throw new Error("KPI Pool not found.");
-    pool.kpis = pool.kpis.filter((kpi) => !configCodes.includes(kpi.configCode));
-    return clone(pool);
+  async removeKpis(poolId: number, configCodes: string[], periodStart?: string, poolStatus?: "DRAFT" | "ACTIVE" | "INACTIVE") {
+    const query = periodStart ? `?periodStart=${encodeURIComponent(periodStart)}` : "";
+    const memberships = await poolApiRequest<{ data: MembershipApiRecord[] }>(`/v1/kpi-pools/${poolId}/kpi-configurations${query}`);
+    const selected = memberships.data.filter((item) => configCodes.includes(item.configCode));
+    if (selected.length !== configCodes.length) throw new Error("One or more memberships were not found.");
+    await Promise.all(selected.map((item) => poolApiRequest(
+      poolStatus === "ACTIVE" ? `/v1/kpi-pools/${poolId}/kpi-configurations/${item.configurationId}/retire` : `/v1/kpi-pools/${poolId}/kpi-configurations/${item.configurationId}`,
+      poolStatus === "ACTIVE" ? { method: "POST", body: JSON.stringify({ effectiveFromPeriod: periodStart }) } : { method: "DELETE" },
+    )));
+    return { removed: selected.length };
   },
   async hideKpisFromPool(poolId: number, configCodes: string[]) {
     await wait();

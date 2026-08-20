@@ -89,12 +89,6 @@ export const navigationItems: NavigationItem[] = [
         path: "/app/pool-kpis/create-pool-info",
         moduleName: "Pool KPIs",
       },
-      {
-        id: "manage-kpis",
-        label: "Manage KPIs",
-        path: "/app/pool-kpis/manage-kpis",
-        moduleName: "Pool KPIs",
-      },
     ],
   },
   {

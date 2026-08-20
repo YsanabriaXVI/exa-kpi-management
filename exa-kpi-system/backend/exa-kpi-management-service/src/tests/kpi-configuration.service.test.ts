@@ -12,7 +12,11 @@ const tx = vi.hoisted(() => ({
   kpiConfigurationRevision: { create: vi.fn() },
   kpiConfigurationRevisionThreshold: { createMany: vi.fn() },
 }));
-const db = vi.hoisted(() => ({ $transaction: vi.fn() }));
+const db = vi.hoisted(() => ({
+  $transaction: vi.fn(),
+  kpiConfiguration: { findMany: vi.fn() },
+  kpiDefinition: { findMany: vi.fn() },
+}));
 vi.mock("../config/database/prisma.js", () => ({ prisma: db }));
 
 import { kpiConfigurationService } from "../services/kpi-configuration.service.js";
@@ -51,5 +55,64 @@ describe("kpiConfigurationService.create", () => {
     expect(tx.kpiConfigurationRevision.create).toHaveBeenCalledWith({ data: expect.objectContaining({ kpiConfigurationId: 20n, revisionNumber: 1, targetValue: 4200 }) });
     expect(tx.kpiConfigurationRevisionThreshold.createMany.mock.calls[0]?.[0].data).toHaveLength(3);
     expect(created).toMatchObject({ code: "KPC-050-04", definitionId: 4 });
+  });
+});
+
+describe("kpiConfigurationService.list", () => {
+  it("projects active definitions without configurations as INCOMPLETE without creating PENDING records", async () => {
+    db.kpiConfiguration.findMany.mockResolvedValue([]);
+    db.kpiDefinition.findMany.mockResolvedValue([{
+      id: 51n,
+      kpiCode: "KPI-051",
+      kpiName: "Fuel performance",
+      createdAt: new Date("2026-07-28"),
+      updatedAt: null,
+    }]);
+
+    const result = await kpiConfigurationService.list({ page: 1, pageSize: 100 });
+
+    expect(db.kpiDefinition.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        isActive: true,
+        statusCode: "ACTIVE",
+        configurations: { none: { deletedAt: null } },
+      }),
+    }));
+    expect(result.data).toEqual([expect.objectContaining({
+      id: -51,
+      code: "",
+      definitionId: 51,
+      definitionCode: "KPI-051",
+      status: "INCOMPLETE",
+    })]);
+  });
+});
+
+describe("kpiConfigurationService.batchLookup", () => {
+  it("loads the complete batch once and preserves requested order while reporting missing IDs", async () => {
+    db.kpiConfiguration.findMany.mockResolvedValue([
+      {
+        id: 15n, configCode: "KPC-052-01", kpiDefinitionId: 52n, inputFrequencyId: 1n,
+        status: { code: "CONFIGURED" },
+        definition: { kpiCode: "KPI-052", kpiName: "Transport damage", isActive: true, statusCode: "ACTIVE", deletedAt: null },
+        inputFrequency: { code: "MONTHLY", name: "Monthly", isActive: true },
+      },
+      {
+        id: 10n, configCode: "KPC-050-01", kpiDefinitionId: 50n, inputFrequencyId: 1n,
+        status: { code: "INACTIVE" },
+        definition: { kpiCode: "KPI-050", kpiName: "Productivity", isActive: true, statusCode: "ACTIVE", deletedAt: null },
+        inputFrequency: { code: "MONTHLY", name: "Monthly", isActive: true },
+      },
+    ]);
+
+    const result = await kpiConfigurationService.batchLookup({ ids: ["10", "15", "22"] });
+
+    expect(db.kpiConfiguration.findMany).toHaveBeenCalledTimes(1);
+    expect(db.kpiConfiguration.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: { in: [10n, 15n, 22n] }, deletedAt: null },
+    }));
+    expect(result.data.map((item) => item.id)).toEqual(["10", "15"]);
+    expect(result.data[0]).toMatchObject({ definitionId: "50", inputFrequencyId: "1", status: "INACTIVE", isActive: false });
+    expect(result.notFoundIds).toEqual(["22"]);
   });
 });

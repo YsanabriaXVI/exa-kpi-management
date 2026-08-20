@@ -1,7 +1,9 @@
 import type { NextFunction,Request,Response } from "express";
-import { kpiConfigurationBodySchema,kpiConfigurationIdParamsSchema,listKpiConfigurationsQuerySchema } from "../schemas/kpi-configuration.schema.js";
+import { batchLookupKpiConfigurationsBodySchema,internalKpiConfigurationCatalogQuerySchema,kpiConfigurationBodySchema,kpiConfigurationIdParamsSchema,listKpiConfigurationsQuerySchema } from "../schemas/kpi-configuration.schema.js";
 import { kpiConfigurationService } from "../services/kpi-configuration.service.js";
 export async function listKpiConfigurations(req:Request,res:Response,next:NextFunction){try{res.json(await kpiConfigurationService.list(listKpiConfigurationsQuerySchema.parse(req.query)));}catch(e){next(e)}}
+export async function batchLookupKpiConfigurations(req:Request,res:Response,next:NextFunction){try{res.json(await kpiConfigurationService.batchLookup(batchLookupKpiConfigurationsBodySchema.parse(req.body)));}catch(e){next(e)}}
+export async function listInternalKpiConfigurationCatalog(req:Request,res:Response,next:NextFunction){try{res.json(await kpiConfigurationService.internalCatalog(internalKpiConfigurationCatalogQuerySchema.parse(req.query)));}catch(e){next(e)}}
 export async function getKpiConfiguration(req:Request,res:Response,next:NextFunction){try{const{id}=kpiConfigurationIdParamsSchema.parse(req.params);res.json({data:await kpiConfigurationService.get(BigInt(id))});}catch(e){next(e)}}
 export async function createKpiConfiguration(req:Request,res:Response,next:NextFunction){try{res.status(201).json({data:await kpiConfigurationService.create(kpiConfigurationBodySchema.parse(req.body),req.identity.actorUserId)});}catch(e){next(e)}}
 export async function updateKpiConfiguration(req:Request,res:Response,next:NextFunction){try{const{id}=kpiConfigurationIdParamsSchema.parse(req.params);res.json({data:await kpiConfigurationService.update(BigInt(id),kpiConfigurationBodySchema.parse(req.body),req.identity.actorUserId)});}catch(e){next(e)}}

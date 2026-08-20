@@ -1,5 +1,13 @@
 # EXA KPI System — Contexto para un nuevo chat
 
+> Nota de arquitectura vigente (agosto de 2026): el backend genérico de demostración,
+> sus endpoints `/api/demo`, las tablas `demo_items` y el `docker-compose.yml` raíz
+> fueron retirados. El backend activo está compuesto por microservicios independientes
+> dentro de `backend/`; actualmente se encuentra implementado
+> `exa-kpi-management-service` y la orquestación vigente es `backend/docker-compose.yml`.
+> Las menciones posteriores al backend starter se conservan solamente como contexto
+> histórico y no describen la forma actual de ejecutar el sistema.
+
 ## Objetivo
 
 EXA KPI System es una aplicación para definir, configurar, asignar, monitorear y reportar KPI y ScoreCards del grupo EXA.

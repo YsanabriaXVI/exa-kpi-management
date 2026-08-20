@@ -5,9 +5,12 @@
 .config-filter-search{height:31px;margin-bottom:4px;padding:0 8px;border:1px solid #d7dde5;border-radius:6px;display:flex;align-items:center;gap:6px;color:#7a8595}.config-filter-search input{width:100%;border:0;outline:0;font:inherit;font-size:9px}
 .config-filter-option-list{max-height:210px;overflow-y:auto}.config-filter-option{width:100%;padding:7px;border:0;border-radius:5px;display:grid;grid-template-columns:16px 1fr;align-items:center;gap:7px;text-align:left;cursor:pointer;background:#fff}.config-filter-option:hover{background:#f5f2f9}.config-filter-option i{width:15px;height:15px;border:1px solid #bcc5d0;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff}.config-filter-option i.checked{border-color:#7650a0;background:#7650a0}.config-filter-option strong,.config-filter-option small{display:block}.config-filter-option strong{color:#445064;font-size:9px}.config-filter-option small{margin-top:2px;color:#8a93a0;font-size:8px}.config-filter-empty{padding:13px;color:#8993a1;font-size:9px;text-align:center}
 .overview-traffic{display:flex;align-items:center;justify-content:center;gap:16px;white-space:nowrap}.traffic-point{display:inline-flex;align-items:center;gap:7px}.traffic-point i{width:15px;height:15px;flex:0 0 15px;border-radius:50%}.traffic-point i.red{background:#ef7777}.traffic-point i.yellow{background:#f2c94c}.traffic-point i.green{background:#58cf8b}.traffic-point small{color:#5f6c7e;font-size:11px;font-weight:750}.pending-value{color:#8b95a3;font-size:11.5px;font-style:italic;white-space:nowrap}
+.config-status-cell{display:inline-flex;align-items:center;gap:7px}.incomplete-help{position:relative;display:inline-flex;align-items:center;color:#8a6a13;cursor:help;outline:none}.incomplete-help>span[role="tooltip"]{position:absolute;z-index:30;right:0;bottom:calc(100% + 9px);width:260px;padding:9px 11px;border:1px solid #e8d28e;border-radius:8px;color:#5f4a12;background:#fff9e6;box-shadow:0 10px 26px rgba(31,42,59,.16);font-size:11px;font-style:normal;font-weight:500;line-height:1.45;white-space:normal;opacity:0;visibility:hidden;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease,visibility .15s ease}.incomplete-help:hover>span[role="tooltip"],.incomplete-help:focus-visible>span[role="tooltip"]{opacity:1;visibility:visible;transform:translateY(0)}
 .config-table th{background:#e8ebef}.config-table tbody tr,.config-table tbody tr:hover{background:#fff}.config-table th:nth-child(7),.config-table td:nth-child(7){text-align:center}.config-table td:nth-child(7) .overview-traffic{margin:0 auto}.config-table th:first-child,.config-table td:first-child{padding-left:20px}
+.config-status-cards{margin:11px 0;display:grid;grid-template-columns:repeat(3,minmax(235px,285px));justify-content:start;gap:10px;font-family:Arial,sans-serif}.config-status-cards>button{position:relative;width:100%;min-height:78px;padding:11px 42px 11px 13px;border:1px solid #dfe5ec;border-radius:9px;display:flex;align-items:center;gap:10px;color:#283447;cursor:pointer;text-align:left;background:#fff;box-shadow:0 3px 12px rgba(23,32,51,.055);font-family:Arial,sans-serif;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}.config-status-cards>button:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(23,32,51,.1)}.config-status-cards>button.active{border-width:2px;box-shadow:0 0 0 3px rgba(20,121,158,.1),0 8px 20px rgba(23,32,51,.1)}.config-status-cards>button>span:first-child{width:37px;height:37px;flex:0 0 37px;border-radius:9px;display:grid;place-items:center}.config-status-cards>button>span:last-child{min-width:0;margin-left:1px;display:block}.config-status-cards small{display:block;margin-bottom:6px;font-size:14px;font-weight:700;line-height:1.15}.config-status-cards strong{position:absolute;top:11px;right:12px;font-size:23px;line-height:1}.config-status-cards em{display:block;color:#697588;font-size:11px;font-style:normal;font-weight:700;line-height:1.3;white-space:nowrap}.config-status-cards .configured>span:first-child{color:#167f4d;background:#e6f7ee}.config-status-cards .configured.active{border-color:#42a977}.config-status-cards .inactive>span:first-child{color:#8a5260;background:#f8e9ed}.config-status-cards .inactive.active{border-color:#b96f81}.config-status-cards .incomplete>span:first-child{color:#9a6b08;background:#fff4d7}.config-status-cards .incomplete.active{border-color:#d7a62e}
 .config-table-footer{padding:12px 16px;border-top:1px solid #edf0f3;display:flex;align-items:center;justify-content:space-between;gap:14px;color:#778294;background:#fff;font-size:11px}.config-pagination{display:flex;align-items:center;gap:9px}.config-pagination button{width:29px;height:29px;border:1px solid #d8dee6;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:#506074;cursor:pointer;background:#fff}.config-pagination button:hover:not(:disabled){border-color:#1680a5;color:#1680a5;background:#eef8fb}.config-pagination button:disabled{color:#b8c0ca;cursor:not-allowed;background:#f7f8fa}
 @media(max-width:1250px){.config-overview-toolbar{grid-template-columns:minmax(220px,1fr) repeat(2,minmax(145px,165px))}.config-overview-toolbar .config-search{grid-column:span 1}}@media(max-width:850px){.config-overview-toolbar{grid-template-columns:1fr 1fr}.config-overview-toolbar .config-search{grid-column:1/-1}}
+@media(max-width:920px){.config-status-cards{grid-template-columns:repeat(2,minmax(235px,285px))}}@media(max-width:620px){.config-status-cards{grid-template-columns:minmax(0,1fr)}.config-status-cards>button{min-height:68px}}
 
 /* Overview sizing aligned with KPI Definition. */
 .kpi-config-page .config-page-header h1 {
@@ -291,6 +294,32 @@ html[data-theme="dark"] .kpi-config-page .code-pill {
 html[data-theme="dark"] .kpi-config-page .pending-value {
   color: #c6d0de;
   font-weight: 650;
+}
+
+html[data-theme="dark"] .kpi-config-page .config-status-cards > button {
+  color: var(--ems-text);
+  border-color: var(--ems-border);
+  background: var(--ems-surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme="dark"] .kpi-config-page .config-status-cards em {
+  color: var(--ems-muted);
+}
+
+html[data-theme="dark"] .kpi-config-page .config-status-cards .configured > span:first-child {
+  color: #79d8a6;
+  background: rgba(35, 157, 94, 0.2);
+}
+
+html[data-theme="dark"] .kpi-config-page .config-status-cards .inactive > span:first-child {
+  color: #e2a2b2;
+  background: rgba(185, 79, 105, 0.2);
+}
+
+html[data-theme="dark"] .kpi-config-page .config-status-cards .incomplete > span:first-child {
+  color: #f0c75e;
+  background: rgba(215, 166, 46, 0.2);
 }
 
 html[data-theme="dark"] .kpi-config-page .traffic-point small {

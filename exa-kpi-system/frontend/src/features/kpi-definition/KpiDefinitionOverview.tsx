@@ -6,6 +6,7 @@ import { ApiError } from "../../api/http-client";
 import { PaginationControls } from "../../components/PaginationControls";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
+import { OverviewDeleteConfirmation } from "../../components/OverviewDeleteConfirmation";
 import { CheckboxMultiSelect } from "./CheckboxMultiSelect";
 import { KpiDefinitionModal } from "./KpiDefinitionModal";
 import { kpiDefinitionKeys, kpiDefinitionService } from "./kpi-definition.service";
@@ -104,7 +105,7 @@ export function KpiDefinitionOverview() {
       <footer className="kpi-table-footer"><span>Showing <strong>{meta.totalItems ? (meta.page-1)*meta.pageSize+1 : 0}-{Math.min(meta.page*meta.pageSize,meta.totalItems)}</strong> of <strong>{meta.totalItems}</strong> definitions {definitionsQuery.isFetching && !definitionsQuery.isLoading ? "· Refreshing..." : ""}</span><RowsPerPageSelect value={pageSize} onChange={(value) => {setPageSize(value);setPage(1);}}/><PaginationControls page={meta.page} totalPages={Math.max(1,meta.totalPages)} onPage={setPage} label="KPI Definitions pagination"/></footer>
     </section>
     {(creating || editing) && <KpiDefinitionModal definition={editing ?? undefined} categories={categoriesQuery.data ?? []} isSaving={saveMutation.isPending} serverError={mutationError} onClose={() => {setCreating(false);setEditing(null);setMutationError("");}} onSubmit={(input, isActive) => saveMutation.mutate({input,definition:editing ?? undefined,isActive})}/>}
-    {deleting && <div className="kpi-modal-backdrop" role="presentation"><section className="confirmation-dialog delete-confirmation-dialog" role="alertdialog" aria-modal="true" aria-labelledby="delete-kpi-title"><button type="button" className="confirmation-dialog-close" aria-label="Close delete confirmation" title="Close" disabled={deleteMutation.isPending} onClick={() => setDeleting(null)}><X size={19}/></button><div className="danger-icon"><Trash2 size={24}/></div><h2 id="delete-kpi-title">Delete KPI Definition?</h2><p><strong>{deleting.kpiCode}</strong> will disappear from KPI Definition Overview but remain stored in the database for audit history.</p><div className="kpi-modal-actions"><button className="button secondary" onClick={() => setDeleting(null)} disabled={deleteMutation.isPending}>Cancel</button><button className="button danger" disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate(deleting)}>{deleteMutation.isPending ? "Deleting..." : "Delete Definition"}</button></div></section></div>}
+    {deleting && <OverviewDeleteConfirmation title="Delete KPI Definition?" message={`${deleting.kpiCode} will disappear from KPI Definition Overview but remain stored in the database for audit history.`} pending={deleteMutation.isPending} onAccept={() => deleteMutation.mutate(deleting)} onCancel={() => setDeleting(null)} />}
     {toast && <div className={`kpi-toast ${toast.tone}`} role="status"><CheckCircle2 size={20}/><span>{toast.message}</span><button aria-label="Dismiss notification" onClick={() => setToast(null)}><X size={16}/></button></div>}
   </main>;
 }

@@ -1,13 +1,17 @@
 import request from "supertest";
 import { beforeEach,describe,expect,it,vi } from "vitest";
-const mocks=vi.hoisted(()=>({list:vi.fn(),get:vi.fn(),create:vi.fn(),update:vi.fn(),deactivate:vi.fn(),softDelete:vi.fn()}));
+const mocks=vi.hoisted(()=>({batchLookup:vi.fn(),internalCatalog:vi.fn(),list:vi.fn(),get:vi.fn(),create:vi.fn(),update:vi.fn(),deactivate:vi.fn(),softDelete:vi.fn()}));
 vi.mock("../services/kpi-configuration.service.js",()=>({kpiConfigurationService:mocks}));
 import {app} from "../app.js";
 const record={id:1,code:"KPC-049-01",definitionId:49,definitionCode:"KPI-049",definitionName:"Costs",goal:20,measurementUnit:"%",evaluationType:"Lower is better",dataSource:"EMS",ranges:{redFrom:0,redTo:30,yellowFrom:31,yellowTo:65,greenFrom:66,greenTo:100},usedIn:0,status:"CONFIGURED",createdAt:"2026-01-01",createdBy:"System",updatedAt:"2026-01-01",updatedBy:"System",poolNames:[]};
 const body={definitionId:49,goal:20,measurementUnit:"%",dataSource:"EMS",ranges:record.ranges,isActive:true};
-beforeEach(()=>{vi.clearAllMocks();mocks.list.mockResolvedValue({data:[],meta:{page:1,pageSize:20,totalItems:0,totalPages:0}})});
+beforeEach(()=>{vi.clearAllMocks();mocks.list.mockResolvedValue({data:[],meta:{page:1,pageSize:20,totalItems:0,totalPages:0}});mocks.internalCatalog.mockResolvedValue({data:[],meta:{page:1,pageSize:20,totalItems:0,totalPages:0}})});
 describe("KPI Configuration API",()=>{
  it("lists configurations",async()=>expect((await request(app).get("/api/v1/kpi-configurations")).status).toBe(200));
+ it("batch looks up configurations and deduplicates repeated IDs",async()=>{mocks.batchLookup.mockResolvedValue({data:[],notFoundIds:["10","22"]});const response=await request(app).post("/api/v1/kpi-configurations/batch-lookup").send({ids:["10","10","22"]});expect(response.status).toBe(200);expect(mocks.batchLookup).toHaveBeenCalledWith({ids:["10","22"]});expect(response.body.notFoundIds).toEqual(["10","22"])});
+ it("exposes a paginated internal catalog",async()=>{const response=await request(app).get("/api/v1/internal/kpi-configurations?page=2&pageSize=10&search=KPI");expect(response.status).toBe(200);expect(mocks.internalCatalog).toHaveBeenCalledWith({page:2,pageSize:10,search:"KPI"})});
+ it("rejects an empty batch",async()=>expect((await request(app).post("/api/v1/kpi-configurations/batch-lookup").send({ids:[]})).status).toBe(400));
+ it("rejects a batch larger than 100 IDs",async()=>expect((await request(app).post("/api/v1/kpi-configurations/batch-lookup").send({ids:Array.from({length:101},(_,index)=>String(index+1))})).status).toBe(400));
  it("gets a configuration",async()=>{mocks.get.mockResolvedValue(record);expect((await request(app).get("/api/v1/kpi-configurations/1")).body.data.code).toBe(record.code)});
  it("creates a validated configuration",async()=>{mocks.create.mockResolvedValue(record);expect((await request(app).post("/api/v1/kpi-configurations").send(body)).status).toBe(201)});
  it("rejects invalid ranges payload",async()=>expect((await request(app).post("/api/v1/kpi-configurations").send({...body,ranges:{}})).status).toBe(400));
