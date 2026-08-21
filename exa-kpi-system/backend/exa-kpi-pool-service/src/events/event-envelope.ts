@@ -19,6 +19,7 @@ export const plannedPoolEventTypes = [
   "kpi.pool.kpi.added.v1",
   "kpi.pool.kpi.retired.v1",
   "kpi.pool.period.composition.finalized.v1",
+  "kpi.pool.validity.extended.v1",
 ] as const;
 
 export function validateEventEnvelope(value: unknown): EventEnvelope {

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Building2,
   CalendarDays,
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -12,7 +13,7 @@ import {
   Search,
   Settings2,
 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { kpiPoolService } from "./kpi-pool.service";
 import { PoolOverviewMultiSelect } from "./PoolOverviewMultiSelect";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
@@ -21,10 +22,12 @@ import { compareSortValues, SortableTableHeader, type SortDirection } from "../.
 import "./kpi-pool.css";
 import "./period-workflow.css";
 import "./pool-detail-period-select.css";
+import { PoolPeriodSelect } from "./PoolPeriodSelect";
 
 export function KpiPoolDetail() {
   const navigate = useNavigate();
   const { poolId } = useParams();
+  const [searchParams] = useSearchParams();
   const id = Number(poolId) || 0;
   const [kpiSearch, setKpiSearch] = useState("");
   const [kpiCategories, setKpiCategories] = useState<string[]>([]);
@@ -51,7 +54,7 @@ export function KpiPoolDetail() {
   });
   const pool = poolQuery.data;
   const periodsQuery = useQuery({ queryKey: ["kpi-pool-periods", id], queryFn: () => kpiPoolService.getInputPeriods(id), enabled: id > 0 });
-  useEffect(() => { if (!viewingPeriod && periodsQuery.data) setViewingPeriod(periodsQuery.data.meta.defaultPeriodStart ?? periodsQuery.data.data[periodsQuery.data.data.length - 1]?.start ?? ""); }, [periodsQuery.data, viewingPeriod]);
+  useEffect(() => { if (!viewingPeriod && periodsQuery.data) { const requestedPeriod = searchParams.get("period"); setViewingPeriod(periodsQuery.data.data.some((period) => period.start === requestedPeriod) ? requestedPeriod! : periodsQuery.data.meta.defaultPeriodStart ?? periodsQuery.data.data[periodsQuery.data.data.length - 1]?.start ?? ""); } }, [periodsQuery.data, searchParams, viewingPeriod]);
   const selectedPeriod = periodsQuery.data?.data.find((period) => period.start === viewingPeriod);
   const compositionQuery = useQuery({ queryKey: ["kpi-pool-composition", id, viewingPeriod], queryFn: () => kpiPoolService.getComposition(id, viewingPeriod), enabled: id > 0 && Boolean(viewingPeriod) && selectedPeriod?.workflowStatus !== "FUTURE" });
   const compositionKpis = compositionQuery.data ?? [];
@@ -166,15 +169,7 @@ export function KpiPoolDetail() {
           <h1>{pool.name}</h1>
           <p>{pool.description}</p>
         </div>
-        <button
-          className="button secondary"
-          disabled={pool.status !== "DRAFT"}
-          onClick={() =>
-            navigate(`/app/pool-kpis/create-pool-info?poolId=${pool.id}`)
-          }
-        >
-          <Pencil size={15} /> Edit Pool Info
-        </button>
+        <div className="pool-detail-header-actions"><button className="button secondary" onClick={() => navigate(`/app/pool-kpis/period-schedule?poolId=${pool.id}`)}><CalendarRange size={15}/> Period Schedule</button><button className="button secondary" disabled={pool.status !== "DRAFT"} onClick={() => navigate(`/app/pool-kpis/create-pool-info?poolId=${pool.id}`)}><Pencil size={15} /> Edit Pool Info</button></div>
       </header>
 
       <section className="pool-summary-card">
@@ -215,7 +210,7 @@ export function KpiPoolDetail() {
           </div>
           <div>
             <dt>Used in ScoreCards</dt>
-            <dd className="summary-number">{pool.scorecards.length}</dd>
+            <dd className="summary-number">{pool.scorecardCount ?? pool.scorecards.length}</dd>
           </div>
         </dl>
       </section>
@@ -232,7 +227,7 @@ export function KpiPoolDetail() {
             <p>Configurations effective during the selected Input Period.</p>
           </div>
           <div className="pool-detail-period-actions">
-            <label><span>View Pool records for</span><div className="pool-period-single-select"><select value={viewingPeriod} onChange={(event) => { setViewingPeriod(event.target.value); setKpiPage(1); }}>{(periodsQuery.data?.data ?? []).map((period) => <option value={period.start} key={period.start}>{formatPeriodOption(period.start)}</option>)}</select><strong className={`pool-period-option-status ${selectedPeriod?.workflowStatus.toLowerCase() ?? "future"}`}>{toTitleCase(selectedPeriod?.workflowStatus ?? "FUTURE")}</strong></div></label>
+            <label><span>View Pool records for</span><PoolPeriodSelect periods={periodsQuery.data?.data ?? []} value={viewingPeriod} onChange={(period) => { setViewingPeriod(period); setKpiPage(1); }}/></label>
             <button
               className="button pool-dark-button"
               disabled={pool.status === "INACTIVE" || selectedPeriod?.configurationStatus !== "EDITABLE"}
@@ -242,7 +237,7 @@ export function KpiPoolDetail() {
             </button>
           </div>
         </div>
-        <div className="pool-detail-filters kpi-detail-filter-grid">
+        {selectedPeriod?.workflowStatus === "FUTURE" ? <div className="future-composition-empty"><CalendarRange size={34}/><span className="selected-period-badge">{formatFullMonth(viewingPeriod)} · Future</span><h2>KPI composition not available yet</h2><p>Complete the previous period workflow before this composition becomes available.</p><strong>Current editable composition: {periodsQuery.data?.meta.defaultPeriodStart ? formatFullMonth(periodsQuery.data.meta.defaultPeriodStart) : "None available"}</strong></div> : <><div className="pool-detail-filters kpi-detail-filter-grid">
           <label className="pool-search">
             <Search size={16} />
             <input
@@ -371,7 +366,7 @@ export function KpiPoolDetail() {
             onPageSize={setKpiPageSize}
             label="KPI Configurations"
           />
-        </div>
+        </div></>}
       </section>
 
       <section className="pool-detail-section">
@@ -380,14 +375,14 @@ export function KpiPoolDetail() {
             <div className="pool-table-title">
               <h2>ScoreCards Using This Pool</h2>
               <span>
-                {pool.scorecards.length}{" "}
-                {pool.scorecards.length === 1
+                {pool.scorecardCount ?? pool.scorecards.length}{" "}
+                {(pool.scorecardCount ?? pool.scorecards.length) === 1
                   ? "ScoreCard uses"
                   : "ScoreCards use"}{" "}
                 this Pool
               </span>
             </div>
-            <p>Read-only usage information from active ScoreCards.</p>
+            <p>Read-only downstream relationships when supplied by a real Scorecards contract.</p>
           </div>
         </div>
         <div className="pool-detail-filters scorecard-detail-filter-grid">
@@ -481,7 +476,7 @@ export function KpiPoolDetail() {
               ) : (
                 <tr>
                   <td colSpan={9} className="table-message">
-                    This Pool is not used by any ScoreCard.
+                    Scorecard relationship details are not available from a connected service yet.
                   </td>
                 </tr>
               )}
@@ -555,16 +550,6 @@ function formatMonth(value: string) {
 
 function formatFullMonth(value: string) {
   return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(value));
-}
-
-function formatPeriodOption(value: string) {
-  const date = new Date(value);
-  const month = new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(date);
-  return `${month} ${date.getUTCFullYear()}`;
-}
-
-function toTitleCase(value: string) {
-  return value.toLowerCase().replace(/(^|_)([a-z])/g, (_match, prefix: string, letter: string) => `${prefix ? " " : ""}${letter.toUpperCase()}`);
 }
 
 function isDateWithinToday(start: string, end: string) {

@@ -1,0 +1,67 @@
+.pool-period-schedule-page { display: grid; gap: 22px; }
+.schedule-pool-context { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 24px; border: 1px solid var(--ems-border); border-radius: 14px; background: var(--ems-surface); }
+.schedule-pool-context > div { display: grid; gap: 5px; }
+.schedule-pool-context span, .schedule-pool-context dt, .schedule-period-selector label { color: var(--ems-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.schedule-pool-context strong { font-size: 18px; color: var(--ems-text); }
+.schedule-pool-context strong i { font-style: normal; color: var(--ems-muted); }
+.schedule-pool-context dl { display: flex; gap: 42px; margin: 0; }
+.schedule-pool-context dl div { display: grid; gap: 5px; }
+.schedule-pool-context dd { margin: 0; color: var(--ems-text); font-weight: 700; }
+.schedule-period-navigation { display: grid; gap: 16px; }
+.schedule-period-selector { width: min(410px, 100%); display: grid; gap: 7px; }
+.schedule-period-selector .pool-period-select { width: 100%; }
+.selected-period-status-card { display: flex; align-items: flex-start; gap: 16px; padding: 20px 22px; border: 1px solid var(--ems-border); border-left-width: 4px; border-radius: 14px; background: var(--ems-surface); }
+.selected-period-status-icon { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; }
+.selected-period-status-copy { min-width: 0; display: grid; gap: 6px; }
+.selected-period-status-copy header { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.selected-period-status-copy header > span { color: var(--ems-text); font-size: 13px; font-weight: 800; }
+.selected-period-status-copy header b { padding: 4px 8px; border-radius: 999px; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+.selected-period-status-copy h2, .selected-period-status-copy p { margin: 0; }
+.selected-period-status-copy h2 { color: var(--ems-text); font-size: 19px; }
+.selected-period-status-copy p, .selected-period-status-copy small { color: var(--ems-muted); line-height: 1.5; }
+.selected-period-status-copy strong { color: var(--ems-text); font-size: 12px; }
+.selected-period-status-copy .button { width: fit-content; margin-top: 5px; }
+.selected-period-status-card.finalized { border-left-color: var(--ems-success); }
+.selected-period-status-card.finalized .selected-period-status-icon, .selected-period-status-card.finalized header b { color: #15803d; background: rgba(22,163,74,.12); }
+.selected-period-status-card.preparing { border-left-color: var(--ems-primary); }
+.selected-period-status-card.preparing .selected-period-status-icon, .selected-period-status-card.preparing header b { color: #1d4ed8; background: rgba(37,99,235,.12); }
+.selected-period-status-card.ready { border-left-color: var(--ems-warning); }
+.selected-period-status-card.ready .selected-period-status-icon, .selected-period-status-card.ready header b { color: #9a6700; background: rgba(230,170,0,.15); }
+.selected-period-status-card.future { border-left-color: var(--ems-muted); }
+.selected-period-status-card.future .selected-period-status-icon, .selected-period-status-card.future header b { color: var(--ems-muted); background: var(--ems-surface-muted); }
+.selected-period-dependency { display: flex; align-items: center; gap: 6px; color: #9a6700!important; }
+.input-period-workflow { display: grid; gap: 12px; }
+.input-period-workflow > header h2 { margin: 0; color: var(--ems-text); font-size: 20px; }
+.input-period-workflow > header p { margin: 5px 0 0; color: var(--ems-muted); font-size: 12px; line-height: 1.5; }
+.period-workflow-board { display: grid; grid-template-columns: minmax(0,1fr) 28px minmax(0,1fr) 28px minmax(0,1fr); align-items: stretch; }
+.workflow-stage-arrow { align-self: center; justify-self: center; color: var(--ems-border); stroke-width: 1.6; }
+.workflow-stage-card { min-width: 0; min-height: 270px; display: flex; flex-direction: column; gap: 15px; padding: 22px; border: 1px solid var(--ems-border); border-left-width: 4px; border-radius: 14px; background: var(--ems-surface); transition: background-color .18s ease,border-color .18s ease; }
+.workflow-stage-card header { display: flex; gap: 10px; align-items: center; }
+.workflow-stage-card header .workflow-stage-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; color: #2563eb; background: rgba(37,99,235,.1); }
+.workflow-stage-number { flex: 0 0 auto; width: 22px; height: 22px; border: 1px solid var(--ems-border); border-radius: 50%; display: grid; place-items: center; color: var(--ems-muted); background: var(--ems-surface-muted); font-size: 10px; font-weight: 800; }
+.workflow-stage-card h2 { margin: 0; font-size: 17px; color: var(--ems-text); }
+.workflow-stage-status { width: fit-content; padding: 5px 9px; border-radius: 999px; font-size: 11px; letter-spacing: .05em; color: #1d4ed8; background: rgba(37,99,235,.12); }
+.workflow-stage-card.finalized { border-left-color: #2f9b63; background: rgba(22,163,74,.065); }.workflow-stage-card.finalized .workflow-stage-icon{color:#15803d;background:rgba(22,163,74,.14)}.workflow-stage-card.finalized .workflow-stage-status { color: #126837; background: rgba(22,163,74,.17); }.workflow-stage-card.finalized .workflow-stage-content>strong{color:#126837}
+.workflow-stage-card.in-preparation { border-left-color:#258bb2;background:rgba(37,139,178,.065) }.workflow-stage-card.in-preparation .workflow-stage-icon{color:#176f91;background:rgba(37,139,178,.14)}.workflow-stage-card.in-preparation .workflow-stage-status{color:#176f91;background:rgba(37,139,178,.16)}.workflow-stage-card.in-preparation .workflow-stage-content>strong{color:#176f91}
+.workflow-stage-card.ready-to-finalize { border-left-color: var(--ems-warning);background:rgba(230,170,0,.07) }.workflow-stage-card.ready-to-finalize .workflow-stage-icon{color:#9a6700;background:rgba(230,170,0,.15)}
+.workflow-stage-card.ready-to-finalize .workflow-stage-status { color: #9a6700; background: rgba(230,170,0,.15); }
+.workflow-stage-card.ready-to-finalize .workflow-stage-content>strong{color:#8a5c00}.workflow-stage-card.waiting{border-left-color:#d29a24;background:rgba(230,170,0,.06)}.workflow-stage-card.waiting .workflow-stage-icon{color:#9a6700;background:rgba(230,170,0,.14)}.workflow-stage-card.waiting .workflow-stage-status{color:#8a5c00;background:rgba(230,170,0,.17)}.workflow-stage-card.waiting .workflow-stage-content>strong{color:#8a5c00}
+.workflow-stage-card.integration-pending{border-left-color:#8b6bb6;background:rgba(124,88,166,.065)}.workflow-stage-card.integration-pending .workflow-stage-icon{color:#74509f;background:rgba(124,88,166,.14)}.workflow-stage-card.integration-pending .workflow-stage-status { color: #68448f; background: rgba(124,88,166,.16); }.workflow-stage-card.integration-pending .workflow-stage-content>strong{color:#68448f}
+.workflow-stage-card.future,.workflow-stage-card.unavailable{border-left-color:#aeb8c0;background:rgba(127,127,127,.045)}.workflow-stage-card.future .workflow-stage-icon,.workflow-stage-card.unavailable .workflow-stage-icon{color:var(--ems-muted);background:rgba(127,127,127,.1)}.workflow-stage-card.future .workflow-stage-status, .workflow-stage-card.unavailable .workflow-stage-status { color: var(--ems-muted); background: rgba(127,127,127,.12); }
+.workflow-stage-content { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 12px; }
+.workflow-stage-content p { margin: 0; color: var(--ems-muted); line-height: 1.55; }
+.workflow-stage-content strong { color: var(--ems-text); }
+.workflow-stage-content .button { margin-top: auto; }
+.schedule-contract-note { margin: 0; padding: 14px 18px; border-left: 3px solid #2563eb; color: var(--ems-muted); background: rgba(37,99,235,.06); }
+@media (max-width: 980px) { .period-workflow-board { grid-template-columns: 1fr; gap: 12px; } .workflow-stage-arrow { transform: rotate(90deg); } .workflow-stage-card { min-height: 220px; } }
+@media (max-width: 720px) { .schedule-pool-context { align-items: flex-start; flex-direction: column; } .schedule-pool-context dl { flex-wrap: wrap; gap: 18px 32px; } }
+html[data-theme="dark"] .selected-period-status-card,
+html[data-theme="dark"] .workflow-stage-card { background: var(--ems-surface); }
+html[data-theme="dark"] .workflow-stage-card.finalized{background:rgba(22,163,74,.1)}html[data-theme="dark"] .workflow-stage-card.in-preparation{background:rgba(37,139,178,.11)}html[data-theme="dark"] .workflow-stage-card.ready-to-finalize,html[data-theme="dark"] .workflow-stage-card.waiting{background:rgba(230,170,0,.095)}html[data-theme="dark"] .workflow-stage-card.integration-pending{background:rgba(124,88,166,.12)}html[data-theme="dark"] .workflow-stage-card.future,html[data-theme="dark"] .workflow-stage-card.unavailable{background:rgba(127,127,127,.065)}
+html[data-theme="dark"] .selected-period-status-card.finalized .selected-period-status-icon,
+html[data-theme="dark"] .selected-period-status-card.finalized header b { color: #7ce0a8; }
+html[data-theme="dark"] .selected-period-status-card.preparing .selected-period-status-icon,
+html[data-theme="dark"] .selected-period-status-card.preparing header b { color: #8dbbff; }
+html[data-theme="dark"] .selected-period-status-card.ready .selected-period-status-icon,
+html[data-theme="dark"] .selected-period-status-card.ready header b,
+html[data-theme="dark"] .selected-period-dependency { color: #f0c45c!important; }

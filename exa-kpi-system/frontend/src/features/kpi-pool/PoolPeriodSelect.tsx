@@ -11,7 +11,7 @@ export function PoolPeriodSelect({ periods, value, onChange }: { periods: PoolIn
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, []);
-  return <div ref={rootRef} className="pool-period-select">
+  return <div ref={rootRef} className="pool-period-select" onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); (event.currentTarget.querySelector(":scope > button") as HTMLButtonElement | null)?.focus(); } }}>
     <button type="button" className={open ? "open" : ""} onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open}>
       <span>{selected ? formatPeriodOption(selected.start) : "Select period"}</span>
       {selected && <StatusBadge period={selected}/>}<ChevronDown size={17}/>

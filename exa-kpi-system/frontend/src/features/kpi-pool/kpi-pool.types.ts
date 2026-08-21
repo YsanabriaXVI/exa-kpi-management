@@ -71,6 +71,7 @@ export type KpiPoolRecord = {
   status: PoolStatus;
   kpiCount?: number;
   scorecardCount?: number;
+  operationalPeriod?: { periodKey: string; start: string; end: string; status: "FINALIZED" | "PREPARING"; kpiCount: number | null; next: { periodKey: string; start: string; status: "PREPARING" } | null } | null;
   kpis: PoolKpi[];
   scorecards: PoolScorecard[];
 };

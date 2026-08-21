@@ -1,0 +1,10 @@
+import { app } from "./app.js";
+import { env } from "./config/env.js";
+import { logger } from "./config/logger.js";
+import { registerTerminationHandlers } from "./terminate.js";
+import { natsManager } from "./config/nats.js";
+import { outboxProcessor } from "./outbox/outbox.processor.js";
+import { poolEventsConsumer } from "./consumers/pool-events.consumer.js";
+const server = app.listen(env.PORT, () => logger.info({ port: env.PORT }, "EXA Scorecards Service listening"));
+void natsManager.start().then(async () => { outboxProcessor.start(); try { await poolEventsConsumer.start(); } catch (error) { logger.error({ error }, "Pool events consumer could not start; HTTP remains available"); } });
+registerTerminationHandlers(server);

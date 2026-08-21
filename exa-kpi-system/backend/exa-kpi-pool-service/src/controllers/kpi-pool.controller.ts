@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { addKpiPoolConfigurationsBodySchema, availableKpiConfigurationsQuerySchema, createKpiPoolBodySchema, finalizePeriodCompositionBodySchema, kpiConfigurationUsageBodySchema, kpiPoolConfigurationParamsSchema, kpiPoolIdParamsSchema, listKpiPoolsQuerySchema, replaceKpiPoolConfigurationBodySchema, retireKpiPoolConfigurationBodySchema, targetPeriodQuerySchema, updateKpiPoolBodySchema } from "../schemas/kpi-pool.schema.js";
+import { addKpiPoolConfigurationsBodySchema, availableKpiConfigurationsQuerySchema, createKpiPoolBodySchema, extendKpiPoolValidityBodySchema, finalizePeriodCompositionBodySchema, kpiConfigurationUsageBodySchema, kpiPoolConfigurationParamsSchema, kpiPoolIdParamsSchema, listKpiPoolsQuerySchema, replaceKpiPoolConfigurationBodySchema, retireKpiPoolConfigurationBodySchema, targetPeriodQuerySchema, updateKpiPoolBodySchema } from "../schemas/kpi-pool.schema.js";
 import { kpiPoolService } from "../services/kpi-pool.service.js";
 import { kpiPoolMembershipService } from "../services/kpi-pool-membership.service.js";
 import { kpiPoolLifecycleService } from "../services/kpi-pool-lifecycle.service.js";
@@ -27,6 +27,14 @@ export async function updateKpiPool(request: Request, response: Response, next: 
     const { id } = kpiPoolIdParamsSchema.parse(request.params);
     const input = updateKpiPoolBodySchema.parse(request.body);
     response.json({ data: await kpiPoolService.update(BigInt(id), input, request.identity.actorUserId) });
+  } catch (error) { next(error); }
+}
+
+export async function extendKpiPoolValidity(request: Request, response: Response, next: NextFunction) {
+  try {
+    const { id } = kpiPoolIdParamsSchema.parse(request.params);
+    const { validTo } = extendKpiPoolValidityBodySchema.parse(request.body);
+    response.json({ data: await kpiPoolService.extendValidity(BigInt(id), validTo, request.identity.actorUserId) });
   } catch (error) { next(error); }
 }
 

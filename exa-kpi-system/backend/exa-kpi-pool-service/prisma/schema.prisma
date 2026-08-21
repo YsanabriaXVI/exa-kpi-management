@@ -91,6 +91,7 @@ model KpiPool {
   companies                KpiPoolCompany[]
   kpis                     KpiPoolKpi[]
   periodCompositions       KpiPoolPeriodComposition[]
+  inputPeriods             KpiPoolInputPeriod[]
 
   @@unique([areaScopeKey, issueYear, poolSequence], map: "uq_kpi_pools_business_scope_sequence")
   @@index([statusCode, deletedAt], map: "ix_kpi_pools_status")
@@ -99,9 +100,26 @@ model KpiPool {
   @@map("kpi_pools")
 }
 
+model KpiPoolInputPeriod {
+  id          BigInt                     @id @default(autoincrement()) @map("kpi_pool_input_period_id")
+  kpiPoolId   BigInt                     @map("kpi_pool_id")
+  periodKey   String                     @map("period_key") @db.Char(7)
+  periodStart DateTime                   @map("period_start") @db.Date
+  periodEnd   DateTime                   @map("period_end") @db.Date
+  createdAt   DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  pool        KpiPool                    @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_input_periods_pool")
+  composition KpiPoolPeriodComposition?
+
+  @@unique([kpiPoolId, periodStart], map: "uq_kpi_pool_input_period")
+  @@unique([kpiPoolId, periodKey], map: "uq_kpi_pool_input_period_key")
+  @@index([kpiPoolId, periodStart], map: "ix_kpi_pool_input_periods_pool_start")
+  @@map("kpi_pool_input_periods")
+}
+
 model KpiPoolPeriodComposition {
   id                BigInt   @id @default(autoincrement()) @map("kpi_pool_period_composition_id")
   kpiPoolId         BigInt   @map("kpi_pool_id")
+  inputPeriodId     BigInt   @unique(map: "uq_kpi_pool_period_composition_input_period") @map("kpi_pool_input_period_id")
   periodStart       DateTime @map("period_start") @db.Date
   periodEnd         DateTime @map("period_end") @db.Date
   statusCode        String   @default("POOL_COMPOSITION_LOCKED") @map("status_code") @db.VarChar(32)
@@ -109,6 +127,7 @@ model KpiPoolPeriodComposition {
   finalizedAt       DateTime @default(now()) @map("finalized_at") @db.DateTime(3)
   finalizedByUserId BigInt?  @map("finalized_by_user_id")
   pool              KpiPool  @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_period_compositions_pool")
+  inputPeriod       KpiPoolInputPeriod @relation(fields: [inputPeriodId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_pool_period_compositions_input_period")
 
   @@unique([kpiPoolId, periodStart], map: "uq_kpi_pool_period_composition")
   @@index([kpiPoolId, statusCode, periodStart], map: "ix_kpi_pool_period_compositions_status")

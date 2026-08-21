@@ -27,6 +27,7 @@ export const addKpiPoolConfigurationsBodySchema = z.object({ configurationIds: z
   .transform(({ configurationIds, effectiveFromPeriod }) => ({ configurationIds: [...new Set(configurationIds)], effectiveFromPeriod }));
 export const retireKpiPoolConfigurationBodySchema = z.object({ effectiveFromPeriod: dateString.optional() }).strict();
 export const finalizePeriodCompositionBodySchema = z.object({ periodStart: dateString }).strict();
+export const extendKpiPoolValidityBodySchema = z.object({ validTo: dateString }).strict();
 export const replaceKpiPoolConfigurationBodySchema = z.object({ oldConfigurationId: positiveId, newConfigurationId: positiveId, effectiveFromPeriod: dateString.optional() }).strict()
   .refine((value) => value.oldConfigurationId !== value.newConfigurationId, "Replacement Configuration must be different");
 export const kpiConfigurationUsageBodySchema = z.object({ configurationIds: z.array(positiveId).min(1).max(100) }).strict()
@@ -66,3 +67,4 @@ export type TargetPeriodQuery = z.infer<typeof targetPeriodQuerySchema>;
 export type RetireKpiPoolConfigurationBody = z.infer<typeof retireKpiPoolConfigurationBodySchema>;
 export type ReplaceKpiPoolConfigurationBody = z.infer<typeof replaceKpiPoolConfigurationBodySchema>;
 export type FinalizePeriodCompositionBody = z.infer<typeof finalizePeriodCompositionBodySchema>;
+export type ExtendKpiPoolValidityBody = z.infer<typeof extendKpiPoolValidityBodySchema>;

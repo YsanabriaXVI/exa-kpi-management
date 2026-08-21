@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Eye, Link2, ListPlus, Save, Search, ShieldAlert, Target, UsersRound, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { getAssignment, saveAssignment } from "./scorecard-assignment.data";
+import type { AssignmentKpi, AssignmentLinkedScorecard } from "./scorecard-assignment.data";
 import { poolScopes } from "./CreateScorecardInfo";
 import { scorecardService } from "./scorecard.service";
 import { ActionToast } from "../../components/ActionToast";
@@ -60,6 +60,7 @@ function AssignmentWeightInput({ value, onChange, disabled = false }: { value: n
 
 export function ScorecardAssignment() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const requestedScorecardId = Number(searchParams.get("scorecardId") ?? 0);
   const readOnlyFromOverview = searchParams.get("source") === "overview";
@@ -69,9 +70,12 @@ export function ScorecardAssignment() {
   const scorecardId = requestedScorecardId || (selectorMode ? storedScorecardId : 0) || 0;
   const scorecardQuery = useQuery({ queryKey: ["scorecard", scorecardId], queryFn: () => scorecardService.getById(scorecardId), enabled: scorecardId > 0 });
   const scorecardsQuery = useQuery({ queryKey: ["scorecards"], queryFn: scorecardService.list, enabled: selectorMode });
-  const initial = useMemo(() => getAssignment(scorecardId || 1), [scorecardId]);
-  const [kpis, setKpis] = useState(initial.kpis);
-  const [linked, setLinked] = useState(initial.linked);
+  const periodsQuery = useQuery({ queryKey: ["scorecard-periods", scorecardId], queryFn: () => scorecardService.periods(scorecardId), enabled: scorecardId > 0 });
+  const [periodKey, setPeriodKey] = useState(searchParams.get("period") ?? "");
+  const selectedPeriod = periodsQuery.data?.find((period) => period.periodKey === periodKey);
+  const compositionQuery = useQuery({ queryKey: ["scorecard-composition", scorecardId, periodKey], queryFn: () => scorecardService.composition(scorecardId, periodKey), enabled: scorecardId > 0 && Boolean(periodKey) && selectedPeriod?.scorecardCompositionStatus !== "UNAVAILABLE", retry: false });
+  const [kpis, setKpis] = useState<AssignmentKpi[]>([]);
+  const [linked, setLinked] = useState<AssignmentLinkedScorecard[]>([]);
   const [saved, setSaved] = useState(false);
   const [selectorSearch, setSelectorSearch] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -94,13 +98,8 @@ export function ScorecardAssignment() {
     if (!term) return [];
     return (scorecardsQuery.data ?? []).filter((item) => normalize(`${item.code} ${item.name} ${item.poolSource}`).includes(term));
   }, [scorecardQuery.data, scorecardsQuery.data, selectorSearch]);
-  useEffect(() => {
-    if (!scorecardId) return;
-    const assignment = getAssignment(scorecardId);
-    setKpis(assignment.kpis);
-    setLinked(assignment.linked);
-    setSaved(false);
-  }, [scorecardId]);
+  useEffect(() => { if (!periodKey && periodsQuery.data?.length) setPeriodKey(periodsQuery.data.find((period) => period.scorecardCompositionStatus !== "UNAVAILABLE")?.periodKey ?? periodsQuery.data[0].periodKey); }, [periodKey, periodsQuery.data]);
+  useEffect(() => { if (!compositionQuery.data) return; setKpis(compositionQuery.data.kpis.map((item) => ({ id: item.kpiConfigurationExternalId, configCode: item.configurationCode, code: item.definitionCode, name: item.definitionName, category: item.categoryName ?? "Not specified", goal: item.goal ?? "Not specified", measurementUnit: item.measurementUnit ?? "Not specified", source: item.dataSource ?? "Not specified", weight: Number(item.weight) }))); setLinked(compositionQuery.data.linkedScorecards.map((item) => ({ id: item.linkedScorecardId, code: item.code, name: item.name, company: item.companies.join(", ") || "Not specified", department: item.departments.join(", ") || "Not specified", frequency: scorecardQuery.data?.inputFrequency ?? "Not available", weight: Number(item.weight) }))); setSaved(true); }, [compositionQuery.data, scorecardQuery.data?.inputFrequency]);
   useEffect(() => {
     if (!selectorMode || !scorecardQuery.data || selectorUserEditedRef.current) return;
     setSelectorSearch(`${scorecardQuery.data.code} · ${scorecardQuery.data.name}`);
@@ -150,11 +149,8 @@ export function ScorecardAssignment() {
     setSaved(false);
     setLinked((items) => items.map((item) => item.id === id ? { ...item, weight: Math.max(0, weight) } : item));
   };
-  const save = () => {
-    saveAssignment(scorecardId, { kpis, linked });
-    setSaved(true);
-    setSaveNotice(Date.now());
-  };
+  const saveMutation = useMutation({ mutationFn: () => scorecardService.updateWeights(scorecardId, periodKey, { kpis: kpis.map((item) => ({ kpiConfigurationExternalId: item.id, weight: item.weight })), linkedScorecards: linked.map((item) => ({ linkedScorecardId: item.id, weight: item.weight })) }), onSuccess: () => { setSaved(true); setSaveNotice(Date.now()); queryClient.invalidateQueries({ queryKey: ["scorecard-composition", scorecardId, periodKey] }); } });
+  const save = () => saveMutation.mutate();
   const startScopeModalDrag = (event: React.PointerEvent<HTMLElement>) => {
     if ((event.target as HTMLElement).closest("button")) return;
     scopeModalDragRef.current = { startX: event.clientX, startY: event.clientY, originX: scopeModalPosition.x, originY: scopeModalPosition.y };
@@ -194,7 +190,8 @@ export function ScorecardAssignment() {
   if (scorecardQuery.isLoading) return <main className="scorecard-page"><div className="scorecard-detail-loading">Loading assignment...</div></main>;
   if (!scorecardQuery.data) return null;
   const scorecard = scorecardQuery.data;
-  const selectionQuery = `?scorecardId=${scorecardId}`;
+  const compositionReadOnly = compositionQuery.data?.status === "FINALIZED";
+  const selectionQuery = `?scorecardId=${scorecardId}&period=${periodKey}`;
   const orderedDurationMonths = [...scorecard.durationMonths].sort((a, b) => a - b);
   const formatDurationMonth = (month: number) => new Intl.DateTimeFormat("en", { month: "long" }).format(new Date(scorecard.year, month, 1));
   const durationLabel = orderedDurationMonths.length
@@ -210,6 +207,12 @@ export function ScorecardAssignment() {
     <header className="assignment-hero">
       <div><h1>ScoreCard Assignment</h1>{selectorMode ? scorecardSelector : <div className="assignment-record-summary"><div><small>ScoreCard Code</small><strong>{scorecard.code}</strong></div><div><small>ScoreCard Name</small><strong>{scorecard.name}</strong></div></div>}<p>Define the final composition. Only the weight of selected items can be edited here.</p></div>
     </header>
+    <section className="assignment-computed-fields" aria-label="Selected Input Period">
+      <article><span><CalendarDays size={20} /></span><div><small>Input Period inherited from Pool</small><select value={periodKey} onChange={(event) => setPeriodKey(event.target.value)}>{periodsQuery.data?.map((period) => <option key={period.periodKey} value={period.periodKey}>{period.periodKey} · {period.scorecardCompositionStatus}</option>)}</select></div></article>
+    </section>
+    {periodsQuery.isError && <section className="assignment-no-data"><h2>Input Periods could not be loaded</h2><p>{(periodsQuery.error as Error).message}</p></section>}
+    {selectedPeriod?.scorecardCompositionStatus === "UNAVAILABLE" && <section className="assignment-no-data"><Clock3 size={28}/><h2>Pool composition unavailable</h2><p>The Pool Composition must be finalized before Scorecard selection can begin for this Input Period.</p></section>}
+    {compositionQuery.isError && <section className="assignment-no-data"><AlertTriangle size={28}/><h2>Composition contract unavailable</h2><p>{(compositionQuery.error as Error).message}</p></section>}
     {readOnlyFromOverview && <section className="assignment-read-only-banner" role="status"><span><ShieldAlert size={22} /></span><div><strong>Borrado no disponible desde ScoreCard Overview</strong><p>No se puede borrar desde aquí. Puedes editar pesos, agregar KPIs y vincular ScoreCards; usa el sidebar para las acciones administrativas.</p></div></section>}
     <div className="assignment-back-row"><button type="button" className="assignment-back" onClick={() => navigate(selectorMode ? "/app/scorecards/overview" : `/app/scorecards/detail?scorecardId=${scorecardId}`)}><ChevronLeft size={16} /> Back</button></div>
 
@@ -243,17 +246,17 @@ export function ScorecardAssignment() {
     </section>
 
     <section className="assignment-section">
-      <header><div><span><Target size={19} /></span><div><h2>KPIs from Pool</h2><p>{kpis.length} selected from {scorecard.poolSource}</p></div></div><button type="button" onClick={() => navigate(`/app/scorecards/assignment/select-kpis-from-pool${selectionQuery}`)}><ListPlus size={14} />Select KPIs from Pool</button></header>
-      <div className="assignment-table-wrap"><table className="assignment-table"><thead><tr><th>KPI Config</th><th>KPI</th><th>KPI Category</th><th>Goal</th><th>Data Source</th><th>Weight</th></tr></thead><tbody>
-        {kpis.map((kpi) => <tr key={kpi.id}><td><span className="code-pill">{kpi.configCode}</span></td><td><strong>{kpi.name}</strong><small>{kpi.code}</small></td><td>{kpi.category}</td><td>{kpi.goal}</td><td>{kpi.source}</td><td><AssignmentWeightInput value={kpi.weight} onChange={(weight) => updateKpiWeight(kpi.id, weight)} /></td></tr>)}
+      <header><div><span><Target size={19} /></span><div><h2>KPIs from Pool</h2><p>{kpis.length} selected from {scorecard.poolSource}</p></div></div>{!compositionReadOnly && <button type="button" onClick={() => navigate(`/app/scorecards/assignment/select-kpis-from-pool${selectionQuery}`)}><ListPlus size={14} />Select KPIs from Pool</button>}</header>
+      <div className="assignment-table-wrap"><table className="assignment-table"><thead><tr><th>KPI Config</th><th>KPI</th><th>KPI Category</th><th>Goal</th><th>Measurement Unit</th><th>Data Source</th><th>Weight</th></tr></thead><tbody>
+        {kpis.map((kpi) => <tr key={kpi.id}><td><span className="code-pill">{kpi.configCode}</span></td><td><strong>{kpi.name}</strong><small>{kpi.code}</small></td><td>{kpi.category}</td><td>{kpi.goal}</td><td>{kpi.measurementUnit}</td><td>{kpi.source}</td><td><AssignmentWeightInput value={kpi.weight} disabled={compositionReadOnly} onChange={(weight) => updateKpiWeight(kpi.id, weight)} /></td></tr>)}
       </tbody></table></div>
       <div className="assignment-table-total"><span>Total KPI Weight:</span><strong>{kpiWeightTotal}%</strong></div>
     </section>
 
     <section className="assignment-section linked">
-      <header><div><span><Link2 size={19} /></span><div><h2>Linked ScoreCards</h2><p>{linked.length} ScoreCards linked to this composition</p></div></div><button type="button" onClick={() => navigate(`/app/scorecards/assignment/select-linked-scorecards${selectionQuery}`)}><Link2 size={14} />Add Linked ScoreCards</button></header>
-      <div className="assignment-table-wrap"><table className="assignment-table"><thead><tr><th>Code</th><th>Linked ScoreCard</th><th>Company</th><th>Department</th><th>Frequency</th><th>Weight</th></tr></thead><tbody>
-        {linked.map((item) => <tr key={item.id}><td><span className="code-pill">{item.code}</span></td><td><strong>{item.name}</strong><small>Linked contribution</small></td><td>{item.company}</td><td>{item.department}</td><td>{item.frequency}</td><td><AssignmentWeightInput value={item.weight} onChange={(weight) => updateLinkedWeight(item.id, weight)} /></td></tr>)}
+      <header><div><span><Link2 size={19} /></span><div><h2>Linked ScoreCards</h2><p>{linked.length} ScoreCards linked to this composition</p></div></div>{!compositionReadOnly && <button type="button" onClick={() => navigate(`/app/scorecards/assignment/select-linked-scorecards${selectionQuery}`)}><Link2 size={14} />Add Linked ScoreCards</button>}</header>
+      <div className="assignment-table-wrap"><table className="assignment-table"><thead><tr><th>Code</th><th>Linked ScoreCard</th><th>Companies</th><th>Departments</th><th>Frequency</th><th>Weight</th></tr></thead><tbody>
+        {linked.map((item) => <tr key={item.id}><td><span className="code-pill">{item.code}</span></td><td><strong>{item.name}</strong><small>Linked contribution</small></td><td>{item.company}</td><td>{item.department}</td><td>{item.frequency}</td><td><AssignmentWeightInput value={item.weight} disabled={compositionReadOnly} onChange={(weight) => updateLinkedWeight(item.id, weight)} /></td></tr>)}
       </tbody></table></div>
       <div className="assignment-table-total"><span>Total Linked ScoreCard Weight:</span><strong>{linkedWeightTotal}%</strong></div>
     </section>
@@ -275,7 +278,7 @@ export function ScorecardAssignment() {
           </div>
         </div>
       </div>
-      <button type="button" className="button primary" disabled={total !== 100} onClick={save}><Save size={16} /> Save Assignment</button>
+      <button type="button" className="button primary" disabled={total !== 100 || compositionReadOnly || saveMutation.isPending} onClick={save}><Save size={16} /> Save Assignment</button>
     </footer>
     {saveNotice > 0 && <ActionToast key={saveNotice} message="ScoreCard assignment saved successfully." onClose={() => setSaveNotice(0)} />}
     {lockedSelectionNotice && <ActionToast message="No se puede borrar el ScoreCard desde aquí. La selección está protegida al entrar desde ScoreCard Overview." tone="warning" onClose={() => setLockedSelectionNotice(false)} />}

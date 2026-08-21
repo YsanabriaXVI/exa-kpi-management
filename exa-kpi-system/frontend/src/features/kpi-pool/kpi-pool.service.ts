@@ -9,6 +9,7 @@ type PoolApiRecord = {
   areas: Array<{ id: string; code: string; name: string }>;
   companies: Array<{ id: string; code: string; name: string }>;
   kpiCount: number; scorecardCount: number;
+  operationalPeriod: { periodKey: string; start: string; end: string; status: "FINALIZED" | "PREPARING"; kpiCount: number | null; next: { periodKey: string; start: string; status: "PREPARING" } | null } | null;
 };
 
 type PoolListResponse = { data: PoolApiRecord[]; meta: { page: number; pageSize: number; totalItems: number; totalPages: number } };
@@ -26,7 +27,7 @@ const fromApi = (value: PoolApiRecord): KpiPoolRecord => ({
   areas: value.areas.map((area) => area.name), areaIds: value.areas.map((area) => area.id),
   frequency: frequencyName(value.inputFrequency.code), inputFrequencyId: value.inputFrequency.id,
   validFrom: value.validFrom, validTo: value.validTo, description: value.description ?? "", status: value.status,
-  kpiCount: value.kpiCount, scorecardCount: value.scorecardCount,
+  kpiCount: value.kpiCount, scorecardCount: value.scorecardCount, operationalPeriod: value.operationalPeriod,
   kpis: [], scorecards: [],
 });
 
@@ -49,8 +50,6 @@ let kpiCatalog: PoolKpi[] = [
   { definitionId: "7", configCode: "KPC-054-01", kpiCode: "KPI-054", name: "Fleet availability", category: "Operations", goal: "95%", measurementUnit: "%", dataSource: "GPS Integration", status: "ACTIVE" },
   { definitionId: "legacy:55", configCode: "KPC-055-01", kpiCode: "KPI-055", name: "Customer claim resolution", category: "Quality", goal: "48 hours", measurementUnit: "Hours", dataSource: "CRM", status: "INACTIVE" },
 ];
-
-const hiddenKpisByPool = new Map<number, Set<string>>();
 
 const importableKpis: PoolKpi[] = [
   { definitionId: "legacy:56", configCode: "KPC-056-01", kpiCode: "KPI-056", name: "Fuel efficiency per route", category: "Operations", goal: "8.5 km/L", measurementUnit: "km/L", dataSource: "GPS Integration", status: "ACTIVE" },
@@ -130,6 +129,10 @@ export const kpiPoolService = {
   async activate(id: number) {
     return poolApiRequest(`/v1/kpi-pools/${id}/activate`, { method: "POST" });
   },
+  async extendValidity(id: number, validTo: string) {
+    const response = await poolApiRequest<{ data: PoolApiRecord & { addedPeriods: Array<{ start: string; end: string }> } }>(`/v1/kpi-pools/${id}/extend-validity`, { method: "POST", body: JSON.stringify({ validTo }) });
+    return { pool: clone(cachePool(fromApi(response.data))), addedPeriods: response.data.addedPeriods };
+  },
   async getManageableKpis(poolId: number, periodStart?: string): Promise<ManageablePoolKpi[]> {
     const query = new URLSearchParams({ page: "1", pageSize: "100" });
     if (periodStart) query.set("periodStart", periodStart);
@@ -146,7 +149,7 @@ export const kpiPoolService = {
   },
   async getInputPeriods(poolId: number) { return poolApiRequest<PoolInputPeriods>(`/v1/kpi-pools/${poolId}/input-periods`); },
   async finalizePeriodComposition(poolId: number, periodStart: string) {
-    return poolApiRequest<{ data: { poolId: string; periodStart: string; periodEnd: string; status: "POOL_COMPOSITION_LOCKED"; kpiCount: number } }>(`/v1/kpi-pools/${poolId}/input-periods/finalize`, { method: "POST", body: JSON.stringify({ periodStart }) });
+    return poolApiRequest<{ data: { poolId: string; poolStatus: "DRAFT" | "ACTIVE" | "INACTIVE"; periodStart: string; periodEnd: string; status: "POOL_COMPOSITION_LOCKED"; kpiCount: number } }>(`/v1/kpi-pools/${poolId}/input-periods/finalize`, { method: "POST", body: JSON.stringify({ periodStart }) });
   },
   async getComposition(poolId: number, periodStart: string): Promise<PoolKpi[]> {
     const response = await poolApiRequest<{ data: MembershipApiRecord[] }>(`/v1/kpi-pools/${poolId}/kpi-configurations?periodStart=${encodeURIComponent(periodStart)}`);
@@ -170,16 +173,6 @@ export const kpiPoolService = {
     if (!configurationIds.length) return [];
     const response = await poolApiRequest<{ data: Array<{ configurationId: string; usedIn: number; pools: Array<{ id: string; code: string; name: string; status: string }> }> }>("/v1/kpi-pools/kpi-configuration-usage", { method: "POST", body: JSON.stringify({ configurationIds }) });
     return response.data;
-  },
-  async getImportableKpis(search: string, recentOnly = false) {
-    await wait();
-    const existing = new Set(kpiCatalog.map((kpi) => kpi.configCode));
-    const term = search.trim().toLowerCase();
-    if (!term && !recentOnly) return [];
-    const matches = importableKpis
-      .filter((kpi) => !existing.has(kpi.configCode))
-      .filter((kpi) => !term || `${kpi.configCode} ${kpi.kpiCode} ${kpi.name} ${kpi.category} ${kpi.dataSource}`.toLowerCase().includes(term));
-    return (recentOnly && !term ? [...matches].reverse().slice(0, 5) : matches).map((kpi) => ({ ...kpi }));
   },
   async getConfigurationDetailByCode(configCode: string): Promise<KpiConfigRecord> {
     await wait();
@@ -235,21 +228,18 @@ export const kpiPoolService = {
       company: scorecard.company,
       status: scorecard.status === "ACTIVE" ? "ACTIVE" : "EXPIRED",
       collaborators: 0,
+      poolSchedule: null,
+      currentComposition: null,
     };
-  },
-  async importKpis(configCodes: string[]) {
-    await wait();
-    const imported = importableKpis.filter((item) => configCodes.includes(item.configCode));
-    if (!imported.length) throw new Error("KPI Configurations not found.");
-    const existing = new Set(kpiCatalog.map((item) => item.configCode));
-    kpiCatalog = [...kpiCatalog, ...imported.filter((item) => !existing.has(item.configCode)).map((item) => ({ ...item }))];
-    return imported.map((item) => ({ ...item }));
   },
   async addKpis(poolId: number, configCodes: string[], periodStart?: string) {
     const catalog = await this.getManageableKpis(poolId, periodStart);
     const configurationIds = catalog.filter((item) => configCodes.includes(item.configCode)).map((item) => item.configurationId!).filter(Boolean);
     if (configurationIds.length !== configCodes.length) throw new Error("One or more KPI Configurations were not found.");
     return poolApiRequest(`/v1/kpi-pools/${poolId}/kpi-configurations`, { method: "POST", body: JSON.stringify({ configurationIds, effectiveFromPeriod: periodStart }) });
+  },
+  async replaceKpi(poolId: number, oldConfigurationId: string, newConfigurationId: string, periodStart: string) {
+    return poolApiRequest(`/v1/kpi-pools/${poolId}/kpi-configurations/replace`, { method: "POST", body: JSON.stringify({ oldConfigurationId, newConfigurationId, effectiveFromPeriod: periodStart }) });
   },
   async addConfigurations(poolId: number, configurations: KpiConfigRecord[]) {
     await wait();
@@ -289,24 +279,6 @@ export const kpiPoolService = {
       poolStatus === "ACTIVE" ? { method: "POST", body: JSON.stringify({ effectiveFromPeriod: periodStart }) } : { method: "DELETE" },
     )));
     return { removed: selected.length };
-  },
-  async hideKpisFromPool(poolId: number, configCodes: string[]) {
-    await wait();
-    const pool = pools.find((item) => item.id === poolId);
-    if (!pool) throw new Error("KPI Pool not found.");
-    const hidden = hiddenKpisByPool.get(poolId) ?? new Set<string>();
-    configCodes.forEach((code) => hidden.add(code));
-    hiddenKpisByPool.set(poolId, hidden);
-    pool.kpis = pool.kpis.filter((kpi) => !hidden.has(kpi.configCode));
-    return clone(pool);
-  },
-  async softDeleteKpi(configCode: string) {
-    await wait();
-    const current = kpiCatalog.find((kpi) => kpi.configCode === configCode);
-    if (!current) throw new Error("KPI Configuration not found.");
-    kpiCatalog = kpiCatalog.map((kpi) => kpi.configCode === configCode ? { ...kpi, status: "INACTIVE" } : kpi);
-    pools = pools.map((pool) => ({ ...pool, kpis: pool.kpis.filter((kpi) => kpi.configCode !== configCode) }));
-    return { ...current, status: "INACTIVE" as const };
   },
 };
 

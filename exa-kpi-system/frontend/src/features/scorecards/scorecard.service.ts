@@ -1,39 +1,37 @@
-import type { ScorecardInput, ScorecardRecord } from "./scorecard.types";
+import type { ScorecardComposition, ScorecardCreateRequest, ScorecardPeriod, ScorecardRecord } from "./scorecard.types";
 
-let scorecards: ScorecardRecord[] = [
-  { id: 1, code: "SCD-0111", name: "Grupo EXA - CONMOXA ScoreCard", departments: ["Administration", "Operations"], durationMonths: [0,1,2,3,4,5], year: 2026, inputFrequency: "Monthly", kpis: 8, linkedScorecards: 3, poolSource: "Grupo EXA KPI Pool", company: "Grupo EXA", status: "ACTIVE", collaborators: 18 },
-  { id: 2, code: "SCD-0112", name: "AXA Monthly ScoreCard", departments: ["Process"], durationMonths: [0,1,2,3,4,5,6,7,8,9,10,11], year: 2024, inputFrequency: "Monthly", kpis: 5, linkedScorecards: 2, poolSource: "AXA Monthly KPI Pool", company: "AXA", status: "EXPIRED", collaborators: 9 },
-  { id: 3, code: "SCD-0113", name: "EXA Financial ScoreCard", departments: ["Innovation", "Finance"], durationMonths: [0,1,2,3,4,5], year: 2026, inputFrequency: "Quarterly", kpis: 6, linkedScorecards: 4, poolSource: "Financial KPI Pool", company: "EXA", status: "ACTIVE", collaborators: 12 },
-  { id: 4, code: "SCD-0114", name: "EXA/Trexa Operations ScoreCard", departments: ["Systems", "Process"], durationMonths: [0,1,2,3,4,5,6,7,8,9,10,11], year: 2025, inputFrequency: "Monthly", kpis: 10, linkedScorecards: 1, poolSource: "Operations KPI Pool", company: "EXA", status: "ACTIVE", collaborators: 22 },
-];
-let archivedScorecards: ScorecardRecord[] = [];
+const baseUrl = (import.meta.env.VITE_SCORECARDS_API_URL as string | undefined) ?? "http://localhost:4003/api";
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${baseUrl}${path}`, { ...init, headers: { "Content-Type": "application/json", ...init?.headers } });
+  if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body?.error?.message ?? `Scorecards API returned ${response.status}`); }
+  return response.status === 204 ? undefined as T : response.json();
+}
 
-const wait = () => new Promise((resolve) => window.setTimeout(resolve, 180));
-const clone = (item: ScorecardRecord) => ({ ...item, departments: [...item.departments], durationMonths: [...item.durationMonths] });
+type ApiScorecard = { id: string; code: string; name: string; status: string; kpiPool: { id: string; code: string; name: string }; poolSchedule: { validFrom: string; validTo: string; inputFrequencyCode: string; inputPeriods: number } | null; currentComposition: ScorecardRecord["currentComposition"]; companies: Array<{ name: string }>; departments: Array<{ name: string; collaborators: unknown[] }>; periodCompositionCount: number };
+const map = (value: ApiScorecard): ScorecardRecord => {
+  const start = value.poolSchedule?.validFrom; const end = value.poolSchedule?.validTo;
+  const startMonth = start ? Number(start.slice(5, 7)) - 1 : -1; const endMonth = end ? Number(end.slice(5, 7)) - 1 : -1;
+  const frequency = value.poolSchedule?.inputFrequencyCode.replace(/_/g, " ").toLowerCase();
+  const frequencyName = frequency ? frequency.replace(/^./, (letter: string) => letter.toUpperCase()) : "Unavailable";
+  return { id: Number(value.id), code: value.code, name: value.name, departments: value.departments.map((row) => row.name), durationMonths: start && end && start.slice(0, 4) === end.slice(0, 4) ? Array.from({ length: endMonth - startMonth + 1 }, (_, index) => startMonth + index) : [], year: start ? Number(start.slice(0, 4)) : 0, inputFrequency: frequencyName, kpis: value.currentComposition?.kpisSelected ?? 0, linkedScorecards: value.currentComposition?.linkedScorecards ?? 0, poolSource: `${value.kpiPool.code} · ${value.kpiPool.name}`, company: value.companies.map((row) => row.name).join(", "), status: value.status as ScorecardRecord["status"], collaborators: value.departments.reduce((sum, row) => sum + row.collaborators.length, 0), poolSchedule: value.poolSchedule ? { validFrom: value.poolSchedule.validFrom, validTo: value.poolSchedule.validTo, frequency: frequencyName, inputPeriods: value.poolSchedule.inputPeriods } : null, currentComposition: value.currentComposition };
+};
 
 export const scorecardService = {
-  async list() {
-    await wait();
-    return scorecards.map(clone);
-  },
-  async getById(id: number) {
-    await wait();
-    const scorecard = scorecards.find((item) => item.id === id);
-    if (!scorecard) throw new Error("ScoreCard not found.");
-    return clone(scorecard);
-  },
-  async create(input: ScorecardInput) {
-    await wait();
-    const id = Math.max(0, ...scorecards.map((item) => item.id)) + 1;
-    const created: ScorecardRecord = { ...input, id, code: `SCD-${String(110 + id).padStart(4, "0")}`, kpis: 0, linkedScorecards: 0 };
-    scorecards = [created, ...scorecards];
-    return clone(created);
-  },
-  async softDelete(id: number) {
-    await wait();
-    const scorecard = scorecards.find((item) => item.id === id);
-    if (!scorecard) throw new Error("ScoreCard not found.");
-    archivedScorecards = [clone(scorecard), ...archivedScorecards];
-    scorecards = scorecards.filter((item) => item.id !== id);
-  },
+  async listPage(input: { page: number; pageSize: number; search?: string; status?: string[]; department?: string[]; frequency?: string[]; year?: string[]; sortBy?: string; sortOrder?: "asc" | "desc" }) { const params = new URLSearchParams({ page: String(input.page), pageSize: String(input.pageSize), sortBy: input.sortBy ?? "createdAt", sortOrder: input.sortOrder ?? "desc" }); if (input.search) params.set("search", input.search); input.status?.forEach((value) => params.append("status", value)); input.department?.forEach((value) => params.append("department", value)); input.frequency?.forEach((value) => params.append("frequency", value.toUpperCase().replace(/ /g, "_"))); input.year?.forEach((value) => params.append("year", value)); const response = await request<{ data: ApiScorecard[]; meta: { page: number; pageSize: number; totalItems: number; totalPages: number } }>(`/v1/scorecards?${params}`); return { data: response.data.map(map), meta: response.meta }; },
+  async list() { return (await scorecardService.listPage({ page: 1, pageSize: 100 })).data; },
+  async getById(id: number) { return map((await request<{ data: ApiScorecard }>(`/v1/scorecards/${id}`)).data); },
+  async create(input: ScorecardCreateRequest) { return map((await request<{ data: ApiScorecard }>("/v1/scorecards", { method: "POST", body: JSON.stringify(input) })).data); },
+  async deactivate(id: number) { await request(`/v1/scorecards/${id}/deactivate`, { method: "PATCH" }); },
+  async periods(id: number) { return (await request<{ data: ScorecardPeriod[] }>(`/v1/scorecards/${id}/periods`)).data; },
+  async composition(id: number, periodKey: string) { return (await request<{ data: ScorecardComposition }>(`/v1/scorecards/${id}/periods/${periodKey}/composition`)).data; },
+  async availableKpis(id: number, periodKey: string) { return (await request<{ data: Array<{ poolMembershipExternalId: string; kpiConfigurationExternalId: string; definitionCode: string; definitionName: string; configurationCode: string; selectionStatus: string }> }>(`/v1/scorecards/${id}/periods/${periodKey}/available-kpis`)).data; },
+  async addKpis(id: number, periodKey: string, items: Array<{ poolMembershipExternalId: string; weight: number }>) { return (await request<{ data: ScorecardComposition }>(`/v1/scorecards/${id}/periods/${periodKey}/kpis`, { method: "POST", body: JSON.stringify({ items }) })).data; },
+  async removeKpi(id: number, periodKey: string, configurationId: string) { await request(`/v1/scorecards/${id}/periods/${periodKey}/kpis/${configurationId}`, { method: "DELETE" }); },
+  async updateWeights(id: number, periodKey: string, body: { kpis: Array<{ kpiConfigurationExternalId: string; weight: number }>; linkedScorecards: Array<{ linkedScorecardId: string; weight: number }> }) { return (await request<{ data: ScorecardComposition }>(`/v1/scorecards/${id}/periods/${periodKey}/weights`, { method: "PATCH", body: JSON.stringify(body) })).data; },
+  async availableLinks(id: number, periodKey: string) { return (await request<{ data: Array<{ id: string; code: string; name: string; status: string; selectionStatus: string }> }>(`/v1/scorecards/${id}/periods/${periodKey}/linked-scorecards`)).data; },
+  async addLink(id: number, periodKey: string, linkedScorecardId: string, weight: number) { return (await request<{ data: ScorecardComposition }>(`/v1/scorecards/${id}/periods/${periodKey}/linked-scorecards`, { method: "POST", body: JSON.stringify({ linkedScorecardId, weight }) })).data; },
+  async removeLink(id: number, periodKey: string, linkedScorecardId: string) { await request(`/v1/scorecards/${id}/periods/${periodKey}/linked-scorecards/${linkedScorecardId}`, { method: "DELETE" }); },
+  async finalize(id: number, periodKey: string) { return (await request<{ data: ScorecardComposition }>(`/v1/scorecards/${id}/periods/${periodKey}/finalize`, { method: "POST" })).data; },
+  async poolWorkflow(poolId: number, periodKey: string) { return (await request<{ data: { status: "NOT_STARTED" | "IN_PROGRESS" | "FINALIZED"; totalScorecards: number; preparing: number; finalized: number; pending: number } }>(`/v1/scorecards/pool-workflow?poolId=${poolId}&periodKey=${periodKey}`)).data; },
+  async poolUsageBatch(targets: Array<{ poolId: string; periodKey: string }>) { return (await request<{ data: Array<{ poolId: string; periodKey: string; scorecardsUsing: number }> }>("/v1/scorecards/pool-workflow/batch", { method: "POST", body: JSON.stringify({ targets }) })).data; },
 };

@@ -1752,3 +1752,24 @@ html[data-theme="dark"] .composition-view-controls>strong{color:#a2ebc2;backgrou
 .scorecard-detail-page .scorecard-detail-table:not(.linked-scorecard-table) td:nth-child(7) .scorecard-traffic-dots{
   justify-content:center;
 }
+.scorecard-overview-page .overview-period-cell,.scorecard-overview-page .scorecard-schedule-cell{min-width:130px;display:grid;gap:5px}.scorecard-overview-page .overview-period-cell strong,.scorecard-overview-page .scorecard-schedule-cell strong{color:var(--ems-text);font-size:12px}.scorecard-overview-page .overview-period-cell small,.scorecard-overview-page .scorecard-schedule-cell small,.scorecard-overview-page .overview-period-empty{color:var(--ems-muted);font-size:10px}.scorecard-overview-page .overview-period-status{width:max-content;padding:4px 8px;border-radius:999px;font-size:9px;font-weight:700}.scorecard-overview-page .overview-period-status.finalized{color:#24744f;background:#e4f5ec}.scorecard-overview-page .overview-period-status.preparing{color:#176f91;background:#e5f3f8}.scorecard-overview-page .overview-period-status.not-started{color:#687588;background:#edf1f4}html[data-theme="dark"] .scorecard-overview-page .overview-period-status.finalized{color:#9ce0bd;background:#234536}html[data-theme="dark"] .scorecard-overview-page .overview-period-status.preparing{color:#9ed8ed;background:#203f4c}html[data-theme="dark"] .scorecard-overview-page .overview-period-status.not-started{color:#c8d2dd;background:#344151}
+.scorecard-overview-page .scorecard-status,
+.scorecard-overview-page .overview-period-status {
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+.scorecard-overview-page .overview-period-cell strong,
+.scorecard-overview-page .scorecard-schedule-cell strong {
+  font-size: 13px;
+}
+
+.scorecard-overview-page .overview-period-cell small,
+.scorecard-overview-page .scorecard-schedule-cell small,
+.scorecard-overview-page .overview-period-empty {
+  font-size: 11px;
+}
+
+.scorecard-overview-page .overview-period-status {
+  font-size: 10px;
+}

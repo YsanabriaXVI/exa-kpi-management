@@ -9,6 +9,10 @@ import { AppError } from "../utils/app-error.js";
 
 type PoolWithFrequency = KpiPool & { frequency: { monthsPerPeriod: number } };
 
+export function lifecycleAllowsPeriodFinalization(status: string, periodIndex: number): boolean {
+  return status === "ACTIVE" || (status === "DRAFT" && periodIndex === 0);
+}
+
 async function requirePool(id: bigint): Promise<PoolWithFrequency> {
   const pool = await prisma.kpiPool.findFirst({ where: { id, deletedAt: null } });
   if (!pool) throw new AppError(404, "KPI_POOL_NOT_FOUND", "KPI Pool was not found");
@@ -60,15 +64,15 @@ async function lockPool(tx: Prisma.TransactionClient, id: bigint) {
   await tx.$queryRaw`SELECT kpi_pool_id FROM kpi_pools WHERE kpi_pool_id = ${id} FOR UPDATE`;
 }
 
-type MembershipEventType = "kpi.pool.kpi.added.v1" | "kpi.pool.kpi.retired.v1" | "kpi.pool.period.composition.finalized.v1";
-function membershipEvent(eventType: MembershipEventType, pool: KpiPool, data: Record<string, unknown>) {
+type MembershipEventType = "kpi.pool.activated.v1" | "kpi.pool.kpi.added.v1" | "kpi.pool.kpi.retired.v1" | "kpi.pool.period.composition.finalized.v1";
+function membershipEvent(eventType: MembershipEventType, pool: KpiPool, data: Record<string, unknown>, versionOffset = 1) {
   const eventId = randomUUID();
-  const payload = { eventId, eventType, occurredAt: new Date().toISOString(), producer: "exa-kpi-pool-service", aggregateType: "kpi_pool", aggregateId: pool.id.toString(), version: pool.aggregateVersion + 1, data: { poolId: pool.id.toString(), ...data } };
+  const payload = { eventId, eventType, occurredAt: new Date().toISOString(), producer: "exa-kpi-pool-service", aggregateType: "kpi_pool", aggregateId: pool.id.toString(), version: pool.aggregateVersion + versionOffset, data: { poolId: pool.id.toString(), ...data } };
   return { eventId, payload };
 }
 
-async function writeOutbox(tx: Prisma.TransactionClient, pool: KpiPool, eventType: MembershipEventType, data: Record<string, unknown>) {
-  const { eventId, payload } = membershipEvent(eventType, pool, data);
+async function writeOutbox(tx: Prisma.TransactionClient, pool: KpiPool, eventType: MembershipEventType, data: Record<string, unknown>, versionOffset = 1) {
+  const { eventId, payload } = membershipEvent(eventType, pool, data, versionOffset);
   await tx.outboxEvent.create({ data: { eventId, eventType, aggregateType: "kpi_pool", aggregateId: pool.id.toString(), aggregateVersion: payload.version, subject: eventType, payload, occurredAt: new Date(payload.occurredAt) } });
 }
 
@@ -94,8 +98,13 @@ export const kpiPoolMembershipService = {
   async periods(poolId: bigint) {
     const pool = await requirePool(poolId);
     const periods = poolPeriods(pool.validFrom, pool.validTo, pool.frequency.monthsPerPeriod);
-    const finalized = await prisma.kpiPoolPeriodComposition.findMany({ where: { kpiPoolId: poolId }, select: { periodStart: true } });
-    const finalizedStarts = new Set(finalized.map((value) => formatDateOnly(value.periodStart)));
+    const [persistedPeriods, finalized] = await Promise.all([
+      prisma.kpiPoolInputPeriod.findMany({ where: { kpiPoolId: poolId }, orderBy: { periodStart: "asc" } }),
+      prisma.kpiPoolPeriodComposition.findMany({ where: { kpiPoolId: poolId }, select: { id: true, inputPeriodId: true, periodStart: true } }),
+    ]);
+    const persistedByStart = new Map(persistedPeriods.map((value) => [formatDateOnly(value.periodStart), value]));
+    const finalizedByStart = new Map(finalized.map((value) => [formatDateOnly(value.periodStart), value]));
+    const finalizedStarts = new Set(finalizedByStart.keys());
     const today = new Date();
     const firstEditableIndex = periods.findIndex((period) => !finalizedStarts.has(formatDateOnly(period.start)) && (pool.statusCode === "DRAFT" || period.start > today));
     const data = await Promise.all(periods.map(async (period, index) => {
@@ -105,9 +114,12 @@ export const kpiPoolMembershipService = {
       const configurationStatus = persistedFinalized || conservativelyLocked ? "POOL_COMPOSITION_LOCKED" as const : isOnlyEditablePeriod ? "EDITABLE" as const : "FUTURE_NOT_AVAILABLE" as const;
       const dependency = await periodFinalizationGateway.evaluate(poolId, periods, index);
       const canEditComposition = configurationStatus === "EDITABLE";
-      const canFinalizeComposition = pool.statusCode === "ACTIVE" && canEditComposition && dependency.canFinalize;
+      const lifecycleAllowsFinalization = lifecycleAllowsPeriodFinalization(pool.statusCode, index);
+      const canFinalizeComposition = lifecycleAllowsFinalization && canEditComposition && dependency.canFinalize;
       const workflowStatus = persistedFinalized || conservativelyLocked ? "FINALIZED" as const : canEditComposition ? "EDITABLE" as const : "FUTURE" as const;
-      return { ...periodDto(period), configurationStatus, canEditComposition, canFinalizeComposition, workflowStatus, dependency };
+      const persisted = persistedByStart.get(formatDateOnly(period.start));
+      const composition = finalizedByStart.get(formatDateOnly(period.start));
+      return { poolPeriodId: persisted?.id.toString() ?? null, poolCompositionId: composition?.id.toString() ?? null, periodKey: formatDateOnly(period.start).slice(0, 7), ...periodDto(period), configurationStatus, canEditComposition, canFinalizeComposition, workflowStatus, dependency };
     }));
     const defaultPeriod = data.find((period) => period.configurationStatus === "EDITABLE") ?? null;
     return { data, meta: { defaultPeriodStart: defaultPeriod?.start ?? null, editabilitySource: "PERSISTED_PERIOD_LOCK_WITH_CONSERVATIVE_FALLBACK" } };
@@ -230,11 +242,12 @@ export const kpiPoolMembershipService = {
 
   async finalizePeriod(poolId: bigint, periodStart: string, actor: bigint) {
     const initial = await requirePool(poolId);
-    if (initial.statusCode !== "ACTIVE") throw new AppError(409, "POOL_NOT_ACTIVE", "Only an ACTIVE Pool can finalize a period composition");
     const periods = poolPeriods(initial.validFrom, initial.validTo, initial.frequency.monthsPerPeriod);
     const period = resolvePoolPeriod(initial.validFrom, initial.validTo, initial.frequency.monthsPerPeriod, periodStart);
-    assertPeriodEditable(initial.statusCode, period, initial.frequency.monthsPerPeriod);
     const periodIndex = periods.findIndex((candidate) => candidate.start.getTime() === period.start.getTime());
+    const firstDraftComposition = initial.statusCode === "DRAFT" && periodIndex === 0;
+    if (!lifecycleAllowsPeriodFinalization(initial.statusCode, periodIndex)) throw new AppError(409, "POOL_NOT_ACTIVE", "Only an ACTIVE Pool or its first DRAFT composition can be finalized");
+    assertPeriodEditable(initial.statusCode, period, initial.frequency.monthsPerPeriod);
     const dependency = await periodFinalizationGateway.evaluate(poolId, periods, periodIndex);
     if (!dependency.canFinalize) throw new AppError(409, "PREVIOUS_INPUT_PERIOD_NOT_CLOSED", "The previous Monitoring Input Period must be closed before this Pool composition can be finalized", dependency);
     return prisma.$transaction(async (tx) => {
@@ -247,10 +260,31 @@ export const kpiPoolMembershipService = {
       const lookup = await kpiManagementClient.batchLookup(memberships.map((value) => value.kpiConfigurationExternalId.toString()));
       const eligible = lookup.notFoundIds.length === 0 && lookup.data.length === memberships.length && lookup.data.every((configuration) => !eligibilityReason(configuration, initial.inputFrequencyExternalId));
       if (!eligible) throw new AppError(422, "POOL_PERIOD_COMPOSITION_INVALID", "One or more KPI Configurations are no longer eligible");
-      await tx.kpiPoolPeriodComposition.create({ data: { kpiPoolId: poolId, periodStart: period.start, periodEnd: period.end, statusCode: "POOL_COMPOSITION_LOCKED", kpiCountSnapshot: memberships.length, finalizedByUserId: actor } });
-      await tx.kpiPool.update({ where: { id: poolId }, data: { aggregateVersion: { increment: 1 }, updatedAt: new Date(), updatedByUserId: actor } });
-      await writeOutbox(tx, initial, "kpi.pool.period.composition.finalized.v1", { periodStart: formatDateOnly(period.start), periodEnd: formatDateOnly(period.end), kpiCount: memberships.length });
-      return { poolId: poolId.toString(), periodStart: formatDateOnly(period.start), periodEnd: formatDateOnly(period.end), status: "POOL_COMPOSITION_LOCKED", kpiCount: memberships.length };
+      const inputPeriod = await tx.kpiPoolInputPeriod.findUnique({ where: { kpiPoolId_periodStart: { kpiPoolId: poolId, periodStart: period.start } } });
+      if (!inputPeriod) throw new AppError(409, "POOL_INPUT_PERIOD_NOT_FOUND", "The persisted Pool Input Period was not found");
+      const composition = await tx.kpiPoolPeriodComposition.create({ data: { kpiPoolId: poolId, inputPeriodId: inputPeriod.id, periodStart: period.start, periodEnd: period.end, statusCode: "POOL_COMPOSITION_LOCKED", kpiCountSnapshot: memberships.length, finalizedByUserId: actor } });
+      await tx.kpiPool.update({ where: { id: poolId }, data: { statusCode: firstDraftComposition ? "ACTIVE" : initial.statusCode, aggregateVersion: { increment: firstDraftComposition ? 2 : 1 }, updatedAt: new Date(), updatedByUserId: actor } });
+      if (firstDraftComposition) await writeOutbox(tx, initial, "kpi.pool.activated.v1", { poolCode: initial.poolCode, validFrom: formatDateOnly(initial.validFrom), validTo: formatDateOnly(initial.validTo), inputFrequencyId: initial.inputFrequencyExternalId.toString() });
+      const finalizedConfigurations = new Map(lookup.data.map((configuration) => [configuration.id, configuration]));
+      const finalizedMemberships = memberships.map((membership) => ({
+        poolMembershipId: membership.id.toString(),
+        kpiDefinitionId: membership.kpiDefinitionExternalId.toString(),
+        kpiConfigurationId: membership.kpiConfigurationExternalId.toString(),
+        definitionCode: membership.definitionCodeSnapshot,
+        definitionName: membership.definitionNameSnapshot,
+        configurationCode: membership.configurationCodeSnapshot,
+        categoryName: finalizedConfigurations.get(membership.kpiConfigurationExternalId.toString())?.categoryName ?? null,
+        goal: finalizedConfigurations.get(membership.kpiConfigurationExternalId.toString())?.goal ?? null,
+        dataSource: finalizedConfigurations.get(membership.kpiConfigurationExternalId.toString())?.dataSource ?? null,
+        measurementUnit: finalizedConfigurations.get(membership.kpiConfigurationExternalId.toString())?.measurementUnit ?? null,
+        displayOrder: membership.displayOrder,
+      }));
+      await writeOutbox(tx, initial, "kpi.pool.period.composition.finalized.v1", {
+        poolPeriodId: inputPeriod.id.toString(), poolCompositionId: composition.id.toString(), periodKey: inputPeriod.periodKey,
+        periodStart: formatDateOnly(period.start), periodEnd: formatDateOnly(period.end), kpiCount: memberships.length,
+        memberships: finalizedMemberships,
+      }, firstDraftComposition ? 2 : 1);
+      return { poolId: poolId.toString(), poolStatus: firstDraftComposition ? "ACTIVE" : initial.statusCode, poolPeriodId: inputPeriod.id.toString(), poolCompositionId: composition.id.toString(), periodKey: inputPeriod.periodKey, periodStart: formatDateOnly(period.start), periodEnd: formatDateOnly(period.end), status: "POOL_COMPOSITION_LOCKED", kpiCount: memberships.length, memberships: finalizedMemberships };
     });
   },
 };

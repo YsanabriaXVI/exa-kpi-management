@@ -11,7 +11,7 @@ const dto = {
   description: null, notes: null, status: "DRAFT", issueYear: 2026, poolSequence: 1,
   areaScopeKey: "OPS|SEG",
   inputFrequency: { id: "1", code: "MONTHLY" }, validFrom: "2026-01-01", validTo: "2026-12-31",
-  areas: [], companies: [], kpiCount: 0, scorecardCount: 0,
+  areas: [], companies: [], kpiCount: 0, scorecardCount: 0, operationalPeriod: null,
   createdAt: "2026-08-20T12:00:00.000Z", updatedAt: null,
 };
 

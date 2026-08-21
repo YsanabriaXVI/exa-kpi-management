@@ -1,0 +1,42 @@
+Desde la raíz del repositorio:
+
+  cd backend/exa-kpi-management-service
+
+  Ejecutar todas las pruebas:
+
+  npm test
+
+  Actualmente ejecuta 32 pruebas:
+
+  src/tests/health.test.ts
+  src/tests/kpi-definition.test.ts
+  src/tests/kpi-definition.service.test.ts
+
+  Ejecutar un archivo específico:
+
+  npx vitest run src/tests/health.test.ts
+
+  npx vitest run src/tests/kpi-definition.test.ts
+
+  npx vitest run src/tests/kpi-definition.service.test.ts
+
+  Modo watch durante desarrollo:
+
+  npm run test:watch
+
+  Validación completa recomendada:
+
+  npm run prisma:generate
+  npm run prisma:validate
+  npm run typecheck
+  npm test
+  npm run build
+
+  Desde la raíz, comprobar Docker y endpoints:
+
+  docker compose -f backend/docker-compose.yml ps
+
+  Invoke-RestMethod http://localhost:4001/api/health/live
+  Invoke-RestMethod http://localhost:4001/api/health/ready
+  Invoke-RestMethod http://localhost:4001/api/v1/kpi-definitions
+  Invoke-RestMethod http://localhost:4001/api/v1/kpi-categories

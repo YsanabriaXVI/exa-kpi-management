@@ -1,17 +1,62 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const db = vi.hoisted(() => ({ kpiPool: { findFirst: vi.fn() }, inputFrequencyReference: { findUnique: vi.fn() }, kpiPoolPeriodComposition: { findUnique: vi.fn() }, $transaction: vi.fn() }));
+const db = vi.hoisted(() => ({
+  kpiPool: { findFirst: vi.fn(), update: vi.fn() },
+  inputFrequencyReference: { findUnique: vi.fn() },
+  kpiPoolPeriodComposition: { findUnique: vi.fn(), create: vi.fn() },
+  kpiPoolInputPeriod: { findUnique: vi.fn() },
+  kpiPoolKpi: { findMany: vi.fn() },
+  outboxEvent: { create: vi.fn() },
+  $queryRaw: vi.fn(),
+  $transaction: vi.fn(),
+}));
 const management = vi.hoisted(() => ({ batchLookup: vi.fn(), listConfigurations: vi.fn() }));
 vi.mock("../config/prisma.js", () => ({ prisma: db }));
 vi.mock("../clients/kpi-management.client.js", () => ({ kpiManagementClient: management }));
-import { kpiPoolMembershipService } from "../services/kpi-pool-membership.service.js";
+import { kpiPoolMembershipService, lifecycleAllowsPeriodFinalization } from "../services/kpi-pool-membership.service.js";
 
 const pool = { id: 2n, statusCode: "DRAFT", inputFrequencyExternalId: 1n, validFrom: new Date("2026-01-01T00:00:00.000Z"), validTo: new Date("2026-12-31T00:00:00.000Z"), aggregateVersion: 1 };
 const configuration = { id: "10", configCode: "KPC-050-01", definitionId: "50", definitionCode: "KPI-050", definitionName: "Productivity", definitionIsActive: true, inputFrequencyId: "1", inputFrequencyCode: "MONTHLY", inputFrequencyName: "Monthly", inputFrequencyIsActive: true, status: "CONFIGURED", isActive: true };
 
-beforeEach(() => { vi.clearAllMocks(); db.kpiPool.findFirst.mockResolvedValue(pool); db.inputFrequencyReference.findUnique.mockResolvedValue({ monthsPerPeriod: 1 }); db.kpiPoolPeriodComposition.findUnique.mockResolvedValue(null); });
+beforeEach(() => {
+  vi.clearAllMocks();
+  db.kpiPool.findFirst.mockResolvedValue(pool);
+  db.inputFrequencyReference.findUnique.mockResolvedValue({ monthsPerPeriod: 1 });
+  db.kpiPoolPeriodComposition.findUnique.mockResolvedValue(null);
+  db.kpiPoolInputPeriod.findUnique.mockResolvedValue({ id: 100n, periodKey: "2026-01" });
+  db.kpiPoolPeriodComposition.create.mockResolvedValue({ id: 200n });
+  db.$transaction.mockImplementation(async (callback: (tx: typeof db) => unknown) => callback(db));
+});
 
 describe("KPI Pool membership validation", () => {
+  it("allows a DRAFT Pool to finalize only its first Input Period", () => {
+    expect(lifecycleAllowsPeriodFinalization("DRAFT", 0)).toBe(true);
+    expect(lifecycleAllowsPeriodFinalization("DRAFT", 1)).toBe(false);
+  });
+
+  it("allows an ACTIVE Pool to finalize a dependency-approved period", () => {
+    expect(lifecycleAllowsPeriodFinalization("ACTIVE", 1)).toBe(true);
+    expect(lifecycleAllowsPeriodFinalization("INACTIVE", 0)).toBe(false);
+  });
+
+  it("finalizes the first composition and activates its DRAFT Pool atomically", async () => {
+    db.kpiPoolKpi.findMany.mockResolvedValue([{ id: 300n, kpiDefinitionExternalId: 50n, kpiConfigurationExternalId: 10n, definitionCodeSnapshot: "KPI-050", definitionNameSnapshot: "Productivity", configurationCodeSnapshot: "KPC-050-01", displayOrder: 1 }]);
+    management.batchLookup.mockResolvedValue({ data: [configuration], notFoundIds: [] });
+
+    await expect(kpiPoolMembershipService.finalizePeriod(2n, "2026-01-01", 1n)).resolves.toMatchObject({
+      poolStatus: "ACTIVE", status: "POOL_COMPOSITION_LOCKED", kpiCount: 1,
+    });
+    expect(db.kpiPoolPeriodComposition.create).toHaveBeenCalledOnce();
+    expect(db.kpiPool.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ statusCode: "ACTIVE" }) }));
+    expect(db.outboxEvent.create).toHaveBeenCalledTimes(2);
+    expect(db.outboxEvent.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ payload: expect.objectContaining({ data: expect.objectContaining({ poolPeriodId: "100", poolCompositionId: "200", memberships: [expect.objectContaining({ poolMembershipId: "300", kpiConfigurationId: "10" })] }) }) }) });
+  });
+
+  it("rejects an empty first composition without activating the Pool", async () => {
+    db.kpiPoolKpi.findMany.mockResolvedValue([]);
+    await expect(kpiPoolMembershipService.finalizePeriod(2n, "2026-01-01", 1n)).rejects.toMatchObject({ code: "POOL_PERIOD_COMPOSITION_EMPTY" });
+    expect(db.kpiPool.update).not.toHaveBeenCalled();
+  });
   it("rejects a missing ID and never starts the write transaction", async () => {
     management.batchLookup.mockResolvedValue({ data: [configuration], notFoundIds: ["999"] });
     await expect(kpiPoolMembershipService.add(2n, { configurationIds: ["10", "999"] }, 1n)).rejects.toMatchObject({ code: "KPI_CONFIGURATION_NOT_FOUND" });

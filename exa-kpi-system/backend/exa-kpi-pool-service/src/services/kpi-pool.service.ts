@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import type { CreateKpiPoolBody, ListKpiPoolsQuery, UpdateKpiPoolBody } from "../schemas/kpi-pool.schema.js";
@@ -10,11 +11,26 @@ const poolInclude = {
   areas: { orderBy: [{ displayOrder: "asc" as const }, { areaCodeSnapshot: "asc" as const }] },
   companies: { orderBy: [{ displayOrder: "asc" as const }, { companyCodeSnapshot: "asc" as const }] },
   kpis: { select: { effectiveFrom: true, effectiveTo: true } },
+  inputPeriods: { orderBy: { periodStart: "asc" as const } },
+  periodCompositions: { orderBy: { periodStart: "asc" as const } },
   _count: { select: { kpis: true } },
 };
 
 const asDate = (value: string) => new Date(`${value}T00:00:00.000Z`);
 const idsEqual = (left: bigint[], right: bigint[]) => left.length === right.length && left.every((id, index) => id === right[index]);
+const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
+const periodKey = (value: Date) => value.toISOString().slice(0, 7);
+const inputPeriodRows = (poolId: bigint, periods: Array<{ start: Date; end: Date }>) => periods.map((period) => ({
+  kpiPoolId: poolId, periodKey: periodKey(period.start), periodStart: period.start, periodEnd: period.end,
+}));
+
+export function validateValidityExtension(status: string, validFrom: Date, currentValidTo: Date, requestedValidTo: Date, monthsPerPeriod: number) {
+  if (status !== "ACTIVE") throw new AppError(409, "POOL_VALIDITY_EXTENSION_NOT_ALLOWED", "Only an ACTIVE Pool can extend its validity");
+  if (requestedValidTo <= currentValidTo) throw new AppError(422, "POOL_VALIDITY_MUST_EXTEND", "The new validity end must be after the current validity end");
+  const currentPeriods = poolPeriods(validFrom, currentValidTo, monthsPerPeriod);
+  const extendedPeriods = poolPeriods(validFrom, requestedValidTo, monthsPerPeriod);
+  return { currentPeriods, extendedPeriods, addedPeriods: extendedPeriods.slice(currentPeriods.length) };
+}
 
 async function loadReferences(tx: Prisma.TransactionClient, areaIds: bigint[], companyIds: bigint[], frequencyId: bigint) {
   const [areas, companies, frequency] = await Promise.all([
@@ -84,7 +100,7 @@ export const kpiPoolService = {
       const areaIds = input.poolAreaIds.map(BigInt);
       const companyIds = input.companyIds.map(BigInt);
       const references = await loadReferences(tx, areaIds, companyIds, BigInt(input.inputFrequencyId));
-      poolPeriods(asDate(input.validFrom), asDate(input.validTo), references.frequency.monthsPerPeriod);
+      const generatedPeriods = poolPeriods(asDate(input.validFrom), asDate(input.validTo), references.frequency.monthsPerPeriod);
       const areaScopeKey = buildAreaScopeKey(orderedCodes(references.areas));
       const issueYear = new Date().getUTCFullYear();
       const poolSequence = await allocateSequence(tx, areaScopeKey, issueYear);
@@ -101,6 +117,7 @@ export const kpiPoolService = {
         },
         include: poolInclude,
       });
+      await tx.kpiPoolInputPeriod.createMany({ data: inputPeriodRows(pool.id, generatedPeriods) });
       return toKpiPoolDto(pool);
     });
   },
@@ -109,8 +126,6 @@ export const kpiPoolService = {
     return prisma.$transaction(async (tx) => {
       const current = await tx.kpiPool.findFirst({ where: { id, deletedAt: null }, include: poolInclude });
       if (!current) throw new AppError(404, "KPI_POOL_NOT_FOUND", "KPI Pool was not found");
-      if (current.statusCode !== "DRAFT") throw new AppError(409, "KPI_POOL_STRUCTURE_LOCKED", "Only DRAFT Pools can be structurally edited");
-
       const areaIds = input.poolAreaIds?.map(BigInt) ?? current.areas.map((area) => area.poolAreaId);
       const companyIds = input.companyIds?.map(BigInt) ?? current.companies.map((company) => company.externalCompanyId);
       const frequencyId = input.inputFrequencyId ? BigInt(input.inputFrequencyId) : current.inputFrequencyExternalId;
@@ -127,10 +142,18 @@ export const kpiPoolService = {
       const associations = associationData(references, actor);
       const areasChanged = !idsEqual(references.areas.map((area) => area.id), current.areas.map((area) => area.poolAreaId));
       const companiesChanged = !idsEqual(references.companies.map((company) => company.externalCompanyId), current.companies.map((company) => company.externalCompanyId));
+      const structureChanged = areasChanged || companiesChanged
+        || references.frequency.externalInputFrequencyId !== current.inputFrequencyExternalId
+        || validFrom.getTime() !== current.validFrom.getTime()
+        || validTo.getTime() !== current.validTo.getTime()
+        || (input.notes !== undefined && input.notes !== current.notes);
+      if (current.statusCode !== "DRAFT" && structureChanged) {
+        throw new AppError(409, "KPI_POOL_STRUCTURE_LOCKED", "Only Pool Name and Pool Description can be edited after activation");
+      }
 
       await tx.kpiPool.update({ where: { id }, data: {
         poolCode, poolSequence, areaScopeKey,
-        poolName: input.poolName, description: input.description, notes: input.notes,
+        poolName: input.poolName, description: input.description, notes: current.statusCode === "DRAFT" ? input.notes : current.notes,
         inputFrequencyExternalId: references.frequency.externalInputFrequencyId,
         inputFrequencyCode: references.frequency.code, validFrom, validTo, updatedAt: new Date(), updatedByUserId: actor,
       } });
@@ -143,6 +166,27 @@ export const kpiPoolService = {
         await tx.kpiPoolCompany.createMany({ data: associations.companies.map((company) => ({ ...company, kpiPoolId: id })) });
       }
       return toKpiPoolDto(await tx.kpiPool.findUniqueOrThrow({ where: { id }, include: poolInclude }));
+    });
+  },
+
+  async extendValidity(id: bigint, requestedValidTo: string, actor: bigint) {
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT kpi_pool_id FROM kpi_pools WHERE kpi_pool_id = ${id} FOR UPDATE`;
+      const current = await tx.kpiPool.findFirst({ where: { id, deletedAt: null } });
+      if (!current) throw new AppError(404, "KPI_POOL_NOT_FOUND", "KPI Pool was not found");
+      const frequency = await tx.inputFrequencyReference.findUnique({ where: { externalInputFrequencyId: current.inputFrequencyExternalId } });
+      if (!frequency?.isActive) throw new AppError(422, "INPUT_FREQUENCY_NOT_AVAILABLE", "Input Frequency does not exist or is inactive");
+      const extension = validateValidityExtension(current.statusCode, current.validFrom, current.validTo, asDate(requestedValidTo), frequency.monthsPerPeriod);
+      await tx.kpiPoolInputPeriod.createMany({ data: inputPeriodRows(id, extension.addedPeriods), skipDuplicates: true });
+      const updated = await tx.kpiPool.update({ where: { id }, data: { validTo: asDate(requestedValidTo), aggregateVersion: { increment: 1 }, updatedAt: new Date(), updatedByUserId: actor }, include: poolInclude });
+      const eventId = randomUUID();
+      const payload = {
+        eventId, eventType: "kpi.pool.validity.extended.v1", occurredAt: new Date().toISOString(), producer: "exa-kpi-pool-service",
+        aggregateType: "kpi_pool", aggregateId: id.toString(), version: current.aggregateVersion + 1,
+        data: { poolId: id.toString(), previousValidTo: dateOnly(current.validTo), validTo: requestedValidTo, addedPeriods: (await tx.kpiPoolInputPeriod.findMany({ where: { kpiPoolId: id, periodStart: { gt: current.validTo } }, orderBy: { periodStart: "asc" } })).map((period) => ({ poolPeriodId: period.id.toString(), periodKey: period.periodKey, start: dateOnly(period.periodStart), end: dateOnly(period.periodEnd) })) },
+      };
+      await tx.outboxEvent.create({ data: { eventId, eventType: payload.eventType, aggregateType: "kpi_pool", aggregateId: id.toString(), aggregateVersion: payload.version, subject: payload.eventType, payload, occurredAt: new Date(payload.occurredAt) } });
+      return { ...toKpiPoolDto(updated), addedPeriods: payload.data.addedPeriods };
     });
   },
 

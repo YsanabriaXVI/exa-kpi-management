@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronLeft, ChevronRight, CircleCheckBig, CircleHelp, Eye, Hourglass, Link2, Minus, PackagePlus, Pencil, Plus, Search, Settings2, Trash2, Unlink, X } from "lucide-react";
+import { CalendarRange, Check, CheckCircle2, ChevronLeft, Eye, EyeOff, Hourglass, Link2, LockKeyhole, Minus, Plus, RefreshCw, Search, Settings2, TriangleAlert, Unlink, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   compareSortValues,
@@ -15,11 +15,12 @@ import "./manage-pool-selector.css";
 import { ActionToast } from "../../components/ActionToast";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
-import { PoolPeriodTimeline } from "./PoolPeriodTimeline";
 import { PoolPeriodSelect } from "./PoolPeriodSelect";
+import { ConfigMultiSelect } from "../kpi-config/ConfigMultiSelect";
+import "../kpi-config/kpi-config-overview.css";
 
 const availabilityCopy: Record<PoolKpiAvailability, string> = {
-  AVAILABLE: "Available to Select",
+  AVAILABLE: "Available to Add",
   IN_POOL: "Already in Pool",
   NOT_AVAILABLE: "Not Available",
 };
@@ -32,38 +33,29 @@ export function ManagePoolKpis() {
   const poolId = requestedPoolId || 0;
   const [activeCard, setActiveCard] = useState<PoolKpiAvailability | "ALL">("AVAILABLE");
   const [search, setSearch] = useState("");
+  const [definitionsSelected, setDefinitionsSelected] = useState<string[]>([]);
   const [categoriesSelected, setCategoriesSelected] = useState<string[]>([]);
   const [dataSourcesSelected, setDataSourcesSelected] = useState<string[]>([]);
   const [statesSelected, setStatesSelected] = useState<string[]>([]);
-  const [measurementUnitsSelected, setMeasurementUnitsSelected] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [hiddenFromView, setHiddenFromView] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<{ key: ManageSortKey; direction: SortDirection }>({ key: "configCode", direction: "asc" });
-  const [showImporter, setShowImporter] = useState(false);
-  const [importSelection, setImportSelection] = useState<string[]>([]);
-  const [importSearch, setImportSearch] = useState("");
-  const [showRecentKpis, setShowRecentKpis] = useState(false);
-  const [importStatusFilter, setImportStatusFilter] = useState<"ACTIVE" | "INACTIVE" | "ALL">("ACTIVE");
-  const [importCategoryFilter, setImportCategoryFilter] = useState("ALL");
-  const [importDataSourceFilter, setImportDataSourceFilter] = useState("ALL");
   const [notice, setNotice] = useState("");
   const [noticeTone, setNoticeTone] = useState<"success" | "warning">("success");
   const [targetPeriod, setTargetPeriod] = useState("");
-  const normalizedImportSearch = importSearch.trim();
+  const [finalizeConfirmationOpen, setFinalizeConfirmationOpen] = useState(false);
   const poolQuery = useQuery({ queryKey: ["kpi-pool", poolId], queryFn: () => kpiPoolService.get(poolId), enabled: poolId > 0 });
   const periodsQuery = useQuery({ queryKey: ["kpi-pool-periods", poolId], queryFn: () => kpiPoolService.getInputPeriods(poolId), enabled: poolId > 0 });
   useEffect(() => { if (periodsQuery.data?.meta.defaultPeriodStart) setTargetPeriod(periodsQuery.data.meta.defaultPeriodStart); }, [periodsQuery.data]);
   const editingPeriod = periodsQuery.data?.data.find((period) => period.start === targetPeriod);
   const periodIsEditable = editingPeriod?.configurationStatus === "EDITABLE";
   const periodCanFinalize = editingPeriod?.canFinalizeComposition === true;
+  const isFinalized = editingPeriod?.workflowStatus === "FINALIZED";
   const targetPeriodLabel = targetPeriod ? formatMonth(targetPeriod) : "selected period";
   const catalogQuery = useQuery({ queryKey: ["pool-manage-kpis", poolId, targetPeriod], queryFn: () => periodIsEditable ? kpiPoolService.getManageableKpis(poolId, targetPeriod) : kpiPoolService.getManageableComposition(poolId, targetPeriod), enabled: poolId > 0 && Boolean(targetPeriod) && Boolean(editingPeriod) && editingPeriod?.workflowStatus !== "FUTURE" });
-  const importableQuery = useQuery({
-    queryKey: ["importable-kpis", normalizedImportSearch, showRecentKpis],
-    queryFn: () => kpiPoolService.getImportableKpis(normalizedImportSearch, showRecentKpis),
-    enabled: showImporter && (normalizedImportSearch.length > 0 || showRecentKpis),
-  });
+  const effectiveCompositionQuery = useQuery({ queryKey: ["kpi-pool-composition", poolId, targetPeriod], queryFn: () => kpiPoolService.getComposition(poolId, targetPeriod), enabled: poolId > 0 && Boolean(targetPeriod) && Boolean(editingPeriod) && editingPeriod?.workflowStatus !== "FUTURE" });
   const refresh = async () => {
     setSelected([]);
     await Promise.all([
@@ -81,54 +73,30 @@ export function ManagePoolKpis() {
     onError: (mutationError) => { setNoticeTone("warning"); setNotice(mutationError instanceof Error ? mutationError.message.replace("KPI_DEFINITION_ALREADY_ASSIGNED: ", "") : "The selected KPI Configurations could not be linked."); },
   });
   const removeMutation = useMutation({ mutationFn: (codes: string[]) => kpiPoolService.removeKpis(poolId, codes, targetPeriod, poolQuery.data?.status), onSuccess: async (_, codes) => { setNotice(codes.length === 1 ? `${codes[0]} was retired from the selected period.` : `${codes.length} KPI Configurations were retired from the selected period.`); await refresh(); } });
+  const replaceMutation = useMutation({
+    mutationFn: async (candidate: ManageablePoolKpi) => {
+      const current = records.find((record) => record.configCode === candidate.conflictingConfigurationCode && record.availability === "IN_POOL");
+      if (!current?.configurationId || !candidate.configurationId) throw new Error("The current or replacement Configuration could not be resolved.");
+      return kpiPoolService.replaceKpi(poolId, current.configurationId, candidate.configurationId, targetPeriod);
+    },
+    onSuccess: async () => { setNoticeTone("success"); setNotice(`KPI Configuration replaced for ${formatMonthLong(targetPeriod)}.`); await refresh(); },
+    onError: (error) => { setNoticeTone("warning"); setNotice(error instanceof Error ? error.message : "The KPI Configuration could not be replaced."); },
+  });
   const finalizeMutation = useMutation({
     mutationFn: () => kpiPoolService.finalizePeriodComposition(poolId, targetPeriod),
-    onSuccess: async (result) => { setNoticeTone("success"); setNotice(`${formatMonth(result.data.periodStart)} composition was finalized with ${result.data.kpiCount} KPI Configurations.`); await refresh(); },
+    onSuccess: async (result) => { setFinalizeConfirmationOpen(false); setNoticeTone("success"); setNotice(`${formatMonth(result.data.periodStart)} composition was finalized with ${result.data.kpiCount} KPI ${result.data.kpiCount === 1 ? "Configuration" : "Configurations"}.`); await refresh(); },
     onError: (error) => { setNoticeTone("warning"); setNotice(error instanceof Error ? error.message : "The period composition could not be finalized."); },
   });
-  const hideMutation = useMutation({
-    mutationFn: (codes: string[]) => kpiPoolService.hideKpisFromPool(poolId, codes),
-    onSuccess: async (_, codes) => {
-      setNoticeTone("warning");
-      setNotice(`Removal successful: ${codes.length} KPI ${codes.length === 1 ? "Configuration was" : "Configurations were"} removed from this Pool view.`);
-      await refresh();
-    },
-  });
-  const deleteMutation = useMutation({
-    mutationFn: kpiPoolService.softDeleteKpi,
-    onSuccess: async () => {
-      setNotice("KPI Configuration was soft deleted and unlinked from active Pools.");
-      await refresh();
-    },
-  });
-  const importMutation = useMutation({
-    mutationFn: kpiPoolService.importKpis,
-    onSuccess: async (imported) => {
-      setShowImporter(false);
-      setImportSearch("");
-      setShowRecentKpis(false);
-      setImportSelection([]);
-      setImportStatusFilter("ACTIVE");
-      setImportCategoryFilter("ALL");
-      setImportDataSourceFilter("ALL");
-      setNotice(`${imported.length} KPI ${imported.length === 1 ? "Configuration was" : "Configurations were"} brought into the Manage KPIs table.`);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["pool-manage-kpis", poolId] }),
-        queryClient.invalidateQueries({ queryKey: ["importable-kpis"] }),
-      ]);
-    },
-  });
   const records = catalogQuery.data ?? [];
-  const operationalPeriod = periodsQuery.data?.data.find((period) => isTodayWithin(period.start, period.end));
-  const recordCodes = new Set(records.map((record) => record.configCode));
-  const recoverableKpis = (importableQuery.data ?? []).filter((kpi) => !recordCodes.has(kpi.configCode));
-  const importCategories = [...new Set(recoverableKpis.map((kpi) => kpi.category))].sort();
-  const importDataSources = [...new Set(recoverableKpis.map((kpi) => kpi.dataSource))].sort();
-  const importable = recoverableKpis.filter((kpi) =>
-    (importStatusFilter === "ALL" || kpi.status === importStatusFilter)
-    && (importCategoryFilter === "ALL" || kpi.category === importCategoryFilter)
-    && (importDataSourceFilter === "ALL" || kpi.dataSource === importDataSourceFilter),
-  );
+  const includedCount = effectiveCompositionQuery.data?.length ?? 0;
+  const isFirstInputPeriod = periodsQuery.data?.data[0]?.start === targetPeriod;
+  const finalizeBlockedReason = getFinalizeBlockedReason({
+    compositionLoading: effectiveCompositionQuery.isLoading,
+    includedCount,
+    periodCanFinalize,
+    previousPeriodStart: editingPeriod?.dependency.previousPeriodStart ?? null,
+  });
+  useEffect(() => { if (!editingPeriod) return; setActiveCard(editingPeriod.workflowStatus === "FINALIZED" ? "IN_POOL" : "AVAILABLE"); setPage(1); setSelected([]); setHiddenFromView([]); }, [editingPeriod?.start, editingPeriod?.workflowStatus]);
   const counts = {
     AVAILABLE: records.filter((item) => item.availability === "AVAILABLE").length,
     IN_POOL: records.filter((item) => item.availability === "IN_POOL").length,
@@ -136,23 +104,25 @@ export function ManagePoolKpis() {
   };
   const filtered = useMemo(() => records.filter((record) => {
     const term = search.toLowerCase();
-    return (activeCard === "ALL" || record.availability === activeCard)
+    return !hiddenFromView.includes(record.configCode)
+      && (activeCard === "ALL" || record.availability === activeCard)
       && (!term || `${record.configCode} ${record.kpiCode} ${record.name}`.toLowerCase().includes(term))
+      && (!definitionsSelected.length || definitionsSelected.includes(record.definitionId))
       && (!categoriesSelected.length || categoriesSelected.includes(record.category))
       && (!dataSourcesSelected.length || dataSourcesSelected.includes(record.dataSource))
-      && (!statesSelected.length || statesSelected.includes(record.status))
-      && (!measurementUnitsSelected.length || measurementUnitsSelected.includes(record.measurementUnit));
-  }).sort((left, right) => compareSortValues(left[sort.key], right[sort.key], sort.direction)), [activeCard, categoriesSelected, dataSourcesSelected, measurementUnitsSelected, records, search, sort, statesSelected]);
+      && (!statesSelected.length || statesSelected.includes(record.status));
+  }).sort((left, right) => compareSortValues(left[sort.key], right[sort.key], sort.direction)), [activeCard, categoriesSelected, dataSourcesSelected, definitionsSelected, hiddenFromView, records, search, sort, statesSelected]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const pageStart = (page - 1) * pageSize;
   const paginated = filtered.slice(pageStart, pageStart + pageSize);
   const filterAnimationKey = [
     activeCard,
     search,
+    definitionsSelected.join(","),
+    hiddenFromView.join(","),
     categoriesSelected.join(","),
     dataSourcesSelected.join(","),
     statesSelected.join(","),
-    measurementUnitsSelected.join(","),
     page,
   ].join("|");
   useEffect(() => setPage((current) => Math.min(current, totalPages)), [totalPages]);
@@ -183,7 +153,7 @@ export function ManagePoolKpis() {
   const selectedIncluded = selected.filter((code) => records.find((item) => item.configCode === code)?.availability === "IN_POOL");
   return (
     <main className="pool-page manage-kpis-page">
-      <nav className="kpi-breadcrumb" aria-label="Breadcrumb"><Link to="/app/pool-kpis/overview">KPI Pool</Link><span>/</span><Link to={poolId ? `/app/pool-kpis/manage-kpis?poolId=${poolId}` : "/app/pool-kpis/manage-kpis"} aria-current="page">Manage KPIs</Link></nav>
+      <nav className="kpi-breadcrumb" aria-label="Breadcrumb"><Link to="/app/pool-kpis/overview">KPI Pool</Link>{poolQuery.data && <><span>/</span><Link to={`/app/pool-kpis/detail/${poolId}`}>{poolQuery.data.code}</Link></>}<span>/</span><Link to={poolId ? `/app/pool-kpis/manage-kpis?poolId=${poolId}` : "/app/pool-kpis/manage-kpis"} aria-current="page">Manage KPIs</Link></nav>
       <header className="pool-page-header"><div><h1>Manage KPIs</h1><p>Prepare the KPI Configuration universe for the selected Pool period.</p></div></header>
 
       {!poolId && <section className="manage-pool-empty"><h2>No KPI Pool selected</h2><p>Open Manage KPIs from the corresponding record in KPI Pool Overview.</p></section>}
@@ -196,21 +166,17 @@ export function ManagePoolKpis() {
       </section>}
 
       {poolId > 0 && !poolQuery.isLoading && <div className={`manage-pool-loaded ${editingPeriod?.workflowStatus === "FUTURE" ? "future-period" : editingPeriod?.workflowStatus === "FINALIZED" ? "finalized-period" : "editable-period"}`} key={poolId}>
-      {poolQuery.data && <section className="manage-workflow-summary">
-        <div className="manage-period-focus-grid"><article className="period-focus-card current"><header><span className="period-focus-icon"><CircleCheckBig size={20}/></span><span>Current Input Period</span></header><strong>{operationalPeriod ? formatMonthLong(operationalPeriod.start) : "Outside Pool validity"}</strong><b className="period-focus-status finalized">Composition Finalized</b><h3>{operationalPeriod?.workflowStatus === "FINALIZED" ? "The KPI composition for this period has been finalized." : "The composition for this period is not finalized yet."}</h3><p>{operationalPeriod?.workflowStatus === "FINALIZED" ? "Scorecards can now select from this finalized KPI set. Monitoring Results will request inputs according to the KPI Configurations selected by the applicable Scorecards." : "This period has not entered its downstream operational workflow yet."}</p></article><article className={`period-focus-card ${periodCanFinalize ? "ready" : periodIsEditable ? "preparing" : editingPeriod?.workflowStatus === "FINALIZED" ? "finalized" : "future"}`}><header><span className="period-focus-icon"><Pencil size={18}/></span><span>{periodIsEditable ? "Next Pool Composition" : "Viewing Period"}</span></header><PoolPeriodSelect periods={periodsQuery.data?.data ?? []} value={targetPeriod} onChange={(period) => { setTargetPeriod(period); setSelected([]); }}/><b className={`period-focus-status ${periodCanFinalize ? "ready" : periodIsEditable ? "editable" : editingPeriod?.workflowStatus === "FINALIZED" ? "finalized" : "future"}`}>{editingPeriod?.workflowStatus === "FINALIZED" ? "Composition Finalized" : periodCanFinalize ? "Ready to Finalize" : periodIsEditable ? "Editable" : "Future"}</b><h3>{periodIsEditable ? `Prepare the KPI Configuration set that will be available to Scorecards for ${formatMonthLong(targetPeriod)}.` : editingPeriod?.workflowStatus === "FINALIZED" ? "This period's KPI composition is finalized." : "This composition is not available yet."}</h3><p>{periodIsEditable ? periodCanFinalize ? "You may still add, remove or replace KPI Configurations until finalization." : `You may add, remove or replace KPI Configurations while this composition remains editable. Finalization becomes available after ${editingPeriod?.dependency.previousPeriodStart ? formatMonthLong(editingPeriod.dependency.previousPeriodStart) : "the previous period"} Monitoring is closed.` : editingPeriod?.workflowStatus === "FINALIZED" ? "This composition is read-only." : "Complete the previous workflow before preparing this period."}</p></article></div>
-      </section>}
-      {poolQuery.data && <section className="manage-period-context">
-        <PoolPeriodTimeline poolId={poolId} periods={periodsQuery.data?.data ?? []} selected={targetPeriod} frequency={poolQuery.data.frequency} onSelect={(period) => { setTargetPeriod(period); setSelected([]); }} />
+      {poolQuery.data && <section className="manage-compact-period-context" aria-label="Composition period context">
+        <div className="manage-period-selector-block"><span>Select Pool Period</span><PoolPeriodSelect periods={periodsQuery.data?.data ?? []} value={targetPeriod} onChange={(period) => { setTargetPeriod(period); setSelected([]); }}/><div className="manage-period-guidance">{isFinalized ? <small className="finalized-period-note"><Check size={15} aria-hidden="true"/><span><strong>{formatMonthLong(targetPeriod)} finalized</strong> — {records.length} KPI {records.length === 1 ? "Configuration is" : "Configurations are"} available to Scorecards. This composition is read-only.</span></small> : isFirstInputPeriod && periodIsEditable ? <small className="first-period-note"><CheckCircle2 size={15} aria-hidden="true"/><span><strong>This is the first Input Period of the Pool.</strong> The composition can be finalized once you have selected the KPI Configurations that should be available to Scorecards.</span></small> : periodCanFinalize ? <small><strong>Editable composition.</strong> You can add, remove or replace KPI Configurations for this period.</small> : periodIsEditable ? <><small><strong>You may continue preparing this composition.</strong></small><small className="finalization-warning"><TriangleAlert size={15} aria-hidden="true"/> <span>Finalization will become available after {editingPeriod?.dependency.previousPeriodStart ? formatMonthLong(editingPeriod.dependency.previousPeriodStart) : "the previous period"} Monitoring is closed.</span></small></> : <small>This composition is not available yet.</small>}</div></div>
+        <button className="button secondary" onClick={() => navigate(`/app/pool-kpis/period-schedule?poolId=${poolId}`)}><CalendarRange size={16}/> View Period Schedule</button>
       </section>}
 
       {editingPeriod?.workflowStatus === "FUTURE" && <section className="future-composition-empty"><Hourglass size={34} /><span className="selected-period-badge">{formatMonthOption(targetPeriod)} · Future</span><h2>KPI composition not available yet</h2><p>Complete the previous period workflow before this composition becomes available.</p><strong>Current editable composition: {formatMonthLong(periodsQuery.data?.meta.defaultPeriodStart ?? targetPeriod)}</strong><button className="button secondary" onClick={() => setTargetPeriod(periodsQuery.data?.meta.defaultPeriodStart ?? targetPeriod)}>Back to editable period</button></section>}
 
-      {editingPeriod?.workflowStatus === "FINALIZED" && <section className="finalized-composition-summary"><h2><Check size={18}/> {formatMonthLong(targetPeriod)} composition finalized</h2><div><strong>{records.length}</strong><span>KPI Configurations are now available for Scorecard selection.</span></div><p>This period is read-only and preserved for historical traceability.</p></section>}
-
-      <section className="selection-summary">
-        <div className="manage-section-heading period-section-heading"><div><h2>Selection Summary for this {targetPeriod ? formatMonthLong(targetPeriod) : "selected period"} Pool</h2><p>Choose a card to filter the records below.</p></div></div>
+      {editingPeriod?.workflowStatus !== "FUTURE" && <><section className="selection-summary">
+        <div className="manage-section-heading period-section-heading"><div><h2>Selection Summary for {targetPeriod ? formatMonthLong(targetPeriod) : "Selected Period"}</h2><p>Choose a card to filter the records below.</p></div></div>
         <div className="availability-cards">
-          <button className={`availability-card all ${activeCard === "ALL" ? "active" : ""}`} onClick={() => setActiveCard("ALL")} aria-pressed={activeCard === "ALL"}><span className="availability-card-icon"><Settings2 size={17} /></span><span><small>All KPI Configurations</small><strong>{records.length}</strong></span></button>
+          <button className={`availability-card all ${activeCard === "ALL" ? "active" : ""}`} onClick={() => setActiveCard("ALL")} aria-pressed={activeCard === "ALL"}><span className="availability-card-icon"><Settings2 size={17} /></span><span><small>All Configurations</small><strong>{records.length}</strong></span></button>
           <AvailabilityCard type="AVAILABLE" count={counts.AVAILABLE} active={activeCard === "AVAILABLE"} onClick={() => setActiveCard(activeCard === "AVAILABLE" ? "ALL" : "AVAILABLE")} />
           <AvailabilityCard type="IN_POOL" label="Included This Period" count={counts.IN_POOL} active={activeCard === "IN_POOL"} onClick={() => setActiveCard(activeCard === "IN_POOL" ? "ALL" : "IN_POOL")} />
           <AvailabilityCard type="NOT_AVAILABLE" count={counts.NOT_AVAILABLE} active={activeCard === "NOT_AVAILABLE"} onClick={() => setActiveCard(activeCard === "NOT_AVAILABLE" ? "ALL" : "NOT_AVAILABLE")} />
@@ -218,20 +184,19 @@ export function ManagePoolKpis() {
       </section>
 
       <section className="manage-table-section">
-        <div className="manage-section-heading manage-table-heading"><div><div className="manage-title-with-period"><h2>{editingPeriod?.workflowStatus === "FINALIZED" ? `Composition Snapshot for ${targetPeriod ? formatMonthLong(targetPeriod) : "Selected Period"}` : `Manage KPI Configurations for ${targetPeriod ? formatMonthLong(targetPeriod) : "Selected Period"}`}</h2></div><p>{editingPeriod?.workflowStatus === "FINALIZED" ? `${records.length} KPI Configurations · Read only` : "Add, remove or replace configurations for this period."}</p></div><div className="manage-table-heading-actions">{periodIsEditable && <button className="button bring-kpi-button" disabled={catalogQuery.isFetching} onClick={async () => { setActiveCard("AVAILABLE"); setPage(1); const result = await catalogQuery.refetch(); if (result.isSuccess) { const available = result.data?.filter((record) => record.availability === "AVAILABLE").length ?? 0; setNoticeTone("success"); setNotice(`${available} KPI ${available === 1 ? "Configuration is" : "Configurations are"} available to select for ${formatMonthLong(targetPeriod)}.`); } }}><PackagePlus size={18} /> {catalogQuery.isFetching ? "Loading KPIs..." : "Load Available KPIs"}</button>}{poolQuery.data?.status === "ACTIVE" && periodIsEditable && <div className="table-finalize-control"><button className="button finalize-period-button" disabled={!periodCanFinalize || finalizeMutation.isPending || records.filter((record) => record.availability === "IN_POOL").length === 0} onClick={() => { const count = records.filter((record) => record.availability === "IN_POOL").length; if (window.confirm(`Finalize the Pool composition for ${formatMonth(targetPeriod)} with ${count} KPI Configurations?`)) finalizeMutation.mutate(); }}>{finalizeMutation.isPending ? "Finalizing…" : "Finalize Composition"}</button><small>{periodCanFinalize ? `${editingPeriod?.dependency.previousPeriodStart ? formatMonthLong(editingPeriod.dependency.previousPeriodStart) : "Previous period"} Monitoring closed` : `Waiting for ${editingPeriod?.dependency.previousPeriodStart ? formatMonthLong(editingPeriod.dependency.previousPeriodStart) : "previous period"} Monitoring to close`}</small></div>}</div></div>
+        <div className="manage-section-heading manage-table-heading"><div><h2>{isFinalized ? "Composition Snapshot" : "Manage KPI Configurations"} for {targetPeriod ? formatMonthLong(targetPeriod) : "Selected Period"}</h2><p>{isFinalized ? "Read-only KPI composition finalized for this Input Period." : "Add, remove or replace KPI Configurations for this period."}</p></div><div className="manage-table-heading-actions">{poolQuery.data?.status !== "INACTIVE" && periodIsEditable && <div className="table-finalize-control"><button className="button finalize-period-button" disabled={Boolean(finalizeBlockedReason) || finalizeMutation.isPending} title={finalizeBlockedReason ?? undefined} onClick={() => setFinalizeConfirmationOpen(true)}>{finalizeMutation.isPending ? "Finalizing…" : <><Check size={15}/> Finalize Composition</>}</button><small className={editingPeriod?.dependency.previousPeriodStart && !periodCanFinalize ? "finalize-blocked-message" : !finalizeBlockedReason ? "finalize-ready-message" : undefined}>{editingPeriod?.dependency.previousPeriodStart && !periodCanFinalize ? <TriangleAlert size={15} aria-hidden="true"/> : !finalizeBlockedReason ? <CheckCircle2 size={14} aria-hidden="true"/> : null}<span>{finalizeBlockedReason ?? "The selected set will become read-only for this Input Period."}</span></small></div>}</div></div>
         <div className="manage-toolbar">
           <label className="pool-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search KPI name, code or category..." /></label>
+          <div className="manage-definition-filter kpi-config-page"><ConfigMultiSelect label="KPI Definition" searchable options={[...new Map(records.map((record) => [record.definitionId, { value: record.definitionId, label: record.kpiCode, description: record.name }])).values()]} selected={definitionsSelected} onChange={setDefinitionsSelected} /></div>
           <PoolOverviewMultiSelect label="All categories" options={[...new Set(records.map((record) => record.category))].map((item) => ({ value: item, label: item }))} selected={categoriesSelected} onChange={setCategoriesSelected} />
           <PoolOverviewMultiSelect label="All data sources" options={[...new Set(records.map((record) => record.dataSource))].map((item) => ({ value: item, label: item }))} selected={dataSourcesSelected} onChange={setDataSourcesSelected} />
           <PoolOverviewMultiSelect label="All states" options={[{ value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }]} selected={statesSelected} onChange={setStatesSelected} />
-          <PoolOverviewMultiSelect label="Measurement Unit" options={[...new Set(records.map((record) => record.measurementUnit))].sort().map((item) => ({ value: item, label: formatMeasurementUnit(item) }))} selected={measurementUnitsSelected} onChange={setMeasurementUnitsSelected} />
         </div>
         {notice && <ActionToast message={notice} tone={noticeTone} onClose={() => setNotice("")} />}
         <div className="pool-inner-table manage-kpi-table-wrap stable-table-shell">
-          <table className="kpi-table manage-kpi-table">
+          <table className={`kpi-table manage-kpi-table ${isFinalized ? "snapshot-table" : "editable-table"}`}>
             <thead><tr>
-              <th>Select</th>
-              <SortableTableHeader active={sort.key === "availability"} direction={sort.direction} onSort={() => sortBy("availability")}>Availability</SortableTableHeader>
+              {!isFinalized && <><th>Select</th><SortableTableHeader active={sort.key === "availability"} direction={sort.direction} onSort={() => sortBy("availability")}>Availability</SortableTableHeader></>}
               <SortableTableHeader active={sort.key === "configCode"} direction={sort.direction} onSort={() => sortBy("configCode")}>Config Code</SortableTableHeader>
               <SortableTableHeader active={sort.key === "kpiCode"} direction={sort.direction} onSort={() => sortBy("kpiCode")}>KPI Code</SortableTableHeader>
               <SortableTableHeader active={sort.key === "name"} direction={sort.direction} onSort={() => sortBy("name")}>KPI Name</SortableTableHeader>
@@ -242,17 +207,17 @@ export function ManagePoolKpis() {
               <SortableTableHeader active={sort.key === "status"} direction={sort.direction} onSort={() => sortBy("status")}>State</SortableTableHeader>
               <th>Actions</th>
             </tr></thead>
-            <tbody key={filterAnimationKey}>{catalogQuery.isLoading ? <tr><td colSpan={11} className="table-message">Loading KPI Configurations...</td></tr> : paginated.length ? paginated.map((record) => (
-              <tr key={record.configCode} className={selected.includes(record.configCode) ? "selected-row" : ""}>
-                <td><input type="checkbox" disabled={record.availability === "NOT_AVAILABLE" && record.reasonCode !== "KPI_DEFINITION_ALREADY_IN_POOL"} checked={selected.includes(record.configCode)} onChange={() => toggle(record.configCode)} aria-label={`Select ${record.configCode}`} /></td>
-                <td><span title={record.reasonCode ?? undefined} className={`availability-label ${record.availability.toLowerCase()}`}>{availabilityCopy[record.availability]}</span></td>
+            <tbody key={filterAnimationKey}>{catalogQuery.isLoading ? <tr><td colSpan={isFinalized ? 9 : 11} className="table-message">Loading KPI Configurations...</td></tr> : paginated.length ? paginated.map((record) => (
+              <tr key={record.configCode} className={`${selected.includes(record.configCode) ? "selected-row" : ""} ${record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE" ? "definition-conflict-row" : ""}`}>
+                {!isFinalized && <><td><input type="checkbox" disabled={record.availability === "NOT_AVAILABLE"} checked={selected.includes(record.configCode)} onChange={() => toggle(record.configCode)} aria-label={`Select ${record.configCode}${record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE" ? `. Another configuration of ${record.kpiCode} is already selected for this period.` : ""}`} title={availabilityReason(record)} /></td><td><span title={availabilityReason(record)} className={`availability-label ${record.availability.toLowerCase()}`}>{availabilityCopy[record.availability]}</span></td></>}
                 <td><span className="code-pill">{record.configCode}</span></td><td>{record.kpiCode}</td><td className="name-cell">{record.name}</td><td>{record.category}</td><td>{record.goal}</td><td>{record.measurementUnit}</td><td>{record.dataSource}</td>
                 <td><span className={`status-chip ${record.status.toLowerCase()}`}><i />{record.status === "ACTIVE" ? "Active" : "Inactive"}</span></td>
                 <td><div className="table-actions">
                   <button className="icon-button view" title="View KPI Configuration detail" onClick={() => navigate(`/app/kpi-management/config/detail-record?kpiConfigCode=${encodeURIComponent(record.configCode)}&poolId=${poolId}&from=pool-manage`)}><Eye size={15} /></button>
+                  {periodIsEditable && record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE" && record.conflictingConfigurationCode && <button className="icon-button configure" disabled={replaceMutation.isPending} title={`Replace ${record.conflictingConfigurationCode} with ${record.configCode} for ${formatMonthLong(targetPeriod)}`} aria-label={`Replace ${record.conflictingConfigurationCode} with ${record.configCode}`} onClick={() => { if (window.confirm(`Replace ${record.conflictingConfigurationCode} with ${record.configCode} for ${formatMonthLong(targetPeriod)}?`)) replaceMutation.mutate(record); }}><RefreshCw size={15}/></button>}
                 </div></td>
               </tr>
-            )) : <tr><td colSpan={11} className="table-message">No KPI Configurations match these filters.</td></tr>}</tbody>
+            )) : <tr><td colSpan={isFinalized ? 9 : 11} className="table-message">No KPI Configurations match these filters.</td></tr>}</tbody>
           </table>
           <div className="manage-table-footer">
             <footer className="manage-table-pagination">
@@ -265,32 +230,30 @@ export function ManagePoolKpis() {
               <button className="button secondary manage-back-button" onClick={() => navigate(`/app/pool-kpis/detail/${poolId}`)}><ChevronLeft size={15} /> Back to KPI Pool</button>
               <div>
                 <button className="button pool-link-selected" disabled={!periodIsEditable || !selectedAvailable.length || addMutation.isPending} onClick={() => addMutation.mutate(selectedAvailable)}><Link2 size={15} /> Add to {targetPeriodLabel}</button>
-                <button className="button pool-unlink-selected" disabled={!periodIsEditable || !selectedIncluded.length || removeMutation.isPending} onClick={() => removeMutation.mutate(selectedIncluded)}><Unlink size={15} /> Remove from {targetPeriodLabel}</button>
-                <button className="button pool-delete-selected" disabled={!selected.length || hideMutation.isPending} onClick={() => hideMutation.mutate(selected)}><Trash2 size={15} /> Delete Selected Rows</button>
+                <button className="button pool-unlink-selected" disabled={!periodIsEditable || !selectedIncluded.length || removeMutation.isPending} title={!periodIsEditable ? "Finalized and future compositions cannot be modified." : !selectedIncluded.length ? "Select one or more included KPI Configurations." : undefined} onClick={() => { if (window.confirm(`Remove ${selectedIncluded.length} selected KPI ${selectedIncluded.length === 1 ? "Configuration" : "Configurations"} from ${formatMonthLong(targetPeriod)}? They will return to Available to Add.`)) removeMutation.mutate(selectedIncluded); }}><Unlink size={15} /> {removeMutation.isPending ? "Removing…" : `Return to Available (${selectedIncluded.length})`}</button>
+                <button className="button secondary pool-hide-selected" disabled={!selected.length} title={!selected.length ? "Select one or more visible rows." : "Hide selected rows from this table without changing the Pool composition."} onClick={() => { setHiddenFromView((current) => [...new Set([...current, ...selected])]); setSelected([]); setNoticeTone("success"); setNotice("Selected rows were hidden from this view. The Pool composition was not changed."); }}><EyeOff size={15} /> Hide from List ({selected.length})</button>
               </div>
             </footer>
           </div>
         </div>
-      </section>
+      </section></>}
       </div>}
 
-      {showImporter && <div className="kpi-modal-backdrop" role="presentation"><section className="import-kpi-modal" role="dialog" aria-modal="true" aria-labelledby="bring-kpi-title">
-        <div className="import-modal-heading"><span><PackagePlus size={21} /></span><div><h2 id="bring-kpi-title">Bring KPI Configurations</h2><p>Select one or more configured KPIs to add them to the Manage KPIs table.</p></div><button onClick={() => { setShowImporter(false); setImportSearch(""); setShowRecentKpis(false); setImportSelection([]); setImportStatusFilter("ACTIVE"); setImportCategoryFilter("ALL"); setImportDataSourceFilter("ALL"); }} aria-label="Close"><X size={18} /></button></div>
-        <label className="pool-search import-search"><Search size={16} /><input value={importSearch} onChange={(event) => setImportSearch(event.target.value)} placeholder="Search KPI code, name or category..." /></label>
-        <label className="recent-kpis-toggle"><input type="checkbox" checked={showRecentKpis} onChange={(event) => setShowRecentKpis(event.target.checked)} /><span><Check size={13} /></span><div><strong>Show latest KPI Configurations</strong><small>Display the most recently available KPIs without typing a search.</small></div></label>
-        <div className="import-result-filters">
-          <label><span className="import-filter-title">State <span className="import-filter-help" tabIndex={0} aria-label="KPI state filter help"><CircleHelp size={15} /><span role="tooltip"><span><strong>All Active KPIs Available</strong>Shows active configurations available to recover because they are not currently in the Manage KPIs table.</span><span><strong>Inactive KPIs Available</strong>Shows inactive configurations not currently in the Manage KPIs table. They cannot be linked until reactivated.</span><span><strong>All KPIs Available</strong>Shows every active and inactive configuration that has not yet been brought into the Manage KPIs table.</span></span></span></span><select value={importStatusFilter} onChange={(event) => setImportStatusFilter(event.target.value as "ACTIVE" | "INACTIVE" | "ALL")}><option value="ACTIVE">All Active KPIs Available</option><option value="INACTIVE">Inactive KPIs Available</option><option value="ALL">All KPIs Available</option></select></label>
-          <label><span>Category</span><select value={importCategoryFilter} onChange={(event) => setImportCategoryFilter(event.target.value)}><option value="ALL">All categories</option>{importCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-          <label><span>Data Source</span><select value={importDataSourceFilter} onChange={(event) => setImportDataSourceFilter(event.target.value)}><option value="ALL">All data sources</option>{importDataSources.map((dataSource) => <option key={dataSource} value={dataSource}>{dataSource}</option>)}</select></label>
-        </div>
-        <div className="import-options" key={`${normalizedImportSearch}-${showRecentKpis}-${importStatusFilter}-${importCategoryFilter}-${importDataSourceFilter}`}>{!normalizedImportSearch && !showRecentKpis ? <p>Type a KPI code, name or category, or show the latest available configurations.</p> : importableQuery.isLoading ? <p>Searching KPI Configurations...</p> : importable.length ? importable.map((kpi) => <label key={kpi.configCode} className={importSelection.includes(kpi.configCode) ? "selected" : ""}><input type="checkbox" checked={importSelection.includes(kpi.configCode)} onChange={() => setImportSelection((current) => current.includes(kpi.configCode) ? current.filter((code) => code !== kpi.configCode) : [...current, kpi.configCode])} /><span className="import-radio">{importSelection.includes(kpi.configCode) && <Check size={13} />}</span><span><strong>{kpi.configCode} · {kpi.kpiCode}</strong><small>{kpi.name} · {kpi.category} · {kpi.dataSource} · {kpi.status === "ACTIVE" ? "Active" : "Inactive"}</small></span></label>) : <p>No new KPI Configurations match this search and filters.</p>}</div>
-        <div className="kpi-modal-actions"><span className="import-selection-count"><strong>{importSelection.length}</strong> selected</span><button className="button secondary" onClick={() => { setShowImporter(false); setImportSearch(""); setShowRecentKpis(false); setImportSelection([]); setImportStatusFilter("ACTIVE"); setImportCategoryFilter("ALL"); setImportDataSourceFilter("ALL"); }}>Cancel</button><button className="button primary" disabled={!importSelection.length || importMutation.isPending} onClick={() => importMutation.mutate(importSelection)}>{importMutation.isPending ? "Bringing KPIs..." : `Bring ${importSelection.length || ""} KPI${importSelection.length === 1 ? "" : "s"} to Table`}</button></div>
-      </section></div>}
+      {finalizeConfirmationOpen && poolQuery.data && <div className="pool-modal-backdrop" role="presentation"><section className="finalize-composition-modal" role="dialog" aria-modal="true" aria-labelledby="finalize-composition-title"><header><span><LockKeyhole size={21}/></span><div><h2 id="finalize-composition-title">Finalize {formatMonthLong(targetPeriod)} Composition?</h2><p>{includedCount} KPI {includedCount === 1 ? "Configuration" : "Configurations"}</p></div><button type="button" aria-label="Close confirmation" onClick={() => setFinalizeConfirmationOpen(false)} disabled={finalizeMutation.isPending}><X size={18}/></button></header><p>These KPI Configurations will become available to Scorecards for {formatMonthLong(targetPeriod)}.</p><dl><div><dt>Pool</dt><dd>{poolQuery.data.code} · {poolQuery.data.name}</dd></div><div><dt>Input Period</dt><dd>{formatMonthLong(targetPeriod)}</dd></div><div><dt>KPI Configurations</dt><dd>{includedCount}</dd></div><div><dt>Companies</dt><dd>{poolQuery.data.companies.join(", ")}</dd></div><div><dt>Validity</dt><dd>{formatMonthLong(poolQuery.data.validFrom)} – {formatMonthLong(poolQuery.data.validTo)}</dd></div><div><dt>Frequency</dt><dd>{poolQuery.data.frequency}</dd></div></dl>{isFirstInputPeriod && <section className="finalize-next-steps"><h3>What happens next?</h3><ul><li>The Pool becomes Active.</li><li>These KPI Configurations become available to Scorecards for this Input Period.</li><li>Pool validity, frequency, companies and structural scope become locked.</li><li>The finalized composition becomes read-only.</li></ul><p>Future period compositions can still be prepared according to the Pool workflow.</p></section>}<footer><button className="button secondary" onClick={() => setFinalizeConfirmationOpen(false)} disabled={finalizeMutation.isPending}>Cancel</button><button className="button primary" onClick={() => finalizeMutation.mutate()} disabled={finalizeMutation.isPending}>{finalizeMutation.isPending ? "Finalizing…" : "Finalize Composition"}</button></footer></section></div>}
+
     </main>
   );
 }
 
 type ManageSortKey = keyof Pick<ManageablePoolKpi, "availability" | "configCode" | "kpiCode" | "name" | "category" | "goal" | "measurementUnit" | "dataSource" | "status">;
+
+export function getFinalizeBlockedReason({ compositionLoading, includedCount, periodCanFinalize, previousPeriodStart }: { compositionLoading: boolean; includedCount: number; periodCanFinalize: boolean; previousPeriodStart: string | null }) {
+  if (compositionLoading) return "Checking the effective Pool composition…";
+  if (includedCount === 0) return "Add at least one KPI Configuration to this Input Period before finalizing.";
+  if (periodCanFinalize) return null;
+  if (previousPeriodStart) return `Waiting for ${formatMonthLong(previousPeriodStart)} Monitoring to close.`;
+  return "Finalization eligibility could not be confirmed. Refresh the period and try again.";
+}
 
 function AvailabilityCard({ type, label, count, active, onClick }: { type: PoolKpiAvailability; label?: string; count: number; active: boolean; onClick: () => void }) {
   return <button className={`availability-card ${type.toLowerCase()} ${active ? "active" : ""}`} onClick={onClick} aria-pressed={active}><span className="availability-card-icon">{type === "AVAILABLE" ? <Plus size={17} /> : type === "IN_POOL" ? <Check size={17} /> : <Minus size={17} />}</span><span><small>{label ?? availabilityCopy[type]}</small><strong>{count}</strong></span></button>;
@@ -311,20 +274,7 @@ function formatMonthOption(value: string) {
   return `${month} • ${year}`;
 }
 
-function isTodayWithin(start: string, end: string) {
-  const today = new Date().toISOString().slice(0, 10);
-  return start <= today && today <= end;
-}
-
-function formatMeasurementUnit(unit: string) {
-  const labels: Record<string, string> = {
-    "%": "% Percentage",
-    Count: "cant Quantity",
-    "$": "$ Dollar",
-    "$/km": "$/km Dollars per kilometer",
-    Hours: "h Hours",
-    Days: "d Days",
-    "km/L": "km/L Kilometers per liter",
-  };
-  return labels[unit] ?? unit;
+function availabilityReason(record: ManageablePoolKpi) {
+  if (record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE") return `Another configuration of ${record.kpiCode} is already selected for this period${record.conflictingConfigurationCode ? `: ${record.conflictingConfigurationCode}` : ""}.`;
+  return record.reasonCode?.replace(/_/g, " ") ?? undefined;
 }

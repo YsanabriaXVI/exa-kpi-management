@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model ScorecardStatus {
+  code         String      @id @db.VarChar(30)
+  name         String      @db.VarChar(100)
+  description  String?     @db.Text
+  displayOrder Int         @default(1) @map("display_order") @db.SmallInt
+  scorecards   Scorecard[]
+
+  @@map("scorecard_statuses")
+}
+
+model ScorecardCodeSequence {
+  id           BigInt   @id @default(autoincrement()) @map("scorecard_code_sequence_id")
+  scopeKey     String   @map("scope_key") @db.VarChar(255)
+  issueYear    Int      @map("issue_year") @db.SmallInt
+  lastSequence Int      @default(0) @map("last_sequence") @db.UnsignedInt
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.DateTime(3)
+
+  @@unique([scopeKey, issueYear], map: "uq_scorecard_code_sequence_scope")
+  @@map("scorecard_code_sequences")
+}
+
+model PoolReference {
+  kpiPoolExternalId        BigInt    @id @map("kpi_pool_external_id")
+  poolCode                 String    @map("pool_code") @db.VarChar(500)
+  poolName                 String    @map("pool_name") @db.VarChar(200)
+  statusCode               String    @map("status_code") @db.VarChar(20)
+  validFrom                DateTime  @map("valid_from") @db.Date
+  validTo                  DateTime  @map("valid_to") @db.Date
+  inputFrequencyExternalId BigInt    @map("input_frequency_external_id")
+  inputFrequencyCode       String    @map("input_frequency_code") @db.VarChar(50)
+  sourceVersion            BigInt?   @map("source_version")
+  sourceUpdatedAt          DateTime? @map("source_updated_at") @db.DateTime(3)
+  syncedAt                 DateTime  @default(now()) @map("synced_at") @db.DateTime(3)
+
+  @@unique([poolCode], map: "uq_pool_references_code")
+  @@index([statusCode, validFrom, validTo], map: "ix_pool_references_status_validity")
+  @@map("pool_references")
+}
+
+model PoolPeriodReference {
+  id                        BigInt    @id @default(autoincrement()) @map("pool_period_reference_id")
+  kpiPoolExternalId         BigInt    @map("kpi_pool_external_id")
+  poolPeriodExternalId      BigInt?   @map("pool_period_external_id")
+  poolCompositionExternalId BigInt?   @map("pool_composition_external_id")
+  periodKey                 String    @map("period_key") @db.Char(7)
+  periodStart               DateTime  @map("period_start") @db.Date
+  periodEnd                 DateTime  @map("period_end") @db.Date
+  compositionStatusCode     String    @map("composition_status_code") @db.VarChar(32)
+  kpiCountSnapshot          Int?      @map("kpi_count_snapshot") @db.UnsignedInt
+  sourceVersion             BigInt?   @map("source_version")
+  sourceUpdatedAt           DateTime? @map("source_updated_at") @db.DateTime(3)
+  syncedAt                  DateTime  @default(now()) @map("synced_at") @db.DateTime(3)
+  memberships               PoolPeriodMembershipReference[]
+
+  @@unique([kpiPoolExternalId, periodStart], map: "uq_pool_period_reference")
+  @@unique([poolPeriodExternalId], map: "uq_pool_period_external")
+  @@unique([poolCompositionExternalId], map: "uq_pool_composition_external")
+  @@index([kpiPoolExternalId, compositionStatusCode, periodStart], map: "ix_pool_period_reference_status")
+  @@map("pool_period_references")
+}
+
+model PoolPeriodMembershipReference {
+  id                         BigInt              @id @default(autoincrement()) @map("pool_period_membership_reference_id")
+  poolPeriodReferenceId      BigInt              @map("pool_period_reference_id")
+  poolMembershipExternalId   BigInt              @map("pool_membership_external_id")
+  kpiDefinitionExternalId    BigInt              @map("kpi_definition_external_id")
+  kpiConfigurationExternalId BigInt              @map("kpi_configuration_external_id")
+  definitionCode             String              @map("definition_code") @db.VarChar(30)
+  definitionName             String              @map("definition_name") @db.VarChar(200)
+    configurationCode          String              @map("configuration_code") @db.VarChar(40)
+    categoryName               String?             @map("category_name") @db.VarChar(120)
+    goalSnapshot               String?             @map("goal_snapshot") @db.VarChar(500)
+    dataSourceSnapshot         String?             @map("data_source_snapshot") @db.VarChar(160)
+    measurementUnitSnapshot   String?             @map("measurement_unit_snapshot") @db.VarChar(120)
+  displayOrder               Int                 @map("display_order") @db.UnsignedInt
+  periodReference            PoolPeriodReference @relation(fields: [poolPeriodReferenceId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_pool_period_membership_references_period")
+
+  @@unique([poolPeriodReferenceId, poolMembershipExternalId], map: "uq_pool_period_membership_reference")
+  @@unique([poolPeriodReferenceId, kpiConfigurationExternalId], map: "uq_pool_period_configuration_reference")
+  @@unique([poolPeriodReferenceId, kpiDefinitionExternalId], map: "uq_pool_period_definition_reference")
+  @@index([kpiConfigurationExternalId], map: "ix_pool_period_membership_configuration")
+  @@map("pool_period_membership_references")
+}
+
+model Scorecard {
+  id                  BigInt                       @id @default(autoincrement()) @map("scorecard_id")
+  code                String                       @unique(map: "uq_scorecards_code") @map("scorecard_code") @db.VarChar(40)
+  name                String                       @map("scorecard_name") @db.VarChar(200)
+  description         String?                      @db.Text
+  kpiPoolExternalId   BigInt                       @map("kpi_pool_external_id")
+  poolCodeSnapshot    String                       @map("pool_code_snapshot") @db.VarChar(500)
+  poolNameSnapshot    String                       @map("pool_name_snapshot") @db.VarChar(200)
+  statusCode          String                       @default("DRAFT") @map("status_code") @db.VarChar(30)
+  aggregateVersion    Int                          @default(1) @map("aggregate_version") @db.UnsignedInt
+  notes               String?                      @db.Text
+  deletedAt           DateTime?                    @map("deleted_at") @db.DateTime(3)
+  createdAt           DateTime                     @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId     BigInt?                      @map("created_by_user_id")
+  updatedAt           DateTime?                    @map("updated_at") @db.DateTime(3)
+  updatedByUserId     BigInt?                      @map("updated_by_user_id")
+  status              ScorecardStatus              @relation(fields: [statusCode], references: [code], onDelete: Restrict, onUpdate: Cascade, map: "fk_scorecards_status")
+  companies           ScorecardCompanyScope[]
+  departments         ScorecardDepartmentScope[]
+  periodCompositions  ScorecardPeriodComposition[]
+  incomingPeriodLinks ScorecardPeriodLink[]        @relation("LinkedScorecard")
+
+  @@index([kpiPoolExternalId, statusCode, deletedAt], map: "ix_scorecards_pool_status")
+  @@index([statusCode, deletedAt], map: "ix_scorecards_status")
+  @@map("scorecards")
+}
+
+model ScorecardCompanyScope {
+  id                  BigInt    @id @default(autoincrement()) @map("scorecard_company_scope_id")
+  scorecardId         BigInt    @map("scorecard_id")
+  externalCompanyId   BigInt    @map("external_company_id")
+  companyCodeSnapshot String    @map("company_code_snapshot") @db.VarChar(30)
+  companyNameSnapshot String    @map("company_name_snapshot") @db.VarChar(150)
+  displayOrder        Int       @default(1) @map("display_order") @db.SmallInt
+  createdAt           DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId     BigInt?   @map("created_by_user_id")
+  scorecard           Scorecard @relation(fields: [scorecardId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_company_scopes_scorecard")
+
+  @@unique([scorecardId, externalCompanyId], map: "uq_scorecard_company_scope")
+  @@unique([scorecardId, displayOrder], map: "uq_scorecard_company_scope_order")
+  @@index([externalCompanyId], map: "ix_scorecard_company_external")
+  @@map("scorecard_company_scopes")
+}
+
+model ScorecardDepartmentScope {
+  id                     BigInt                   @id @default(autoincrement()) @map("scorecard_department_scope_id")
+  scorecardId            BigInt                   @map("scorecard_id")
+  externalDepartmentId   BigInt                   @map("external_department_id")
+  externalCompanyId      BigInt                   @map("external_company_id")
+  departmentCodeSnapshot String                   @map("department_code_snapshot") @db.VarChar(50)
+  departmentNameSnapshot String                   @map("department_name_snapshot") @db.VarChar(150)
+  displayOrder           Int                      @default(1) @map("display_order") @db.SmallInt
+  createdAt              DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId        BigInt?                  @map("created_by_user_id")
+  scorecard              Scorecard                @relation(fields: [scorecardId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_department_scopes_scorecard")
+  employees              ScorecardEmployeeScope[]
+
+  @@unique([scorecardId, externalDepartmentId], map: "uq_scorecard_department_scope")
+  @@unique([scorecardId, displayOrder], map: "uq_scorecard_department_scope_order")
+  @@index([externalDepartmentId], map: "ix_scorecard_department_external")
+  @@index([externalCompanyId], map: "ix_scorecard_department_company_external")
+  @@map("scorecard_department_scopes")
+}
+
+model ScorecardEmployeeScope {
+  id                         BigInt                   @id @default(autoincrement()) @map("scorecard_employee_scope_id")
+  scorecardDepartmentScopeId BigInt                   @map("scorecard_department_scope_id")
+  externalEmployeeId         BigInt                   @map("external_employee_id")
+  employeeCodeSnapshot       String                   @map("employee_code_snapshot") @db.VarChar(50)
+  employeeNameSnapshot       String                   @map("employee_name_snapshot") @db.VarChar(220)
+  createdAt                  DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId            BigInt?                  @map("created_by_user_id")
+  departmentScope            ScorecardDepartmentScope @relation(fields: [scorecardDepartmentScopeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_employee_scopes_department")
+
+  @@unique([scorecardDepartmentScopeId, externalEmployeeId], map: "uq_scorecard_department_employee")
+  @@index([externalEmployeeId], map: "ix_scorecard_employee_external")
+  @@map("scorecard_employee_scopes")
+}
+
+model ScorecardPeriodComposition {
+  id                        BigInt                @id @default(autoincrement()) @map("scorecard_period_composition_id")
+  scorecardId               BigInt                @map("scorecard_id")
+  kpiPoolExternalId         BigInt                @map("kpi_pool_external_id")
+  poolPeriodExternalId      BigInt?               @map("pool_period_external_id")
+  periodStart               DateTime              @map("period_start") @db.Date
+  periodEnd                 DateTime              @map("period_end") @db.Date
+  periodKey                 String                @map("period_key") @db.Char(7)
+  poolCompositionExternalId BigInt?               @map("pool_composition_external_id")
+  statusCode                String                @default("PREPARING") @map("status_code") @db.VarChar(30)
+  finalizedAt               DateTime?             @map("finalized_at") @db.DateTime(3)
+  finalizedByUserId         BigInt?               @map("finalized_by_user_id")
+  createdAt                 DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId           BigInt?               @map("created_by_user_id")
+  updatedAt                 DateTime?             @map("updated_at") @db.DateTime(3)
+  updatedByUserId           BigInt?               @map("updated_by_user_id")
+  scorecard                 Scorecard             @relation(fields: [scorecardId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_period_compositions_scorecard")
+  kpis                      ScorecardPeriodKpi[]
+  links                     ScorecardPeriodLink[]
+
+  @@unique([scorecardId, periodStart], map: "uq_scorecard_period_composition")
+  @@index([scorecardId, statusCode, periodStart], map: "ix_scorecard_period_status")
+  @@index([poolCompositionExternalId], map: "ix_scorecard_pool_composition_external")
+  @@index([poolPeriodExternalId], map: "ix_scorecard_pool_period_external")
+  @@map("scorecard_period_compositions")
+}
+
+model ScorecardPeriodKpi {
+  id                           BigInt                     @id @default(autoincrement()) @map("scorecard_period_kpi_id")
+  scorecardPeriodCompositionId BigInt                     @map("scorecard_period_composition_id")
+  kpiPoolMembershipExternalId  BigInt                     @map("kpi_pool_membership_external_id")
+  kpiDefinitionExternalId      BigInt                     @map("kpi_definition_external_id")
+  kpiConfigurationExternalId   BigInt                     @map("kpi_configuration_external_id")
+  definitionCodeSnapshot       String                     @map("definition_code_snapshot") @db.VarChar(30)
+  definitionNameSnapshot       String                     @map("definition_name_snapshot") @db.VarChar(200)
+    configurationCodeSnapshot    String                     @map("configuration_code_snapshot") @db.VarChar(40)
+    categoryNameSnapshot         String?                    @map("category_name_snapshot") @db.VarChar(120)
+    goalSnapshot                 String?                    @map("goal_snapshot") @db.VarChar(500)
+    dataSourceSnapshot           String?                    @map("data_source_snapshot") @db.VarChar(160)
+    measurementUnitSnapshot      String?                    @map("measurement_unit_snapshot") @db.VarChar(120)
+  weightPercent                Decimal                    @map("weight_percent") @db.Decimal(7, 4)
+  displayOrder                 Int                        @default(1) @map("display_order") @db.UnsignedInt
+  createdAt                    DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId              BigInt?                    @map("created_by_user_id")
+  updatedAt                    DateTime?                  @map("updated_at") @db.DateTime(3)
+  updatedByUserId              BigInt?                    @map("updated_by_user_id")
+  composition                  ScorecardPeriodComposition @relation(fields: [scorecardPeriodCompositionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_period_kpis_composition")
+
+  @@unique([scorecardPeriodCompositionId, kpiConfigurationExternalId], map: "uq_scorecard_period_kpi")
+  @@unique([scorecardPeriodCompositionId, kpiDefinitionExternalId], map: "uq_scorecard_period_kpi_definition")
+  @@unique([scorecardPeriodCompositionId, displayOrder], map: "uq_scorecard_period_kpi_order")
+  @@index([kpiPoolMembershipExternalId], map: "ix_scorecard_pool_membership_external")
+  @@index([kpiDefinitionExternalId], map: "ix_scorecard_definition_external")
+  @@index([kpiConfigurationExternalId], map: "ix_scorecard_configuration_external")
+  @@map("scorecard_period_kpis")
+}
+
+model ScorecardPeriodLink {
+  id                           BigInt                     @id @default(autoincrement()) @map("scorecard_period_link_id")
+  scorecardPeriodCompositionId BigInt                     @map("scorecard_period_composition_id")
+  linkedScorecardId            BigInt                     @map("linked_scorecard_id")
+  weightPercent                Decimal                    @map("weight_percent") @db.Decimal(7, 4)
+  displayOrder                 Int                        @default(1) @map("display_order") @db.UnsignedInt
+  createdAt                    DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId              BigInt?                    @map("created_by_user_id")
+  composition                  ScorecardPeriodComposition @relation(fields: [scorecardPeriodCompositionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_period_links_composition")
+  linkedScorecard              Scorecard                  @relation("LinkedScorecard", fields: [linkedScorecardId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_scorecard_period_links_linked_scorecard")
+
+  @@unique([scorecardPeriodCompositionId, linkedScorecardId], map: "uq_scorecard_period_link")
+  @@unique([scorecardPeriodCompositionId, displayOrder], map: "uq_scorecard_period_link_order")
+  @@index([linkedScorecardId], map: "ix_scorecard_period_linked_scorecard")
+  @@map("scorecard_period_links")
+}
+
+model OutboxEvent {
+  id               BigInt    @id @default(autoincrement()) @map("outbox_event_id")
+  eventId          String    @unique(map: "uq_outbox_events_event_id") @map("event_id") @db.Char(36)
+  eventType        String    @map("event_type") @db.VarChar(120)
+  aggregateType    String    @map("aggregate_type") @db.VarChar(80)
+  aggregateId      String    @map("aggregate_id") @db.VarChar(100)
+  aggregateVersion Int       @map("aggregate_version") @db.UnsignedInt
+  subject          String    @db.VarChar(200)
+  payload          Json
+  occurredAt       DateTime  @map("occurred_at") @db.DateTime(3)
+  status           String    @default("PENDING") @db.VarChar(20)
+  attemptCount     Int       @default(0) @map("attempt_count") @db.UnsignedInt
+  nextAttemptAt    DateTime? @map("next_attempt_at") @db.DateTime(3)
+  lastError        String?   @map("last_error") @db.Text
+  publishedAt      DateTime? @map("published_at") @db.DateTime(3)
+  lockedAt         DateTime? @map("locked_at") @db.DateTime(3)
+  lockedBy         String?   @map("locked_by") @db.VarChar(100)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt        DateTime? @map("updated_at") @db.DateTime(3)
+
+  @@index([status, nextAttemptAt, occurredAt], map: "ix_outbox_events_pending")
+  @@index([aggregateType, aggregateId, aggregateVersion], map: "ix_outbox_events_aggregate")
+  @@map("outbox_events")
+}
+
+model ProcessedEvent {
+  eventId       String   @id @map("event_id") @db.Char(36)
+  eventType     String   @map("event_type") @db.VarChar(120)
+  subject       String   @db.VarChar(200)
+  aggregateId   String?  @map("aggregate_id") @db.VarChar(100)
+  sourceService String?  @map("source_service") @db.VarChar(100)
+  processedAt   DateTime @default(now()) @map("processed_at") @db.DateTime(3)
+
+  @@index([eventType, processedAt], map: "ix_processed_events_type")
+  @@map("processed_events")
+}

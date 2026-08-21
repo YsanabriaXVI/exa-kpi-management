@@ -27,55 +27,55 @@
 --   CONSTRAINT `chk_departments_not_self_parent` CHECK (parent_department_id IS NULL OR parent_department_id <> department_id)
 -- );
 
-CREATE TABLE `employees` (
-  `employee_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `employee_code` varchar(50) UNIQUE NOT NULL,
-  `first_name` varchar(100) NOT NULL,
-  `last_name` varchar(100) NOT NULL,
-  `email` varchar(254) NOT NULL,
-  `is_active` boolean NOT NULL DEFAULT true,
-  `created_at` timestamp NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamp,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_employees_code_not_blank` CHECK (length(trim(employee_code)) > 0),
-  CONSTRAINT `chk_employees_first_name_not_blank` CHECK (length(trim(first_name)) > 0),
-  CONSTRAINT `chk_employees_last_name_not_blank` CHECK (length(trim(last_name)) > 0),
-  CONSTRAINT `chk_employees_email_not_blank` CHECK (length(trim(email)) > 0)
-);
+-- CREATE TABLE `employees` (
+--   `employee_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `employee_code` varchar(50) UNIQUE NOT NULL,
+--   `first_name` varchar(100) NOT NULL,
+--   `last_name` varchar(100) NOT NULL,
+--   `email` varchar(254) NOT NULL,
+--   `is_active` boolean NOT NULL DEFAULT true,
+--   `created_at` timestamp NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamp,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_employees_code_not_blank` CHECK (length(trim(employee_code)) > 0),
+--   CONSTRAINT `chk_employees_first_name_not_blank` CHECK (length(trim(first_name)) > 0),
+--   CONSTRAINT `chk_employees_last_name_not_blank` CHECK (length(trim(last_name)) > 0),
+--   CONSTRAINT `chk_employees_email_not_blank` CHECK (length(trim(email)) > 0)
+-- );
 
-CREATE TABLE `employee_assignments` (
-  `employee_assignment_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `employee_id` bigint NOT NULL,
-  `company_id` bigint NOT NULL,
-  `department_id` bigint NOT NULL,
-  `valid_from` date,
-  `valid_to` date,
-  `is_primary` boolean NOT NULL DEFAULT true,
-  `is_active` boolean NOT NULL DEFAULT true,
-  `created_at` timestamp NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamp,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_employee_assignments_validity` CHECK (valid_to IS NULL OR valid_from IS NULL OR valid_to >= valid_from)
-);
+-- CREATE TABLE `employee_assignments` (
+--   `employee_assignment_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `employee_id` bigint NOT NULL,
+--   `company_id` bigint NOT NULL,
+--   `department_id` bigint NOT NULL,
+--   `valid_from` date,
+--   `valid_to` date,
+--   `is_primary` boolean NOT NULL DEFAULT true,
+--   `is_active` boolean NOT NULL DEFAULT true,
+--   `created_at` timestamp NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamp,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_employee_assignments_validity` CHECK (valid_to IS NULL OR valid_from IS NULL OR valid_to >= valid_from)
+-- );
 
-CREATE TABLE `users` (
-  `user_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `employee_id` bigint,
-  `username` varchar(120) UNIQUE NOT NULL,
-  `email` varchar(254) UNIQUE NOT NULL,
-  `is_active` boolean NOT NULL DEFAULT true,
-  `password_hash` varchar(255) NOT NULL,
-  `must_change_password` boolean NOT NULL DEFAULT true,
-  `last_login_at` timestamptz,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_users_username_not_blank` CHECK (length(trim(username)) > 0),
-  CONSTRAINT `chk_users_email_not_blank` CHECK (length(trim(email)) > 0)
-);
+-- CREATE TABLE `users` (
+--   `user_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `employee_id` bigint,
+--   `username` varchar(120) UNIQUE NOT NULL,
+--   `email` varchar(254) UNIQUE NOT NULL,
+--   `is_active` boolean NOT NULL DEFAULT true,
+--   `password_hash` varchar(255) NOT NULL,
+--   `must_change_password` boolean NOT NULL DEFAULT true,
+--   `last_login_at` timestamptz,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_users_username_not_blank` CHECK (length(trim(username)) > 0),
+--   CONSTRAINT `chk_users_email_not_blank` CHECK (length(trim(email)) > 0)
+-- );
 
 -- CREATE TABLE `kpi_categories` (
 -- `kpi_category_id` bigint PRIMARY KEY AUTO_INCREMENT,
@@ -312,134 +312,134 @@ CREATE TABLE `users` (
 --   `availability_reason_code` varchar(60)
 -- );
 
-CREATE TABLE `scorecard_statuses` (
-  `scorecard_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(30) UNIQUE NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_scorecard_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_scorecard_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_scorecard_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `scorecard_statuses` (
+--   `scorecard_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(30) UNIQUE NOT NULL,
+--   `name` varchar(100) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_scorecard_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_scorecard_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_scorecard_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `scorecards` (
-  `scorecard_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `scorecard_code` varchar(40) UNIQUE NOT NULL,
-  `scorecard_name` varchar(200) NOT NULL,
-  `description` text,
-  `kpi_pool_id` bigint NOT NULL,
-  `input_frequency_id` bigint NOT NULL,
-  `valid_from` date NOT NULL,
-  `valid_to` date NOT NULL,
-  `scorecard_status_id` bigint NOT NULL,
-  `notes` text,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_scorecards_code_not_blank` CHECK (length(trim(scorecard_code)) > 0),
-  CONSTRAINT `chk_scorecards_name_not_blank` CHECK (length(trim(scorecard_name)) > 0),
-  CONSTRAINT `chk_scorecards_validity` CHECK (valid_to >= valid_from)
-);
+-- CREATE TABLE `scorecards` (
+--   `scorecard_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `scorecard_code` varchar(40) UNIQUE NOT NULL,
+--   `scorecard_name` varchar(200) NOT NULL,
+--   `description` text,
+--   `kpi_pool_id` bigint NOT NULL,
+--   `input_frequency_id` bigint NOT NULL,
+--   `valid_from` date NOT NULL,
+--   `valid_to` date NOT NULL,
+--   `scorecard_status_id` bigint NOT NULL,
+--   `notes` text,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_scorecards_code_not_blank` CHECK (length(trim(scorecard_code)) > 0),
+--   CONSTRAINT `chk_scorecards_name_not_blank` CHECK (length(trim(scorecard_name)) > 0),
+--   CONSTRAINT `chk_scorecards_validity` CHECK (valid_to >= valid_from)
+-- );
 
-CREATE TABLE `scorecard_departments` (
-  `scorecard_department_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `scorecard_id` bigint NOT NULL,
-  `department_id` bigint NOT NULL,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint
-);
+-- CREATE TABLE `scorecard_departments` (
+--   `scorecard_department_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `scorecard_id` bigint NOT NULL,
+--   `department_id` bigint NOT NULL,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint
+-- );
 
-CREATE TABLE `scorecard_employees` (
-  `scorecard_employee_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `scorecard_department_id` bigint NOT NULL,
-  `employee_id` bigint NOT NULL,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint
-);
+-- CREATE TABLE `scorecard_employees` (
+--   `scorecard_employee_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `scorecard_department_id` bigint NOT NULL,
+--   `employee_id` bigint NOT NULL,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint
+-- );
 
-CREATE TABLE `scorecard_kpis` (
-  `scorecard_kpi_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `scorecard_id` bigint NOT NULL,
-  `kpi_pool_kpi_id` bigint NOT NULL,
-  `weight_percent` numeric(7,4) NOT NULL,
-  `display_order` integer NOT NULL DEFAULT 1,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_scorecard_kpis_weight` CHECK (weight_percent > 0 AND weight_percent <= 100),
-  CONSTRAINT `chk_scorecard_kpis_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `scorecard_kpis` (
+--   `scorecard_kpi_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `scorecard_id` bigint NOT NULL,
+--   `kpi_pool_kpi_id` bigint NOT NULL,
+--   `weight_percent` numeric(7,4) NOT NULL,
+--   `display_order` integer NOT NULL DEFAULT 1,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_scorecard_kpis_weight` CHECK (weight_percent > 0 AND weight_percent <= 100),
+--   CONSTRAINT `chk_scorecard_kpis_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `scorecard_linked_scorecards` (
-  `scorecard_linked_scorecard_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `scorecard_id` bigint NOT NULL,
-  `linked_scorecard_id` bigint NOT NULL,
-  `weight_percent` numeric(7,4) NOT NULL,
-  `display_order` integer NOT NULL DEFAULT 1,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_scorecard_links_not_self` CHECK (scorecard_id <> linked_scorecard_id),
-  CONSTRAINT `chk_scorecard_links_weight` CHECK (weight_percent > 0 AND weight_percent <= 100),
-  CONSTRAINT `chk_scorecard_links_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `scorecard_linked_scorecards` (
+--   `scorecard_linked_scorecard_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `scorecard_id` bigint NOT NULL,
+--   `linked_scorecard_id` bigint NOT NULL,
+--   `weight_percent` numeric(7,4) NOT NULL,
+--   `display_order` integer NOT NULL DEFAULT 1,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_scorecard_links_not_self` CHECK (scorecard_id <> linked_scorecard_id),
+--   CONSTRAINT `chk_scorecard_links_weight` CHECK (weight_percent > 0 AND weight_percent <= 100),
+--   CONSTRAINT `chk_scorecard_links_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `scorecard_kpi_availability_statuses` (
-  `scorecard_kpi_availability_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  CONSTRAINT `chk_scorecard_kpi_availability_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_scorecard_kpi_availability_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_scorecard_kpi_availability_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `scorecard_kpi_availability_statuses` (
+--   `scorecard_kpi_availability_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(100) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   CONSTRAINT `chk_scorecard_kpi_availability_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_scorecard_kpi_availability_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_scorecard_kpi_availability_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `scorecard_kpi_availability` (
-  `scorecard_id` bigint NOT NULL,
-  `kpi_pool_kpi_id` bigint NOT NULL,
-  `scorecard_kpi_availability_status_id` bigint NOT NULL,
-  `availability_reason_code` varchar(60)
-);
+-- CREATE TABLE `scorecard_kpi_availability` (
+--   `scorecard_id` bigint NOT NULL,
+--   `kpi_pool_kpi_id` bigint NOT NULL,
+--   `scorecard_kpi_availability_status_id` bigint NOT NULL,
+--   `availability_reason_code` varchar(60)
+-- );
 
-CREATE TABLE `scorecard_composition_summary` (
-  `scorecard_id` bigint PRIMARY KEY,
-  `own_kpi_count` integer NOT NULL,
-  `linked_scorecard_count` integer NOT NULL,
-  `own_kpi_weight_percent` numeric(7,4) NOT NULL,
-  `linked_scorecard_weight_percent` numeric(7,4) NOT NULL,
-  `total_weight_percent` numeric(7,4) NOT NULL,
-  `composition_status_code` varchar(20) NOT NULL,
-  CONSTRAINT `chk_scorecard_composition_own_count` CHECK (own_kpi_count >= 0),
-  CONSTRAINT `chk_scorecard_composition_linked_count` CHECK (linked_scorecard_count >= 0),
-  CONSTRAINT `chk_scorecard_composition_own_weight` CHECK (own_kpi_weight_percent >= 0),
-  CONSTRAINT `chk_scorecard_composition_linked_weight` CHECK (linked_scorecard_weight_percent >= 0),
-  CONSTRAINT `chk_scorecard_composition_total` CHECK (total_weight_percent = own_kpi_weight_percent + linked_scorecard_weight_percent),
-  CONSTRAINT `chk_scorecard_composition_status` CHECK (composition_status_code IN ('INCOMPLETE', 'COMPLETE', 'OVERWEIGHT'))
-);
+-- CREATE TABLE `scorecard_composition_summary` (
+--   `scorecard_id` bigint PRIMARY KEY,
+--   `own_kpi_count` integer NOT NULL,
+--   `linked_scorecard_count` integer NOT NULL,
+--   `own_kpi_weight_percent` numeric(7,4) NOT NULL,
+--   `linked_scorecard_weight_percent` numeric(7,4) NOT NULL,
+--   `total_weight_percent` numeric(7,4) NOT NULL,
+--   `composition_status_code` varchar(20) NOT NULL,
+--   CONSTRAINT `chk_scorecard_composition_own_count` CHECK (own_kpi_count >= 0),
+--   CONSTRAINT `chk_scorecard_composition_linked_count` CHECK (linked_scorecard_count >= 0),
+--   CONSTRAINT `chk_scorecard_composition_own_weight` CHECK (own_kpi_weight_percent >= 0),
+--   CONSTRAINT `chk_scorecard_composition_linked_weight` CHECK (linked_scorecard_weight_percent >= 0),
+--   CONSTRAINT `chk_scorecard_composition_total` CHECK (total_weight_percent = own_kpi_weight_percent + linked_scorecard_weight_percent),
+--   CONSTRAINT `chk_scorecard_composition_status` CHECK (composition_status_code IN ('INCOMPLETE', 'COMPLETE', 'OVERWEIGHT'))
+-- );
 
-CREATE TABLE `scorecard_result_schedule_preview` (
-  `scorecard_id` bigint NOT NULL,
-  `sequence_no` integer NOT NULL,
-  `period_start` date NOT NULL,
-  `period_end` date NOT NULL,
-  `period_label` varchar(100) NOT NULL,
-  CONSTRAINT `chk_scorecard_schedule_sequence` CHECK (sequence_no > 0),
-  CONSTRAINT `chk_scorecard_schedule_period` CHECK (period_end >= period_start),
-  CONSTRAINT `chk_scorecard_schedule_label_not_blank` CHECK (length(trim(period_label)) > 0)
-);
+-- CREATE TABLE `scorecard_result_schedule_preview` (
+--   `scorecard_id` bigint NOT NULL,
+--   `sequence_no` integer NOT NULL,
+--   `period_start` date NOT NULL,
+--   `period_end` date NOT NULL,
+--   `period_label` varchar(100) NOT NULL,
+--   CONSTRAINT `chk_scorecard_schedule_sequence` CHECK (sequence_no > 0),
+--   CONSTRAINT `chk_scorecard_schedule_period` CHECK (period_end >= period_start),
+--   CONSTRAINT `chk_scorecard_schedule_label_not_blank` CHECK (length(trim(period_label)) > 0)
+-- );
 
 CREATE TABLE `monitoring_period_statuses` (
   `monitoring_period_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
@@ -927,62 +927,62 @@ CREATE TABLE `period_reopenings` (
   CONSTRAINT `chk_period_reopenings_reopened_time` CHECK (reopened_at IS NULL OR reopened_at >= requested_at)
 );
 
-CREATE TABLE `scorecard_results` (
-  `scorecard_result_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `period_closure_id` bigint NOT NULL,
-  `monitoring_period_scorecard_id` bigint NOT NULL,
-  `scorecard_id` bigint NOT NULL,
-  `own_kpi_contribution_percent` numeric(7,4) NOT NULL DEFAULT 0,
-  `linked_scorecard_contribution_percent` numeric(7,4) NOT NULL DEFAULT 0,
-  `final_score_percent` numeric(7,4) NOT NULL,
-  `missing_own_kpi_count` integer NOT NULL DEFAULT 0,
-  `missing_linked_scorecard_count` integer NOT NULL DEFAULT 0,
-  `calculation_notes` text,
-  `calculated_at` timestamptz NOT NULL DEFAULT (now()),
-  `calculated_by_user_id` bigint,
-  CONSTRAINT `chk_scorecard_results_own_contribution` CHECK (own_kpi_contribution_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_scorecard_results_linked_contribution` CHECK (linked_scorecard_contribution_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_scorecard_results_final_score` CHECK (final_score_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_scorecard_results_final_math` CHECK (final_score_percent = own_kpi_contribution_percent + linked_scorecard_contribution_percent),
-  CONSTRAINT `chk_scorecard_results_missing_kpis` CHECK (missing_own_kpi_count >= 0),
-  CONSTRAINT `chk_scorecard_results_missing_links` CHECK (missing_linked_scorecard_count >= 0)
-);
+-- CREATE TABLE `scorecard_results` (
+--   `scorecard_result_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `period_closure_id` bigint NOT NULL,
+--   `monitoring_period_scorecard_id` bigint NOT NULL,
+--   `scorecard_id` bigint NOT NULL,
+--   `own_kpi_contribution_percent` numeric(7,4) NOT NULL DEFAULT 0,
+--   `linked_scorecard_contribution_percent` numeric(7,4) NOT NULL DEFAULT 0,
+--   `final_score_percent` numeric(7,4) NOT NULL,
+--   `missing_own_kpi_count` integer NOT NULL DEFAULT 0,
+--   `missing_linked_scorecard_count` integer NOT NULL DEFAULT 0,
+--   `calculation_notes` text,
+--   `calculated_at` timestamptz NOT NULL DEFAULT (now()),
+--   `calculated_by_user_id` bigint,
+--   CONSTRAINT `chk_scorecard_results_own_contribution` CHECK (own_kpi_contribution_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_scorecard_results_linked_contribution` CHECK (linked_scorecard_contribution_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_scorecard_results_final_score` CHECK (final_score_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_scorecard_results_final_math` CHECK (final_score_percent = own_kpi_contribution_percent + linked_scorecard_contribution_percent),
+--   CONSTRAINT `chk_scorecard_results_missing_kpis` CHECK (missing_own_kpi_count >= 0),
+--   CONSTRAINT `chk_scorecard_results_missing_links` CHECK (missing_linked_scorecard_count >= 0)
+-- );
 
-CREATE TABLE `scorecard_kpi_result_items` (
-  `scorecard_kpi_result_item_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `scorecard_result_id` bigint NOT NULL,
-  `monitoring_period_input_consumer_id` bigint NOT NULL,
-  `kpi_result_id` bigint,
-  `weight_percent_snapshot` numeric(7,4) NOT NULL,
-  `kpi_score_percent` numeric(7,4),
-  `weighted_score_percent` numeric(7,4),
-  `is_missing` boolean NOT NULL DEFAULT false,
-  `notes` text,
-  CONSTRAINT `chk_scorecard_kpi_items_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
-  CONSTRAINT `chk_scorecard_kpi_items_score` CHECK (kpi_score_percent IS NULL OR kpi_score_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_scorecard_kpi_items_weighted_score` CHECK (weighted_score_percent IS NULL OR weighted_score_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_scorecard_kpi_items_missing_consistency` CHECK ((is_missing = true AND kpi_result_id IS NULL AND kpi_score_percent IS NULL AND weighted_score_percent IS NULL)
-      OR (is_missing = false AND kpi_result_id IS NOT NULL AND kpi_score_percent IS NOT NULL AND weighted_score_percent IS NOT NULL))
-);
+-- CREATE TABLE `scorecard_kpi_result_items` (
+--   `scorecard_kpi_result_item_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `scorecard_result_id` bigint NOT NULL,
+--   `monitoring_period_input_consumer_id` bigint NOT NULL,
+--   `kpi_result_id` bigint,
+--   `weight_percent_snapshot` numeric(7,4) NOT NULL,
+--   `kpi_score_percent` numeric(7,4),
+--   `weighted_score_percent` numeric(7,4),
+--   `is_missing` boolean NOT NULL DEFAULT false,
+--   `notes` text,
+--   CONSTRAINT `chk_scorecard_kpi_items_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
+--   CONSTRAINT `chk_scorecard_kpi_items_score` CHECK (kpi_score_percent IS NULL OR kpi_score_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_scorecard_kpi_items_weighted_score` CHECK (weighted_score_percent IS NULL OR weighted_score_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_scorecard_kpi_items_missing_consistency` CHECK ((is_missing = true AND kpi_result_id IS NULL AND kpi_score_percent IS NULL AND weighted_score_percent IS NULL)
+--       OR (is_missing = false AND kpi_result_id IS NOT NULL AND kpi_score_percent IS NOT NULL AND weighted_score_percent IS NOT NULL))
+-- );
 
-CREATE TABLE `scorecard_link_result_items` (
-  `scorecard_link_result_item_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `scorecard_result_id` bigint NOT NULL,
-  `monitoring_period_scorecard_link_id` bigint NOT NULL,
-  `linked_scorecard_result_id` bigint,
-  `resolution_code` varchar(50) NOT NULL,
-  `weight_percent_snapshot` numeric(7,4) NOT NULL,
-  `linked_score_percent` numeric(7,4),
-  `weighted_score_percent` numeric(7,4),
-  `is_missing` boolean NOT NULL DEFAULT false,
-  `notes` text,
-  CONSTRAINT `chk_scorecard_link_items_resolution` CHECK (resolution_code IN ('SAME_PERIOD', 'LATEST_PRIOR_CLOSED', 'EXCEPTION_ZERO', 'MISSING')),
-  CONSTRAINT `chk_scorecard_link_items_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
-  CONSTRAINT `chk_scorecard_link_items_score` CHECK (linked_score_percent IS NULL OR linked_score_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_scorecard_link_items_weighted_score` CHECK (weighted_score_percent IS NULL OR weighted_score_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_scorecard_link_items_missing_consistency` CHECK ((is_missing = true AND linked_scorecard_result_id IS NULL AND linked_score_percent IS NULL AND weighted_score_percent IS NULL)
-      OR (is_missing = false AND linked_scorecard_result_id IS NOT NULL AND linked_score_percent IS NOT NULL AND weighted_score_percent IS NOT NULL))
-);
+-- CREATE TABLE `scorecard_link_result_items` (
+--   `scorecard_link_result_item_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `scorecard_result_id` bigint NOT NULL,
+--   `monitoring_period_scorecard_link_id` bigint NOT NULL,
+--   `linked_scorecard_result_id` bigint,
+--   `resolution_code` varchar(50) NOT NULL,
+--   `weight_percent_snapshot` numeric(7,4) NOT NULL,
+--   `linked_score_percent` numeric(7,4),
+--   `weighted_score_percent` numeric(7,4),
+--   `is_missing` boolean NOT NULL DEFAULT false,
+--   `notes` text,
+--   CONSTRAINT `chk_scorecard_link_items_resolution` CHECK (resolution_code IN ('SAME_PERIOD', 'LATEST_PRIOR_CLOSED', 'EXCEPTION_ZERO', 'MISSING')),
+--   CONSTRAINT `chk_scorecard_link_items_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
+--   CONSTRAINT `chk_scorecard_link_items_score` CHECK (linked_score_percent IS NULL OR linked_score_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_scorecard_link_items_weighted_score` CHECK (weighted_score_percent IS NULL OR weighted_score_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_scorecard_link_items_missing_consistency` CHECK ((is_missing = true AND linked_scorecard_result_id IS NULL AND linked_score_percent IS NULL AND weighted_score_percent IS NULL)
+--       OR (is_missing = false AND linked_scorecard_result_id IS NOT NULL AND linked_score_percent IS NOT NULL AND weighted_score_percent IS NOT NULL))
+-- );
 
 CREATE TABLE `roles` (
   `role_id` bigint PRIMARY KEY AUTO_INCREMENT,
@@ -1315,19 +1315,19 @@ CREATE TABLE `vw_scorecard_analysis_base` (
   `trend_code` varchar(20)
 );
 
-CREATE UNIQUE INDEX `uq_departments_company_code` ON `departments` (`company_id`, `code`);
+-- CREATE UNIQUE INDEX `uq_departments_company_code` ON `departments` (`company_id`, `code`);
 
-CREATE INDEX `ix_departments_parent` ON `departments` (`parent_department_id`);
+-- CREATE INDEX `ix_departments_parent` ON `departments` (`parent_department_id`);
 
-CREATE UNIQUE INDEX `uq_employee_department_assignment` ON `employee_assignments` (`employee_id`, `department_id`, `valid_from`);
+-- CREATE UNIQUE INDEX `uq_employee_department_assignment` ON `employee_assignments` (`employee_id`, `department_id`, `valid_from`);
 
-CREATE INDEX `ix_employee_assignments_company` ON `employee_assignments` (`company_id`);
+-- CREATE INDEX `ix_employee_assignments_company` ON `employee_assignments` (`company_id`);
 
-CREATE INDEX `ix_employee_assignments_department` ON `employee_assignments` (`department_id`);
+-- CREATE INDEX `ix_employee_assignments_department` ON `employee_assignments` (`department_id`);
 
-CREATE UNIQUE INDEX `uq_users_employee` ON `users` (`employee_id`);
+-- CREATE UNIQUE INDEX `uq_users_employee` ON `users` (`employee_id`);
 
-CREATE INDEX `ix_users_is_active` ON `users` (`is_active`);
+-- CREATE INDEX `ix_users_is_active` ON `users` (`is_active`);
 
 -- CREATE INDEX `ix_data_sources_source_type` ON `data_sources` (`source_type`);
 
@@ -1381,41 +1381,41 @@ CREATE INDEX `ix_users_is_active` ON `users` (`is_active`);
 
 -- CREATE INDEX `ix_pool_configuration_availability_status` ON `kpi_pool_configuration_availability` (`kpi_pool_availability_status_id`);
 
-CREATE INDEX `ix_scorecards_kpi_pool` ON `scorecards` (`kpi_pool_id`);
+-- CREATE INDEX `ix_scorecards_kpi_pool` ON `scorecards` (`kpi_pool_id`);
 
-CREATE INDEX `ix_scorecards_input_frequency` ON `scorecards` (`input_frequency_id`);
+-- CREATE INDEX `ix_scorecards_input_frequency` ON `scorecards` (`input_frequency_id`);
 
-CREATE INDEX `ix_scorecards_status` ON `scorecards` (`scorecard_status_id`);
+-- CREATE INDEX `ix_scorecards_status` ON `scorecards` (`scorecard_status_id`);
 
-CREATE INDEX `ix_scorecards_validity` ON `scorecards` (`valid_from`, `valid_to`);
+-- CREATE INDEX `ix_scorecards_validity` ON `scorecards` (`valid_from`, `valid_to`);
 
-CREATE INDEX `ix_scorecards_pool_frequency` ON `scorecards` (`kpi_pool_id`, `input_frequency_id`);
+-- CREATE INDEX `ix_scorecards_pool_frequency` ON `scorecards` (`kpi_pool_id`, `input_frequency_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_department` ON `scorecard_departments` (`scorecard_id`, `department_id`);
+-- CREATE UNIQUE INDEX `uq_scorecard_department` ON `scorecard_departments` (`scorecard_id`, `department_id`);
 
-CREATE INDEX `ix_scorecard_departments_department` ON `scorecard_departments` (`department_id`);
+-- CREATE INDEX `ix_scorecard_departments_department` ON `scorecard_departments` (`department_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_department_employee` ON `scorecard_employees` (`scorecard_department_id`, `employee_id`);
+-- CREATE UNIQUE INDEX `uq_scorecard_department_employee` ON `scorecard_employees` (`scorecard_department_id`, `employee_id`);
 
-CREATE INDEX `ix_scorecard_employees_employee` ON `scorecard_employees` (`employee_id`);
+-- CREATE INDEX `ix_scorecard_employees_employee` ON `scorecard_employees` (`employee_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_pool_kpi` ON `scorecard_kpis` (`scorecard_id`, `kpi_pool_kpi_id`);
+-- CREATE UNIQUE INDEX `uq_scorecard_pool_kpi` ON `scorecard_kpis` (`scorecard_id`, `kpi_pool_kpi_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_kpi_display_order` ON `scorecard_kpis` (`scorecard_id`, `display_order`);
+-- CREATE UNIQUE INDEX `uq_scorecard_kpi_display_order` ON `scorecard_kpis` (`scorecard_id`, `display_order`);
 
-CREATE INDEX `ix_scorecard_kpis_pool_kpi` ON `scorecard_kpis` (`kpi_pool_kpi_id`);
+-- CREATE INDEX `ix_scorecard_kpis_pool_kpi` ON `scorecard_kpis` (`kpi_pool_kpi_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_linked_scorecard` ON `scorecard_linked_scorecards` (`scorecard_id`, `linked_scorecard_id`);
+-- CREATE UNIQUE INDEX `uq_scorecard_linked_scorecard` ON `scorecard_linked_scorecards` (`scorecard_id`, `linked_scorecard_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_link_display_order` ON `scorecard_linked_scorecards` (`scorecard_id`, `display_order`);
+-- CREATE UNIQUE INDEX `uq_scorecard_link_display_order` ON `scorecard_linked_scorecards` (`scorecard_id`, `display_order`);
 
-CREATE INDEX `ix_scorecard_links_linked_scorecard` ON `scorecard_linked_scorecards` (`linked_scorecard_id`);
+-- CREATE INDEX `ix_scorecard_links_linked_scorecard` ON `scorecard_linked_scorecards` (`linked_scorecard_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_kpi_availability` ON `scorecard_kpi_availability` (`scorecard_id`, `kpi_pool_kpi_id`);
+-- CREATE UNIQUE INDEX `uq_scorecard_kpi_availability` ON `scorecard_kpi_availability` (`scorecard_id`, `kpi_pool_kpi_id`);
 
-CREATE INDEX `ix_scorecard_kpi_availability_status` ON `scorecard_kpi_availability` (`scorecard_kpi_availability_status_id`);
+-- CREATE INDEX `ix_scorecard_kpi_availability_status` ON `scorecard_kpi_availability` (`scorecard_kpi_availability_status_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_schedule_preview` ON `scorecard_result_schedule_preview` (`scorecard_id`, `sequence_no`);
+-- CREATE UNIQUE INDEX `uq_scorecard_schedule_preview` ON `scorecard_result_schedule_preview` (`scorecard_id`, `sequence_no`);
 
 CREATE UNIQUE INDEX `uq_scorecard_schedule_period_start` ON `scorecard_result_schedule_preview` (`scorecard_id`, `period_start`);
 

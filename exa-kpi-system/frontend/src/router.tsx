@@ -11,6 +11,7 @@ import { KpiPoolOverview } from "./features/kpi-pool/KpiPoolOverview";
 import { KpiPoolInfo } from "./features/kpi-pool/KpiPoolInfo";
 import { KpiPoolDetail } from "./features/kpi-pool/KpiPoolDetail";
 import { ManagePoolKpis } from "./features/kpi-pool/ManagePoolKpis";
+import { PoolPeriodSchedule } from "./features/kpi-pool/PoolPeriodSchedule";
 import { ScorecardOverview } from "./features/scorecards/ScorecardOverview";
 import { CreateScorecardInfo } from "./features/scorecards/CreateScorecardInfo";
 import { ScorecardDetail } from "./features/scorecards/ScorecardDetail";
@@ -59,6 +60,7 @@ const customPaths = new Set([
   "/app/pool-kpis/create-pool-info",
   "/app/pool-kpis/detail",
   "/app/pool-kpis/manage-kpis",
+  "/app/pool-kpis/period-schedule",
   "/app/scorecards/overview",
   "/app/scorecards/create-scorecard-info",
   "/app/scorecards/detail",
@@ -146,6 +148,10 @@ export const router = createBrowserRouter([
       {
         path: "pool-kpis/manage-kpis",
         element: <ManagePoolKpis />,
+      },
+      {
+        path: "pool-kpis/period-schedule",
+        element: <PoolPeriodSchedule />,
       },
       {
         path: "scorecards",
