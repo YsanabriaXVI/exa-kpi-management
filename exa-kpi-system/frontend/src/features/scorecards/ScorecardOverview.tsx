@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -6,6 +6,7 @@ import { scorecardService } from "./scorecard.service";
 import { ScorecardMultiSelect } from "./ScorecardMultiSelect";
 import {
   SortableTableHeader,
+  compareSortValues,
   type SortDirection,
 } from "../../components/SortableTableHeader";
 import { ActionToast } from "../../components/ActionToast";
@@ -29,6 +30,7 @@ export function ScorecardOverview() {
   const [actionMessage, setActionMessage] = useState("");
   const remove = useMutation({ mutationFn: scorecardService.deactivate, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["scorecards"] }); setActionMessage("ScoreCard deactivated. Its historical records were preserved."); } });
   const records = query.data?.data ?? [];
+  const sortedRecords = useMemo(() => [...records].sort((left, right) => compareSortValues(scorecardSortValue(left, sort.key), scorecardSortValue(right, sort.key), sort.direction)), [records, sort]);
   const options = (values: string[]) => [...new Set(values)].sort().map((value) => ({ value, label: value }));
   const totalItems = query.data?.meta.totalItems ?? 0;
   const totalPages = Math.max(1, query.data?.meta.totalPages ?? 1);
@@ -53,10 +55,15 @@ export function ScorecardOverview() {
     <div className="kpi-table-wrap scorecard-table-wrap stable-table-shell"><table className="kpi-table scorecard-table"><thead><tr>
       <SortableTableHeader active={sort.key === "code"} direction={sort.direction} onSort={() => sortBy("code")}>ScoreCard Code</SortableTableHeader>
       <SortableTableHeader active={sort.key === "name"} direction={sort.direction} onSort={() => sortBy("name")}>ScoreCard Name</SortableTableHeader>
-      <th>Departments</th><th>KPI Pool Source</th><th>Pool Schedule</th><th>Current Composition</th><th>KPIs Selected</th><th>Linked SC</th>
+      <SortableTableHeader active={sort.key === "departments"} direction={sort.direction} onSort={() => sortBy("departments")}>Departments</SortableTableHeader>
+      <SortableTableHeader active={sort.key === "poolSource"} direction={sort.direction} onSort={() => sortBy("poolSource")}>KPI Pool Source</SortableTableHeader>
+      <SortableTableHeader active={sort.key === "poolSchedule"} direction={sort.direction} onSort={() => sortBy("poolSchedule")}>Pool Schedule</SortableTableHeader>
+      <SortableTableHeader active={sort.key === "currentComposition"} direction={sort.direction} onSort={() => sortBy("currentComposition")}>Current Composition</SortableTableHeader>
+      <SortableTableHeader active={sort.key === "kpis"} direction={sort.direction} onSort={() => sortBy("kpis")}>KPIs Selected</SortableTableHeader>
+      <SortableTableHeader active={sort.key === "linkedScorecards"} direction={sort.direction} onSort={() => sortBy("linkedScorecards")}>Linked SC</SortableTableHeader>
       <SortableTableHeader active={sort.key === "status"} direction={sort.direction} onSort={() => sortBy("status")}>Status</SortableTableHeader>
       <th>Actions</th>
-    </tr></thead><tbody>{query.isLoading ? <tr><td colSpan={10} className="table-message">Loading ScoreCards...</td></tr> : query.isError ? <tr><td colSpan={10} className="table-message">ScoreCards could not be loaded: {(query.error as Error).message}</td></tr> : records.length ? records.map((item) => <tr key={item.id}><td><span className="code-pill">{item.code}</span></td><td className="name-cell">{item.name}</td><td>{item.departments.join(", ")}</td><td>{item.poolSource}</td><td><PoolScheduleCell schedule={item.poolSchedule}/></td><td><CompositionCell composition={item.currentComposition}/></td><td className="scorecard-count">{item.currentComposition ? item.kpis : "—"}</td><td className="scorecard-count">{item.currentComposition ? item.linkedScorecards : "—"}</td><td><span className={`scorecard-status ${item.status.toLowerCase()}`}><i />{title(item.status)}</span></td><td><div className="table-actions">
+    </tr></thead><tbody>{query.isLoading ? <tr><td colSpan={10} className="table-message">Loading ScoreCards...</td></tr> : query.isError ? <tr><td colSpan={10} className="table-message">ScoreCards could not be loaded: {(query.error as Error).message}</td></tr> : sortedRecords.length ? sortedRecords.map((item) => <tr key={item.id}><td><span className="code-pill">{item.code}</span></td><td className="name-cell">{item.name}</td><td>{item.departments.join(", ")}</td><td>{item.poolSource}</td><td><PoolScheduleCell schedule={item.poolSchedule}/></td><td><CompositionCell composition={item.currentComposition}/></td><td className="scorecard-count">{item.currentComposition ? item.kpis : "—"}</td><td className="scorecard-count">{item.currentComposition ? item.linkedScorecards : "—"}</td><td><span className={`scorecard-status ${item.status.toLowerCase()}`}><i />{title(item.status)}</span></td><td><div className="table-actions">
       <button className="icon-button edit" title="Edit ScoreCard Info" onClick={() => navigate(`/app/scorecards/create-scorecard-info?scorecardId=${item.id}`)}><Pencil size={15} /></button>
       <button className="icon-button delete" title="Deactivate ScoreCard (history is preserved)" disabled={remove.isPending || item.status === "INACTIVE"} onClick={() => { if (window.confirm(`Deactivate ${item.code}? Historical compositions will remain available.`)) remove.mutate(item.id); }}><Trash2 size={15} /></button>
       <button className="icon-button configure" title="Open ScoreCard Assignment" onClick={() => navigate(`/app/scorecards/assignment?scorecardId=${item.id}&selector=1&source=overview`)}><Settings2 size={15} /></button>
@@ -67,7 +74,16 @@ export function ScorecardOverview() {
   </main>;
 }
 
-type ScorecardSortKey = "code" | "name" | "departments" | "duration" | "inputFrequency" | "kpis" | "linkedScorecards" | "poolSource" | "status";
+type ScorecardSortKey = "code" | "name" | "departments" | "poolSource" | "poolSchedule" | "currentComposition" | "kpis" | "linkedScorecards" | "status";
+
+function scorecardSortValue(record: import("./scorecard.types").ScorecardRecord, key: ScorecardSortKey): string | number {
+  if (key === "departments") return record.departments.join(" ");
+  if (key === "poolSchedule") return record.poolSchedule?.validFrom ?? "";
+  if (key === "currentComposition") return record.currentComposition?.periodKey ?? "";
+  if (key === "kpis") return record.currentComposition ? record.kpis : -1;
+  if (key === "linkedScorecards") return record.currentComposition ? record.linkedScorecards : -1;
+  return record[key];
+}
 
 function title(value: string) { return value.charAt(0) + value.slice(1).toLowerCase(); }
 function PoolScheduleCell({ schedule }: { schedule: import("./scorecard.types").ScorecardRecord["poolSchedule"] }) {
@@ -76,7 +92,7 @@ function PoolScheduleCell({ schedule }: { schedule: import("./scorecard.types").
 }
 function CompositionCell({ composition }: { composition: import("./scorecard.types").ScorecardRecord["currentComposition"] }) {
   if (!composition) return <span className="overview-period-empty">Not started</span>;
-  return <div className="overview-period-cell"><strong>{formatPeriodKey(composition.periodKey)}</strong><span className={`overview-period-status ${composition.status.toLowerCase().replace("_", "-")}`}>{composition.status === "NOT_STARTED" ? "Not Started" : title(composition.status)}</span>{composition.previous && <small>Previous: {formatPeriodKey(composition.previous.periodKey, true)} · Finalized</small>}</div>;
+  return <div className="overview-period-cell"><div className="overview-period-current"><strong>{formatPeriodKey(composition.periodKey)}</strong><span className={`overview-period-status ${composition.status.toLowerCase().replace("_", "-")}`}>{composition.status === "NOT_STARTED" ? "Not Started" : title(composition.status)}</span></div>{composition.previous && <small>Previous: {formatPeriodKey(composition.previous.periodKey, true)} · Finalized</small>}</div>;
 }
 function formatScheduleDate(value: string) { return new Intl.DateTimeFormat("en", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value)); }
-function formatPeriodKey(value: string, short = false) { const [year, month] = value.split("-").map(Number); return new Intl.DateTimeFormat("en", { month: "short", ...(short ? {} : { year: "numeric" }), timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1))); }
+function formatPeriodKey(value: string, short = false) { const [year, month] = value.split("-").map(Number); return new Intl.DateTimeFormat("en", { month: "long", ...(short ? {} : { year: "numeric" }), timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1))); }

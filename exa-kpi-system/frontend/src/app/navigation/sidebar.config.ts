@@ -89,6 +89,12 @@ export const navigationItems: NavigationItem[] = [
         path: "/app/pool-kpis/create-pool-info",
         moduleName: "Pool KPIs",
       },
+      {
+        id: "pool-period-schedule",
+        label: "Pool Period Schedule",
+        path: "/app/pool-kpis/period-schedule",
+        moduleName: "Pool KPIs",
+      },
     ],
   },
   {

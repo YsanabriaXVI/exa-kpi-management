@@ -148,12 +148,16 @@ export function hasCircularLink(graph: Map<string, string[]>, root: string) {
   return visit(root, new Set());
 }
 
-async function assertNoCycle(ownerId: bigint, periodKey: string, links: bigint[]) {
+async function assertNoCycle(db: Prisma.TransactionClient | typeof prisma, ownerId: bigint, periodKey: string, links: bigint[]) {
   if (links.includes(ownerId)) throw new AppError(422, "SCORECARD_SELF_LINK_NOT_ALLOWED", "A Scorecard cannot link to itself");
-  const values = await prisma.scorecardPeriodComposition.findMany({ where: { periodKey }, select: { scorecardId: true, links: { select: { linkedScorecardId: true } } } });
+  const values = await db.scorecardPeriodComposition.findMany({ where: { periodKey }, select: { scorecardId: true, links: { select: { linkedScorecardId: true } } } });
   const graph = new Map(values.map((row) => [row.scorecardId.toString(), row.links.map((link) => link.linkedScorecardId.toString())]));
   graph.set(ownerId.toString(), links.map(String));
   if (hasCircularLink(graph, ownerId.toString())) throw new AppError(422, "SCORECARD_LINK_CYCLE", "Linked Scorecards would create a circular dependency");
+}
+
+function linkedConflict(row: { id: bigint; code: string; name: string }, periodKey: string, reasonCode: string) {
+  return { linkedScorecardId: row.id.toString(), scorecardCode: row.code, scorecardName: row.name, reasonCode, periodKey };
 }
 
 async function outbox(tx: Prisma.TransactionClient, type: string, owner: { id: bigint; code: string; aggregateVersion: number }, data: Prisma.InputJsonObject) {
@@ -184,15 +188,32 @@ export const scorecardCompositionService = {
   async availableKpis(scorecardId: bigint, periodKey: string) {
     const owner = await scorecard(scorecardId); const period = await finalizedPeriod(owner.kpiPoolExternalId, periodKey); const current = await findComposition(scorecardId, periodKey);
     const selected = new Set(current?.kpis.map((row) => row.kpiPoolMembershipExternalId.toString()) ?? []);
-    return { data: period.memberships.map((row) => ({ poolMembershipExternalId: row.poolMembershipExternalId.toString(), kpiDefinitionExternalId: row.kpiDefinitionExternalId.toString(), kpiConfigurationExternalId: row.kpiConfigurationExternalId.toString(), definitionCode: row.definitionCode, definitionName: row.definitionName, configurationCode: row.configurationCode, categoryName: row.categoryName, goal: row.goalSnapshot, dataSource: row.dataSourceSnapshot, measurementUnit: row.measurementUnitSnapshot, displayOrder: row.displayOrder, selectionStatus: selected.has(row.poolMembershipExternalId.toString()) ? "SELECTED_IN_SCORECARD" : "AVAILABLE_TO_SELECT" })) };
+    const occupied = await prisma.scorecardPeriodKpi.findMany({ where: { kpiPoolExternalId: owner.kpiPoolExternalId, periodKey, composition: { scorecardId: { not: scorecardId } } }, select: { kpiConfigurationExternalId: true, composition: { select: { scorecard: { select: { id: true, code: true, name: true } } } } } });
+    const occupiedByConfiguration = new Map(occupied.map((row) => [row.kpiConfigurationExternalId.toString(), row.composition.scorecard]));
+    return { data: period.memberships.map((row) => { const assigned = occupiedByConfiguration.get(row.kpiConfigurationExternalId.toString()); return { poolMembershipExternalId: row.poolMembershipExternalId.toString(), kpiDefinitionExternalId: row.kpiDefinitionExternalId.toString(), kpiConfigurationExternalId: row.kpiConfigurationExternalId.toString(), definitionCode: row.definitionCode, definitionName: row.definitionName, configurationCode: row.configurationCode, categoryName: row.categoryName, goal: row.goalSnapshot, dataSource: row.dataSourceSnapshot, measurementUnit: row.measurementUnitSnapshot, displayOrder: row.displayOrder, selectionStatus: selected.has(row.poolMembershipExternalId.toString()) ? "SELECTED_IN_SCORECARD" : assigned ? "ASSIGNED_TO_ANOTHER_SCORECARD" : "AVAILABLE_TO_SELECT", assignedScorecard: assigned ? { id: assigned.id.toString(), code: assigned.code, name: assigned.name } : null }; }) };
   },
 
   async addKpis(scorecardId: bigint, periodKey: string, items: Array<{ poolMembershipExternalId: string; weight: number }>, actor: bigint) {
     const owner = await scorecard(scorecardId); canPrepare(owner); const period = await finalizedPeriod(owner.kpiPoolExternalId, periodKey); const current = await getOrCreate(owner, period, actor); editable(owner, current);
     const allowed = new Map(period.memberships.map((row) => [row.poolMembershipExternalId.toString(), row]));
     if (items.some((item) => !allowed.has(item.poolMembershipExternalId))) throw new AppError(422, "KPI_NOT_IN_FINALIZED_POOL_COMPOSITION", "A KPI does not belong to this finalized Pool Composition");
+    const configurationIds = items.map((item) => allowed.get(item.poolMembershipExternalId)!.kpiConfigurationExternalId);
     const offset = current.kpis.length;
-    await prisma.scorecardPeriodKpi.createMany({ data: items.map((item, index) => { const row = allowed.get(item.poolMembershipExternalId)!; return { scorecardPeriodCompositionId: current.id, kpiPoolMembershipExternalId: row.poolMembershipExternalId, kpiDefinitionExternalId: row.kpiDefinitionExternalId, kpiConfigurationExternalId: row.kpiConfigurationExternalId, definitionCodeSnapshot: row.definitionCode, definitionNameSnapshot: row.definitionName, configurationCodeSnapshot: row.configurationCode, categoryNameSnapshot: row.categoryName, goalSnapshot: row.goalSnapshot, dataSourceSnapshot: row.dataSourceSnapshot, measurementUnitSnapshot: row.measurementUnitSnapshot, weightPercent: new Prisma.Decimal(item.weight), displayOrder: offset + index + 1, createdByUserId: actor }; }), skipDuplicates: true });
+    const conflictDetails = async () => {
+      const occupied = await prisma.scorecardPeriodKpi.findMany({ where: { kpiPoolExternalId: owner.kpiPoolExternalId, periodKey, kpiConfigurationExternalId: { in: configurationIds }, composition: { scorecardId: { not: scorecardId } } }, select: { kpiConfigurationExternalId: true, configurationCodeSnapshot: true, definitionNameSnapshot: true, composition: { select: { scorecard: { select: { id: true, code: true, name: true } } } } } });
+      return occupied.map((row) => ({ kpiConfigurationId: row.kpiConfigurationExternalId.toString(), kpiConfigurationCode: row.configurationCodeSnapshot, kpiName: row.definitionNameSnapshot, reasonCode: "ASSIGNED_TO_ANOTHER_SCORECARD", scorecardId: row.composition.scorecard.id.toString(), scorecardCode: row.composition.scorecard.code, scorecardName: row.composition.scorecard.name, periodKey }));
+    };
+    try {
+      await prisma.$transaction(async (tx) => {
+        const occupied = await tx.scorecardPeriodKpi.findMany({ where: { kpiPoolExternalId: owner.kpiPoolExternalId, periodKey, kpiConfigurationExternalId: { in: configurationIds }, composition: { scorecardId: { not: scorecardId } } }, select: { kpiConfigurationExternalId: true, configurationCodeSnapshot: true, definitionNameSnapshot: true, composition: { select: { scorecard: { select: { id: true, code: true, name: true } } } } } });
+        if (occupied.length) throw new AppError(409, "SCORECARD_KPI_ASSIGNMENT_CONFLICT", "One or more KPI Configurations are no longer available.", { conflicts: occupied.map((row) => ({ kpiConfigurationId: row.kpiConfigurationExternalId.toString(), kpiConfigurationCode: row.configurationCodeSnapshot, kpiName: row.definitionNameSnapshot, reasonCode: "ASSIGNED_TO_ANOTHER_SCORECARD", scorecardId: row.composition.scorecard.id.toString(), scorecardCode: row.composition.scorecard.code, scorecardName: row.composition.scorecard.name, periodKey })) });
+        await tx.scorecardPeriodKpi.createMany({ data: items.map((item, index) => { const row = allowed.get(item.poolMembershipExternalId)!; return { scorecardPeriodCompositionId: current.id, kpiPoolMembershipExternalId: row.poolMembershipExternalId, kpiDefinitionExternalId: row.kpiDefinitionExternalId, kpiConfigurationExternalId: row.kpiConfigurationExternalId, kpiPoolExternalId: owner.kpiPoolExternalId, periodKey, definitionCodeSnapshot: row.definitionCode, definitionNameSnapshot: row.definitionName, configurationCodeSnapshot: row.configurationCode, categoryNameSnapshot: row.categoryName, goalSnapshot: row.goalSnapshot, dataSourceSnapshot: row.dataSourceSnapshot, measurementUnitSnapshot: row.measurementUnitSnapshot, weightPercent: new Prisma.Decimal(item.weight), displayOrder: offset + index + 1, createdByUserId: actor }; }), skipDuplicates: false });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2034")) throw new AppError(409, "SCORECARD_KPI_ASSIGNMENT_CONFLICT", "One or more KPI Configurations are no longer available.", { conflicts: await conflictDetails() });
+      throw error;
+    }
     return dto((await findComposition(scorecardId, periodKey))!);
   },
 
@@ -205,17 +226,49 @@ export const scorecardCompositionService = {
   async availableLinks(scorecardId: bigint, periodKey: string) {
     const owner = await scorecard(scorecardId); await finalizedPeriod(owner.kpiPoolExternalId, periodKey); const current = await findComposition(scorecardId, periodKey);
     const selected = new Set(current?.links.map((row) => row.linkedScorecardId.toString()) ?? []);
-    const rows = await prisma.scorecard.findMany({ where: { id: { not: scorecardId }, kpiPoolExternalId: owner.kpiPoolExternalId, statusCode: { not: "INACTIVE" }, deletedAt: null }, orderBy: { code: "asc" } });
-    return { data: rows.map((row) => ({ id: row.id.toString(), code: row.code, name: row.name, status: row.statusCode, selectionStatus: selected.has(row.id.toString()) ? "SELECTED_IN_SCORECARD" : "AVAILABLE_TO_LINK" })) };
+    const [rows, compositions, candidatePeriods] = await Promise.all([
+      prisma.scorecard.findMany({ where: { deletedAt: null }, include: { departments: { orderBy: { displayOrder: "asc" }, select: { departmentNameSnapshot: true } } }, orderBy: { code: "asc" } }),
+      prisma.scorecardPeriodComposition.findMany({ where: { periodKey }, select: { scorecardId: true, statusCode: true, links: { select: { linkedScorecardId: true } } } }),
+      prisma.poolPeriodReference.findMany({ where: { periodKey, compositionStatusCode: "FINALIZED" }, select: { kpiPoolExternalId: true } }),
+    ]);
+    const poolsWithPeriod = new Set(candidatePeriods.map((row) => row.kpiPoolExternalId.toString()));
+    const periodStatus = new Map(compositions.map((row) => [row.scorecardId.toString(), row.statusCode]));
+    const graph = new Map(compositions.map((row) => [row.scorecardId.toString(), row.links.map((link) => link.linkedScorecardId.toString())]));
+    return { data: rows.map((row) => {
+      const isSelected = selected.has(row.id.toString());
+      const candidateGraph = new Map(graph); candidateGraph.set(scorecardId.toString(), [...selected, row.id.toString()]);
+      const reasonCode = row.id === scorecardId ? "SELF_REFERENCE" : row.statusCode === "INACTIVE" ? "INACTIVE_SCORECARD" : !isSelected && !poolsWithPeriod.has(row.kpiPoolExternalId.toString()) ? "INPUT_PERIOD_NOT_AVAILABLE" : !isSelected && hasCircularLink(candidateGraph, scorecardId.toString()) ? "CIRCULAR_REFERENCE" : null;
+      const compositionStatus = periodStatus.get(row.id.toString()) ?? "NOT_STARTED";
+      const waiting = isSelected && compositionStatus !== "FINALIZED";
+      return { id: row.id.toString(), code: row.code, name: row.name, departments: row.departments.map((department) => department.departmentNameSnapshot), status: row.statusCode, compositionStatus, reasonCode, selectionStatus: reasonCode ? "NOT_AVAILABLE" : waiting ? "LINKED_WAITING_FOR_FINALIZATION" : isSelected ? "LINKED_THIS_PERIOD" : "AVAILABLE_TO_LINK" };
+    }) };
   },
 
-  async addLink(scorecardId: bigint, periodKey: string, linkedId: bigint, weight: number, actor: bigint) {
+  async addLinks(scorecardId: bigint, periodKey: string, items: Array<{ linkedScorecardId: string; weight: number }>, actor: bigint) {
     const owner = await scorecard(scorecardId); canPrepare(owner); const period = await finalizedPeriod(owner.kpiPoolExternalId, periodKey); const current = await getOrCreate(owner, period, actor); editable(owner, current);
-    if (linkedId === scorecardId) throw new AppError(422, "SCORECARD_SELF_LINK_NOT_ALLOWED", "A Scorecard cannot link to itself");
-    const linked = await prisma.scorecard.findFirst({ where: { id: linkedId, kpiPoolExternalId: owner.kpiPoolExternalId, statusCode: { not: "INACTIVE" }, deletedAt: null } });
-    if (!linked) throw new AppError(422, linkedId === scorecardId ? "SCORECARD_SELF_LINK_NOT_ALLOWED" : "LINKED_SCORECARD_NOT_ELIGIBLE", "Linked Scorecard is not eligible");
-    await assertNoCycle(scorecardId, periodKey, [...current.links.map((row) => row.linkedScorecardId), linkedId]);
-    await prisma.scorecardPeriodLink.upsert({ where: { scorecardPeriodCompositionId_linkedScorecardId: { scorecardPeriodCompositionId: current.id, linkedScorecardId: linkedId } }, update: { weightPercent: new Prisma.Decimal(weight) }, create: { scorecardPeriodCompositionId: current.id, linkedScorecardId: linkedId, weightPercent: new Prisma.Decimal(weight), displayOrder: current.links.length + 1, createdByUserId: actor } });
+    const linkedIds = items.map((item) => BigInt(item.linkedScorecardId));
+    const candidates = await prisma.scorecard.findMany({ where: { id: { in: linkedIds }, deletedAt: null } });
+    const availablePoolPeriods = new Set((await prisma.poolPeriodReference.findMany({ where: { periodKey, compositionStatusCode: "FINALIZED", kpiPoolExternalId: { in: candidates.map((row) => row.kpiPoolExternalId) } }, select: { kpiPoolExternalId: true } })).map((row) => row.kpiPoolExternalId.toString()));
+    const byId = new Map(candidates.map((row) => [row.id.toString(), row]));
+    const conflicts = items.flatMap((item) => { const row = byId.get(item.linkedScorecardId); const reasonCode = BigInt(item.linkedScorecardId) === scorecardId ? "SELF_REFERENCE" : !row || row.statusCode === "INACTIVE" ? "INACTIVE_SCORECARD" : !availablePoolPeriods.has(row.kpiPoolExternalId.toString()) ? "INPUT_PERIOD_NOT_AVAILABLE" : null; return reasonCode ? [linkedConflict(row ?? { id: BigInt(item.linkedScorecardId), code: item.linkedScorecardId, name: "Unavailable Scorecard" }, periodKey, reasonCode)] : []; });
+    if (conflicts.length) throw new AppError(409, "LINKED_SCORECARD_CONFLICT", "One or more Scorecards are no longer eligible.", { conflicts });
+    try {
+      await prisma.$transaction(async (tx) => {
+        const freshCandidates = await tx.scorecard.findMany({ where: { id: { in: linkedIds }, deletedAt: null } });
+        const freshById = new Map(freshCandidates.map((row) => [row.id.toString(), row]));
+        const freshPoolPeriods = new Set((await tx.poolPeriodReference.findMany({ where: { periodKey, compositionStatusCode: "FINALIZED", kpiPoolExternalId: { in: freshCandidates.map((row) => row.kpiPoolExternalId) } }, select: { kpiPoolExternalId: true } })).map((row) => row.kpiPoolExternalId.toString()));
+        const eligibilityConflicts = items.flatMap((item) => { const row = freshById.get(item.linkedScorecardId); const reasonCode = BigInt(item.linkedScorecardId) === scorecardId ? "SELF_REFERENCE" : !row || row.statusCode === "INACTIVE" ? "INACTIVE_SCORECARD" : !freshPoolPeriods.has(row.kpiPoolExternalId.toString()) ? "INPUT_PERIOD_NOT_AVAILABLE" : null; return reasonCode ? [linkedConflict(row ?? { id: BigInt(item.linkedScorecardId), code: item.linkedScorecardId, name: "Unavailable Scorecard" }, periodKey, reasonCode)] : []; });
+        if (eligibilityConflicts.length) throw new AppError(409, "LINKED_SCORECARD_CONFLICT", "One or more Scorecards are no longer eligible.", { conflicts: eligibilityConflicts });
+        const allLinks = [...new Set([...current.links.map((row) => row.linkedScorecardId.toString()), ...items.map((item) => item.linkedScorecardId)])].map(BigInt);
+        try { await assertNoCycle(tx, scorecardId, periodKey, allLinks); }
+        catch (error) { if (error instanceof AppError) throw new AppError(409, "LINKED_SCORECARD_CONFLICT", "One or more Scorecards are no longer eligible.", { conflicts: candidates.map((row) => linkedConflict(row, periodKey, row.id === scorecardId ? "SELF_REFERENCE" : "CIRCULAR_REFERENCE")) }); throw error; }
+        for (const [index, item] of items.entries()) await tx.scorecardPeriodLink.upsert({ where: { scorecardPeriodCompositionId_linkedScorecardId: { scorecardPeriodCompositionId: current.id, linkedScorecardId: BigInt(item.linkedScorecardId) } }, update: { weightPercent: new Prisma.Decimal(item.weight) }, create: { scorecardPeriodCompositionId: current.id, linkedScorecardId: BigInt(item.linkedScorecardId), weightPercent: new Prisma.Decimal(item.weight), displayOrder: current.links.length + index + 1, createdByUserId: actor } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof AppError) throw error;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2002" || error.code === "P2034")) throw new AppError(409, "LINKED_SCORECARD_CONFLICT", "The linked Scorecard selection changed concurrently.", { conflicts: candidates.map((row) => linkedConflict(row, periodKey, "CIRCULAR_REFERENCE")) });
+      throw error;
+    }
     return dto((await findComposition(scorecardId, periodKey))!);
   },
 
@@ -238,7 +291,7 @@ export const scorecardCompositionService = {
     if (!current || (!current.kpis.length && !current.links.length)) throw new AppError(422, "SCORECARD_COMPOSITION_EMPTY", "Select at least one KPI or linked Scorecard before finalization"); editable(owner, current);
     const allowed = new Set(period.memberships.map((row) => row.poolMembershipExternalId.toString()));
     if (current.kpis.some((row) => !allowed.has(row.kpiPoolMembershipExternalId.toString()))) throw new AppError(422, "KPI_NOT_IN_FINALIZED_POOL_COMPOSITION", "A KPI no longer belongs to this Pool Composition");
-    await assertNoCycle(scorecardId, periodKey, current.links.map((row) => row.linkedScorecardId));
+    await assertNoCycle(prisma, scorecardId, periodKey, current.links.map((row) => row.linkedScorecardId));
     for (const link of current.links) if (!await prisma.scorecardPeriodComposition.findFirst({ where: { scorecardId: link.linkedScorecardId, periodKey, statusCode: "FINALIZED" } })) throw new AppError(422, "LINKED_SCORECARD_COMPOSITION_NOT_FINALIZED", `${link.linkedScorecard.code} is not finalized for ${periodKey}`);
     const total = [...current.kpis, ...current.links].reduce((sum, row) => sum.plus(row.weightPercent), new Prisma.Decimal(0));
     if (!total.equals(new Prisma.Decimal("100.0000"))) throw new AppError(422, "SCORECARD_WEIGHT_TOTAL_INVALID", "KPI and Linked Scorecard weights must total exactly 100.0000", { total: total.toFixed(4) });
@@ -256,6 +309,16 @@ export const scorecardCompositionService = {
     const rows = await prisma.scorecard.findMany({ where: { kpiPoolExternalId: poolId, statusCode: { not: "INACTIVE" }, deletedAt: null }, select: { periodCompositions: { where: { periodKey }, select: { statusCode: true } } } });
     const preparing = rows.filter((row) => row.periodCompositions[0]?.statusCode === "PREPARING").length; const finalized = rows.filter((row) => row.periodCompositions[0]?.statusCode === "FINALIZED").length;
     return { data: { poolId: poolId.toString(), periodKey, totalScorecards: rows.length, preparing, finalized, pending: rows.length - preparing - finalized, status: rows.length === 0 ? "NOT_STARTED" : finalized === rows.length ? "FINALIZED" : preparing || finalized ? "IN_PROGRESS" : "NOT_STARTED" } };
+  },
+
+  async poolUsage(poolId: bigint, periodKey: string) {
+    const compositions = await prisma.scorecardPeriodComposition.findMany({
+      where: { kpiPoolExternalId: poolId, periodKey, kpis: { some: {} } },
+      select: { scorecard: { select: { id: true, code: true, name: true, departments: { orderBy: { displayOrder: "asc" }, select: { departmentNameSnapshot: true } } } }, kpis: { select: { kpiConfigurationExternalId: true, configurationCodeSnapshot: true, definitionCodeSnapshot: true, definitionNameSnapshot: true } } },
+      orderBy: { scorecard: { code: "asc" } },
+    });
+    const assignments = compositions.flatMap((composition) => composition.kpis.map((kpi) => ({ kpiConfigurationId: kpi.kpiConfigurationExternalId.toString(), configurationCode: kpi.configurationCodeSnapshot, kpiCode: kpi.definitionCodeSnapshot, kpiName: kpi.definitionNameSnapshot, scorecardId: composition.scorecard.id.toString(), scorecardCode: composition.scorecard.code, scorecardName: composition.scorecard.name, departments: composition.scorecard.departments.map((department) => department.departmentNameSnapshot) })));
+    return { data: { poolId: poolId.toString(), periodKey, assignedKpiCount: new Set(assignments.map((row) => row.kpiConfigurationId)).size, scorecardsUsingCount: compositions.length, assignments } };
   },
 
   async poolUsageBatch(targets: Array<{ poolId: string; periodKey: string }>) {

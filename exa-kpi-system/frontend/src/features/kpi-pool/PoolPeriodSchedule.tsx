@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, ArrowRight, CalendarRange, CheckCircle2, Clock3, Layers3, ListChecks, PencilLine, TriangleAlert } from "lucide-react";
+import { Activity, ArrowRight, CalendarRange, Check, CheckCircle2, Clock3, Layers3, ListChecks, PencilLine, Search, TriangleAlert, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { kpiPoolService } from "./kpi-pool.service";
 import type { PoolInputPeriod } from "./kpi-pool.types";
@@ -12,9 +12,14 @@ import "./pool-period-schedule.css";
 
 export function PoolPeriodSchedule() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const poolId = Number(params.get("poolId")) || 0;
+  const poolSearchRef = useRef<HTMLDivElement>(null);
+  const initializedPoolId = useRef(0);
+  const [poolSearch, setPoolSearch] = useState("");
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [selectedStart, setSelectedStart] = useState("");
+  const poolsQuery = useQuery({ queryKey: ["kpi-pools", "period-schedule-options"], queryFn: () => kpiPoolService.list(), staleTime: 60 * 1000 });
   const poolQuery = useQuery({ queryKey: ["kpi-pool", poolId], queryFn: () => kpiPoolService.get(poolId), enabled: poolId > 0 });
   const periodsQuery = useQuery({ queryKey: ["kpi-pool-periods", poolId], queryFn: () => kpiPoolService.getInputPeriods(poolId), enabled: poolId > 0 });
   const periods = periodsQuery.data?.data ?? [];
@@ -33,14 +38,57 @@ export function PoolPeriodSchedule() {
   const scorecardWorkflowQuery = useQuery({ queryKey: ["scorecard-pool-workflow", poolId, selected?.start], queryFn: () => scorecardService.poolWorkflow(poolId, selected!.start.slice(0, 7)), enabled: poolId > 0 && selected?.workflowStatus === "FINALIZED", retry: false });
   const editable = periods.find((period) => period.workflowStatus === "EDITABLE");
 
-  if (!poolId) return <ScheduleEmpty onBack={() => navigate("/app/pool-kpis/overview")} />;
+  useEffect(() => {
+    if (!poolQuery.data || initializedPoolId.current === poolQuery.data.id) return;
+    initializedPoolId.current = poolQuery.data.id;
+    setPoolSearch(poolLabel(poolQuery.data));
+  }, [poolQuery.data]);
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (!poolSearchRef.current?.contains(event.target as Node)) setSuggestionsOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setSuggestionsOpen(false); };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", escape); };
+  }, []);
+
+  const poolSuggestions = useMemo(() => {
+    const pools = poolsQuery.data ?? [];
+    const query = normalizePoolSearch(poolSearch);
+    if (!query || poolQuery.data && poolSearch === poolLabel(poolQuery.data)) return pools;
+    const terms = query.split(" ").filter(Boolean);
+    return pools.filter((pool) => {
+      const candidate = normalizePoolSearch(`${pool.code} ${pool.name} ${pool.companies.join(" ")}`);
+      return terms.every((term) => candidate.includes(term));
+    });
+  }, [poolSearch, poolQuery.data, poolsQuery.data]);
+
+  const selectPool = (id: number) => {
+    setSelectedStart("");
+    setSuggestionsOpen(false);
+    setParams({ poolId: String(id) });
+  };
+
+  const clearPool = () => {
+    initializedPoolId.current = 0;
+    setPoolSearch("");
+    setSelectedStart("");
+    setSuggestionsOpen(true);
+    setParams({});
+  };
+
   if (poolQuery.isLoading || periodsQuery.isLoading) return <main className="pool-page"><div className="pool-loading">Loading Pool Period Schedule...</div></main>;
-  if (!poolQuery.data || !selected) return <ScheduleEmpty onBack={() => navigate("/app/pool-kpis/overview")} />;
+  const selector = <PoolAutocomplete value={poolSearch} open={suggestionsOpen} loading={poolsQuery.isLoading} suggestions={poolSuggestions} selectedId={poolId} containerRef={poolSearchRef} onValue={(value) => { setPoolSearch(value); setSuggestionsOpen(true); }} onOpen={() => setSuggestionsOpen(true)} onSelect={selectPool} onClear={clearPool}/>;
+  if (!poolId || !poolQuery.data || !selected) return <ScheduleEmpty selector={selector} hasPoolId={poolId > 0} onBack={() => navigate("/app/pool-kpis/overview")} />;
   const pool = poolQuery.data;
 
   return <main className="pool-page pool-period-schedule-page">
     <nav className="kpi-breadcrumb" aria-label="Breadcrumb"><Link to="/app/pool-kpis/overview">KPI Pool</Link><span>/</span><Link to={`/app/pool-kpis/period-schedule?poolId=${poolId}`} aria-current="page">Pool Period Schedule</Link></nav>
     <header className="pool-page-header"><div><h1>Pool Period Schedule</h1><p>Review each Input Period across Pool Composition, Scorecard KPI Selection and Monitoring Results.</p></div></header>
+
+    {selector}
 
     <section className="schedule-pool-context" aria-label="KPI Pool context">
       <div><span>KPI Pool</span><strong>{pool.code} <i aria-hidden="true">·</i> {pool.name}</strong></div>
@@ -82,7 +130,12 @@ function SelectedPeriodStatusCard({ period, editable, onManage }: { period: Pool
   return <section className="selected-period-status-card preparing" aria-live="polite"><span className="selected-period-status-icon"><PencilLine size={24}/></span><div className="selected-period-status-copy"><header><span>{periodLabel}</span><b>Preparing</b></header><h2>Pool Composition in Preparation</h2><p>You may add, remove or replace KPI Configurations for this Input Period.</p>{period.dependency.previousPeriodStart && <small className="selected-period-dependency"><TriangleAlert size={14}/> Finalization is waiting for {formatPeriod(period.dependency.previousPeriodStart)} Monitoring to close.</small>}<button className="button primary" onClick={onManage}>Manage {formatPeriodMonth(period.start)} KPIs</button></div></section>;
 }
 
-function ScheduleEmpty({ onBack }: { onBack: () => void }) { return <main className="pool-page"><section className="detail-empty-state"><CalendarRange size={32}/><h1>No KPI Pool selected</h1><p>Open Period Schedule from a KPI Pool in the Overview.</p><button className="button secondary" onClick={onBack}>Back to Overview</button></section></main>; }
+function PoolAutocomplete({ value, open, loading, suggestions, selectedId, containerRef, onValue, onOpen, onSelect, onClear }: { value: string; open: boolean; loading: boolean; suggestions: import("./kpi-pool.types").KpiPoolRecord[]; selectedId: number; containerRef: React.RefObject<HTMLDivElement>; onValue: (value: string) => void; onOpen: () => void; onSelect: (id: number) => void; onClear: () => void }) {
+  return <section className="schedule-pool-search" aria-labelledby="schedule-pool-search-title"><div><h2 id="schedule-pool-search-title">Select KPI Pool</h2><p>Search by Pool code, name or company.</p></div><div className="pool-autocomplete" ref={containerRef}><Search size={17}/><input value={value} onFocus={onOpen} onChange={(event) => onValue(event.target.value)} placeholder="Search Pools..." role="combobox" aria-expanded={open} aria-controls="pool-suggestions" autoComplete="off"/>{value && <button type="button" onClick={onClear} aria-label="Clear selected Pool"><X size={16}/></button>}{open && <div className="pool-suggestions" id="pool-suggestions" role="listbox">{loading ? <div className="pool-no-suggestions">Loading Pools...</div> : suggestions.length ? suggestions.map((pool) => <button type="button" role="option" aria-selected={pool.id === selectedId} key={pool.id} onClick={() => onSelect(pool.id)}><span><strong>{pool.code}</strong><small>{pool.name} · {pool.companies.join(", ")}</small></span>{pool.id === selectedId && <Check size={16}/>}</button>) : <div className="pool-no-suggestions"><strong>No matching Pools</strong><span>Try another code, name or company. Periods are treated as separators.</span></div>}</div>}</div></section>;
+}
+function ScheduleEmpty({ selector, hasPoolId, onBack }: { selector: React.ReactNode; hasPoolId: boolean; onBack: () => void }) { return <main className="pool-page pool-period-schedule-page"><nav className="kpi-breadcrumb" aria-label="Breadcrumb"><Link to="/app/pool-kpis/overview">KPI Pool</Link><span>/</span><Link to="/app/pool-kpis/period-schedule" aria-current="page">Pool Period Schedule</Link></nav><header className="pool-page-header"><div><h1>Pool Period Schedule</h1><p>Select a Pool to review its Input Period workflow.</p></div></header>{selector}<section className="detail-empty-state"><CalendarRange size={32}/><h2>{hasPoolId ? "KPI Pool schedule unavailable" : "No KPI Pool selected"}</h2><p>{hasPoolId ? "Choose another Pool from the search above." : "Search for a Pool above to display its period schedule."}</p><button className="button secondary" onClick={onBack}>Back to Overview</button></section></main>; }
+function poolLabel(pool: import("./kpi-pool.types").KpiPoolRecord) { return `${pool.code} — ${pool.name}`; }
+function normalizePoolSearch(value: string) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[.—–·_-]+/g, " ").replace(/\s+/g, " ").trim(); }
 function poolStageState(period: PoolInputPeriod) { return period.workflowStatus === "FINALIZED" ? "FINALIZED" : period.workflowStatus === "FUTURE" ? "FUTURE" : period.canFinalizeComposition ? "READY TO FINALIZE" : "IN PREPARATION"; }
 function downstreamStageState(period: PoolInputPeriod) { return period.workflowStatus === "FINALIZED" ? "INTEGRATION PENDING" : period.workflowStatus === "EDITABLE" ? "WAITING" : "FUTURE"; }
 function scorecardStageState(period: PoolInputPeriod, state?: "NOT_STARTED" | "IN_PROGRESS" | "FINALIZED") { if (period.workflowStatus !== "FINALIZED") return period.workflowStatus === "EDITABLE" ? "WAITING" : "FUTURE"; return state === "FINALIZED" ? "FINALIZED" : state === "IN_PROGRESS" ? "IN PREPARATION" : state === "NOT_STARTED" ? "AVAILABLE" : "INTEGRATION PENDING"; }

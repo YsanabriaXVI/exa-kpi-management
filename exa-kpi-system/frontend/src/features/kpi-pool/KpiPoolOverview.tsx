@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarRange, Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { kpiPoolService } from "./kpi-pool.service";
 import { PoolOverviewMultiSelect } from "./PoolOverviewMultiSelect";
@@ -106,7 +106,6 @@ export function KpiPoolOverview() {
                 <button className="icon-button edit" title="Edit" aria-label={`Edit ${pool.code}`} onClick={() => navigate(`/app/pool-kpis/create-pool-info?poolId=${pool.id}`)}><Pencil size={15} /></button>
                 <button className="icon-button configure" title="Manage KPIs" onClick={() => navigate(`/app/pool-kpis/manage-kpis?poolId=${pool.id}&source=overview`)}><Settings2 size={15} /></button>
                 <button className="icon-button view" title="View Details" aria-label={`View details for ${pool.code}`} onClick={() => navigate(`/app/pool-kpis/detail/${pool.id}`)}><Eye size={15} /></button>
-                <button className="icon-button schedule" title="Pool Period Schedule" aria-label={`Open period schedule for ${pool.code}`} onClick={() => navigate(`/app/pool-kpis/period-schedule?poolId=${pool.id}`)}><CalendarRange size={15} /></button>
                 <button className="icon-button delete" title="Delete" aria-label={`Delete ${pool.code}`} onClick={() => setPoolToHide({ id: pool.id, code: pool.code })}><Trash2 size={15} /></button>
               </div></td>
             </tr>
@@ -127,12 +126,12 @@ type PoolSortKey = "code" | "name" | "companies" | "frequency" | "validity" | "o
 
 function PeriodCell({ period }: { period: import("./kpi-pool.types").KpiPoolRecord["operationalPeriod"] }) {
   if (!period) return <span className="overview-period-empty">Not available</span>;
-  return <div className="overview-period-cell"><strong>{formatMonth(period.start)}</strong><span className={`overview-period-status ${period.status.toLowerCase()}`}>{titlePeriod(period.status)}</span>{period.next && <small>Next: {formatMonthShort(period.next.start)} · Preparing</small>}</div>;
+  return <div className="overview-period-cell"><div className="overview-period-current"><strong>{formatMonth(period.start)}</strong><span className={`overview-period-status ${period.status.toLowerCase()}`}>{titlePeriod(period.status)}</span></div>{period.next && <small>Next: {formatMonthShort(period.next.start)} · Preparing</small>}</div>;
 }
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value));
 }
-function formatMonth(value: string) { return new Intl.DateTimeFormat("en", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value)); }
-function formatMonthShort(value: string) { return new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(new Date(value)); }
+function formatMonth(value: string) { return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(value)); }
+function formatMonthShort(value: string) { return new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(new Date(value)); }
 function titlePeriod(value: string) { return value === "FINALIZED" ? "Finalized" : "Preparing"; }

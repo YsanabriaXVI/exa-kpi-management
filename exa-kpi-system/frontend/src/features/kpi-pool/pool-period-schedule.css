@@ -1,4 +1,20 @@
 .pool-period-schedule-page { display: grid; gap: 22px; }
+.schedule-pool-search { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 20px 24px; border: 1px solid var(--ems-border); border-radius: 14px; background: var(--ems-surface); }
+.schedule-pool-search h2, .schedule-pool-search p { margin: 0; }
+.schedule-pool-search h2 { color: var(--ems-text); font-size: 17px; }
+.schedule-pool-search p { margin-top: 4px; color: var(--ems-muted); font-size: 12px; }
+.pool-autocomplete { position: relative; width: min(560px, 100%); }
+.pool-autocomplete > svg { position: absolute; z-index: 1; top: 13px; left: 14px; color: var(--ems-muted); pointer-events: none; }
+.pool-autocomplete > input { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 42px 10px 42px; border: 1px solid var(--ems-border); border-radius: 10px; outline: none; color: var(--ems-text); background: var(--ems-surface); font: inherit; }
+.pool-autocomplete > input:focus { border-color: var(--ems-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ems-primary) 14%, transparent); }
+.pool-autocomplete > button { position: absolute; z-index: 2; top: 8px; right: 8px; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 7px; color: var(--ems-muted); background: transparent; cursor: pointer; }
+.pool-suggestions { position: absolute; z-index: 20; top: calc(100% + 6px); right: 0; left: 0; max-height: 300px; overflow-y: auto; padding: 6px; border: 1px solid var(--ems-border); border-radius: 11px; background: var(--ems-surface); box-shadow: 0 14px 32px rgba(15,23,42,.16); }
+.pool-suggestions > button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 11px; border: 0; border-radius: 8px; color: var(--ems-text); background: transparent; text-align: left; cursor: pointer; }
+.pool-suggestions > button:hover, .pool-suggestions > button[aria-selected="true"] { background: var(--ems-surface-muted); }
+.pool-suggestions > button span { min-width: 0; display: grid; gap: 3px; }
+.pool-suggestions small { overflow: hidden; color: var(--ems-muted); text-overflow: ellipsis; white-space: nowrap; }
+.pool-no-suggestions { min-height: 70px; display: grid; place-content: center; gap: 3px; padding: 10px; color: var(--ems-muted); text-align: center; }
+.pool-no-suggestions span { font-size: 12px; }
 .schedule-pool-context { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 24px; border: 1px solid var(--ems-border); border-radius: 14px; background: var(--ems-surface); }
 .schedule-pool-context > div { display: grid; gap: 5px; }
 .schedule-pool-context span, .schedule-pool-context dt, .schedule-period-selector label { color: var(--ems-muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
@@ -54,7 +70,7 @@
 .workflow-stage-content .button { margin-top: auto; }
 .schedule-contract-note { margin: 0; padding: 14px 18px; border-left: 3px solid #2563eb; color: var(--ems-muted); background: rgba(37,99,235,.06); }
 @media (max-width: 980px) { .period-workflow-board { grid-template-columns: 1fr; gap: 12px; } .workflow-stage-arrow { transform: rotate(90deg); } .workflow-stage-card { min-height: 220px; } }
-@media (max-width: 720px) { .schedule-pool-context { align-items: flex-start; flex-direction: column; } .schedule-pool-context dl { flex-wrap: wrap; gap: 18px 32px; } }
+@media (max-width: 720px) { .schedule-pool-search, .schedule-pool-context { align-items: flex-start; flex-direction: column; } .pool-autocomplete { width: 100%; } .schedule-pool-context dl { flex-wrap: wrap; gap: 18px 32px; } }
 html[data-theme="dark"] .selected-period-status-card,
 html[data-theme="dark"] .workflow-stage-card { background: var(--ems-surface); }
 html[data-theme="dark"] .workflow-stage-card.finalized{background:rgba(22,163,74,.1)}html[data-theme="dark"] .workflow-stage-card.in-preparation{background:rgba(37,139,178,.11)}html[data-theme="dark"] .workflow-stage-card.ready-to-finalize,html[data-theme="dark"] .workflow-stage-card.waiting{background:rgba(230,170,0,.095)}html[data-theme="dark"] .workflow-stage-card.integration-pending{background:rgba(124,88,166,.12)}html[data-theme="dark"] .workflow-stage-card.future,html[data-theme="dark"] .workflow-stage-card.unavailable{background:rgba(127,127,127,.065)}

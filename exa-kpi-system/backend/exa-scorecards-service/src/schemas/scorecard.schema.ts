@@ -15,8 +15,12 @@ export const scorecardPeriodLinkParamsSchema = scorecardPeriodParamsSchema.exten
 const weight = z.coerce.number().nonnegative().max(100).multipleOf(0.0001);
 export const addPeriodKpisBodySchema = z.object({ items: z.array(z.object({ poolMembershipExternalId: externalId, weight })).min(1) });
 export const updatePeriodWeightsBodySchema = z.object({ kpis: z.array(z.object({ kpiConfigurationExternalId: externalId, weight })), linkedScorecards: z.array(z.object({ linkedScorecardId: externalId, weight })) });
-export const addPeriodLinkBodySchema = z.object({ linkedScorecardId: externalId, weight });
+export const addPeriodLinkBodySchema = z.union([
+  z.object({ linkedScorecardId: externalId, weight }),
+  z.object({ items: z.array(z.object({ linkedScorecardId: externalId, weight })).min(1) }),
+]).transform((value) => "items" in value ? value.items : [value]);
 export const poolWorkflowQuerySchema = z.object({ poolId: externalId, periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) });
+export const poolUsageQuerySchema = poolWorkflowQuerySchema;
 export const poolUsageBatchBodySchema = z.object({ targets: z.array(z.object({ poolId: externalId, periodKey: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })).min(1).max(100) });
 const repeatedIds = z.preprocess((value) => value === undefined ? undefined : Array.isArray(value) ? value : [value], z.array(externalId).optional());
 const repeatedText = z.preprocess((value) => value === undefined ? undefined : Array.isArray(value) ? value : [value], z.array(z.string().trim().min(1).max(150)).optional());

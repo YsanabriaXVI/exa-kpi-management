@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addPeriodKpisBodySchema, updatePeriodWeightsBodySchema } from "../schemas/scorecard.schema.js";
+import { addPeriodKpisBodySchema, addPeriodLinkBodySchema, updatePeriodWeightsBodySchema } from "../schemas/scorecard.schema.js";
 import { hasCircularLink } from "../services/scorecard-composition.service.js";
 
 describe("Scorecard period composition rules", () => {
@@ -14,5 +14,11 @@ describe("Scorecard period composition rules", () => {
     expect(addPeriodKpisBodySchema.safeParse({ items: [{ poolMembershipExternalId: "10", weight: 0 }] }).success).toBe(true);
     expect(addPeriodKpisBodySchema.safeParse({ items: [{ poolMembershipExternalId: "10", weight: -1 }] }).success).toBe(false);
     expect(updatePeriodWeightsBodySchema.safeParse({ kpis: [{ kpiConfigurationExternalId: "3", weight: 100.0001 }], linkedScorecards: [] }).success).toBe(false);
+  });
+
+  it("normalizes single and batch linked Scorecard selections for atomic persistence", () => {
+    expect(addPeriodLinkBodySchema.parse({ linkedScorecardId: "2", weight: 0 })).toEqual([{ linkedScorecardId: "2", weight: 0 }]);
+    expect(addPeriodLinkBodySchema.parse({ items: [{ linkedScorecardId: "2", weight: 0 }, { linkedScorecardId: "3", weight: 0 }] })).toHaveLength(2);
+    expect(addPeriodLinkBodySchema.safeParse({ items: [] }).success).toBe(false);
   });
 });

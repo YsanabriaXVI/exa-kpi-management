@@ -1,12 +1,10 @@
 .pool-composition-header {
-  display: grid;
-  grid-template-columns: max-content minmax(360px, 1fr) max-content;
+  display: flex;
+  justify-content: space-between;
   align-items: end;
   gap: 32px;
 }
-.pool-composition-header .pool-detail-period-actions { display: contents; }
-.pool-composition-header .pool-detail-period-actions > label { justify-self: center; }
-.pool-composition-header .pool-detail-period-actions > button { justify-self: end; }
+.pool-composition-header .pool-detail-period-actions { display: flex; }
 .pool-detail-period-actions select {
   width: 320px;
   min-width: 320px;

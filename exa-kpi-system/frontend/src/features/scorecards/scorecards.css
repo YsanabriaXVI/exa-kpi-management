@@ -1726,8 +1726,9 @@ html[data-theme="dark"] .composition-view-controls>strong{color:#a2ebc2;backgrou
   }
   .scorecard-detail-page .scorecard-donut,
   .scorecard-detail-page .scorecard-composition-totals{grid-column:1}
-  .scorecard-detail-page .scorecard-composition-totals{width:min(290px,100%)}
+.scorecard-detail-page .scorecard-composition-totals{width:min(290px,100%)}
 }
+.scorecard-detail-period-select{width:100%;margin-top:3px;border:0;outline:0;color:var(--ems-text);background:transparent;font:600 14px Calibri,Arial,sans-serif}.scorecard-detail-unified-header{padding:15px 17px;border-bottom:1px solid var(--ems-border);display:flex;align-items:center;justify-content:space-between;gap:12px}.scorecard-detail-unified-header>div{display:flex;align-items:center;gap:9px}.scorecard-detail-unified-header>div>span{display:grid}.scorecard-detail-unified-header strong{color:var(--ems-text);font-size:17px}.scorecard-detail-unified-header small{margin-top:2px;color:var(--ems-muted);font-size:12px}.scorecard-detail-unified-header>span{padding:6px 10px;border-radius:999px;color:#67368f;background:#ece3f4;font-size:12px;font-weight:700}.scorecard-detail-unified-section>header{padding:13px 16px;border-top:1px solid var(--ems-border);border-bottom:1px solid var(--ems-border);background:var(--ems-surface-muted)}.scorecard-detail-unified-section>header>div{display:flex;align-items:center;gap:9px;color:#2f68df}.scorecard-detail-unified-section.linked>header>div{color:#7650a0}.scorecard-detail-unified-section>header span{display:grid}.scorecard-detail-unified-section>header strong{color:var(--ems-text);font-size:15px}.scorecard-detail-unified-section>header small{margin-top:2px;color:var(--ems-muted);font-size:11px}.scorecard-detail-unified-section .scorecard-detail-table{width:100%;min-width:1100px}.scorecard-detail-unified-section .linked-scorecard-table{min-width:900px}.scorecard-detail-unified-section .scorecard-detail-table th,.scorecard-detail-unified-section .scorecard-detail-table td{width:auto!important;min-width:110px!important}.scorecard-detail-unified-section .scorecard-detail-table :is(th,td):nth-child(2){min-width:240px!important}.scorecard-detail-unified-section .scorecard-detail-table th:last-child,.scorecard-detail-unified-section .scorecard-detail-table td:last-child{width:85px!important;min-width:85px!important;text-align:center}.scorecard-detail-unified-section .scorecard-detail-table td:nth-child(2){text-align:left}.scorecard-detail-unified-section+.scorecard-detail-unified-section{border-top:10px solid var(--ems-surface-muted)}html[data-theme="dark"] .scorecard-detail-unified-header>span{color:#e1c4f4;background:#423552}html[data-theme="dark"] .scorecard-detail-period-select{color:#f2f6fa;background:#263548}@media(max-width:700px){.scorecard-detail-unified-header{align-items:flex-start;flex-direction:column}}
 .scorecard-detail-page .scorecard-detail-table:not(.linked-scorecard-table) th:nth-child(8),
 .scorecard-detail-page .scorecard-detail-table:not(.linked-scorecard-table) td:nth-child(8){
   padding-left:34px;
@@ -1769,7 +1770,32 @@ html[data-theme="dark"] .composition-view-controls>strong{color:#a2ebc2;backgrou
 .scorecard-overview-page .overview-period-empty {
   font-size: 11px;
 }
+.scorecard-overview-page .scorecard-schedule-cell small {
+  font-size: 12px;
+  line-height: 1.35;
+}
 
 .scorecard-overview-page .overview-period-status {
-  font-size: 10px;
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  margin-top:3px;
+  padding:4px 7px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+}
+.scorecard-overview-page .overview-period-current{
+  width:max-content;
+  display:grid;
+  justify-items:center;
+  gap:5px;
+}
+.scorecard-overview-page .overview-period-cell{
+  justify-items:center;
+  text-align:center;
+}
+.scorecard-overview-page .overview-period-cell>small{
+  justify-self:center;
+  text-align:center;
 }
