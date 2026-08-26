@@ -169,6 +169,36 @@ async function outbox(tx: Prisma.TransactionClient, type: string, owner: { id: b
 }
 
 export const scorecardCompositionService = {
+  async monitoringMaterialization(poolId: bigint, poolInputPeriodId: string) {
+    const period = await kpiPoolClient.period(poolId.toString(), poolInputPeriodId);
+    if (!period.poolCompositionId || period.workflowStatus !== "FINALIZED") {
+      return { data: { poolId: poolId.toString(), poolInputPeriodId, periodKey: period.periodKey, periodStart: period.start, periodEnd: period.end, readiness: "NOT_READY", reason: "POOL_COMPOSITION_NOT_FINALIZED", applicableScorecardCount: 0, finalizedScorecardCount: 0, scorecards: [] } };
+    }
+    const rows = await prisma.scorecard.findMany({
+      where: { kpiPoolExternalId: poolId, statusCode: { in: ["DRAFT", "ACTIVE"] }, deletedAt: null },
+      select: {
+        id: true, code: true, name: true, statusCode: true,
+        departments: { orderBy: { displayOrder: "asc" }, select: { externalDepartmentId: true, departmentCodeSnapshot: true, departmentNameSnapshot: true } },
+        periodCompositions: { where: { poolPeriodExternalId: BigInt(poolInputPeriodId) }, take: 1, include },
+      },
+      orderBy: { code: "asc" },
+    });
+    const finalizedByScorecard = new Map(rows.flatMap((row) => row.periodCompositions.filter((composition) => composition.statusCode === "FINALIZED").map((composition) => [row.id.toString(), composition] as const)));
+    const scorecards = rows.map((row) => {
+      const composition = row.periodCompositions[0];
+      const compositionStatus = composition?.statusCode === "FINALIZED" ? "FINALIZED" : composition?.statusCode === "PREPARING" ? "PREPARING" : "NOT_STARTED";
+      return {
+        scorecardId: row.id.toString(), scorecardCode: row.code, scorecardName: row.name, lifecycle: row.statusCode,
+        compositionStatus, scorecardPeriodCompositionId: composition?.id.toString() ?? null,
+        departments: row.departments.map((department) => ({ id: department.externalDepartmentId.toString(), code: department.departmentCodeSnapshot, name: department.departmentNameSnapshot })),
+        directKpiAssignments: composition?.kpis.map((kpi) => ({ scorecardKpiAssignmentId: kpi.id.toString(), kpiConfigurationId: kpi.kpiConfigurationExternalId.toString(), kpiDefinitionId: kpi.kpiDefinitionExternalId.toString(), poolMembershipExternalId: kpi.kpiPoolMembershipExternalId.toString(), weightPercent: kpi.weightPercent.toFixed(4), displayOrder: kpi.displayOrder })) ?? [],
+        linkedScorecards: composition?.links.map((link) => ({ linkAssignmentId: link.id.toString(), linkedScorecardId: link.linkedScorecardId.toString(), linkedScorecardCompositionId: finalizedByScorecard.get(link.linkedScorecardId.toString())?.id.toString() ?? null, weightPercent: link.weightPercent.toFixed(4), displayOrder: link.displayOrder })) ?? [],
+      };
+    });
+    const finalizedScorecardCount = scorecards.filter((item) => item.compositionStatus === "FINALIZED").length;
+    const noScorecards = scorecards.length === 0;
+    return { data: { poolId: poolId.toString(), poolInputPeriodId, poolCompositionId: period.poolCompositionId, periodKey: period.periodKey, periodStart: period.start, periodEnd: period.end, readiness: !noScorecards && finalizedScorecardCount === scorecards.length ? "READY" : "NOT_READY", reason: noScorecards ? "NO_APPLICABLE_SCORECARDS" : finalizedScorecardCount === scorecards.length ? null : "SCORECARD_COMPOSITIONS_INCOMPLETE", applicableScorecardCount: scorecards.length, finalizedScorecardCount, scorecards } };
+  },
   async periods(scorecardId: bigint) {
     const owner = await scorecard(scorecardId);
     const [poolPeriods, compositions] = await Promise.all([

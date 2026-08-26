@@ -11,4 +11,6 @@ CREATE USER IF NOT EXISTS 'exa_kpi_pool'@'%' IDENTIFIED BY 'exa_pool_dev';
 GRANT ALL PRIVILEGES ON `exa_kpi_pool`.* TO 'exa_kpi_pool'@'%';
 CREATE USER IF NOT EXISTS 'exa_scorecard'@'%' IDENTIFIED BY 'exa_scorecard_dev';
 GRANT ALL PRIVILEGES ON `exa_scorecard`.* TO 'exa_scorecard'@'%';
+CREATE USER IF NOT EXISTS 'exa_monitoring'@'%' IDENTIFIED BY 'exa_monitoring_dev';
+GRANT ALL PRIVILEGES ON `exa_monitoring`.* TO 'exa_monitoring'@'%';
 FLUSH PRIVILEGES;

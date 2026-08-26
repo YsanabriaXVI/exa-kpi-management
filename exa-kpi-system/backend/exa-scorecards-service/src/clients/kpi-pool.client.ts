@@ -31,11 +31,16 @@ async function request<T>(path: string): Promise<T> {
 export const kpiPoolClient = {
   async getPool(id: string) { return (await request<{ data: PoolRecord }>(`/api/v1/kpi-pools/${id}`)).data; },
   async periods(id: string) { return (await request<{ data: PoolPeriod[] }>(`/api/v1/kpi-pools/${id}/input-periods`)).data; },
+  async period(id: string, poolInputPeriodId: string) {
+    const period = (await kpiPoolClient.periods(id)).find((item) => item.poolPeriodId === poolInputPeriodId);
+    if (!period) throw new AppError(404, "POOL_INPUT_PERIOD_NOT_FOUND", "The Pool Input Period does not exist in the selected KPI Pool");
+    return period;
+  },
   async memberships(id: string, periodStart: string) {
     return (await request<{ data: PoolMembership[] }>(`/api/v1/kpi-pools/${id}/kpi-configurations?periodStart=${encodeURIComponent(periodStart)}`)).data;
   },
   async eligiblePools() {
-    const result = await request<{ data: PoolRecord[] }>("/api/v1/kpi-pools?page=1&pageSize=100&status=ACTIVE&sortBy=poolName&sortOrder=asc");
+    const result = await request<{ data: PoolRecord[] }>("/api/v1/kpi-pools?page=1&pageSize=100&status=DRAFT&sortBy=poolName&sortOrder=asc");
     return Promise.all(result.data.map(async (pool) => {
       const periods = await kpiPoolClient.periods(pool.id);
       return { id: pool.id, poolCode: pool.poolCode, poolName: pool.poolName, companies: pool.companies.map(({ id, code, name }) => ({ id, code, name })), validFrom: pool.validFrom, validTo: pool.validTo, frequency: { id: pool.inputFrequency.id, code: pool.inputFrequency.code, name: formatFrequency(pool.inputFrequency.code) }, inputPeriods: periods.length };

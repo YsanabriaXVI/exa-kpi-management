@@ -166,7 +166,6 @@ Para trabajar específicamente con exa-kpi-management-service, entra primero al 
 › como hago para consultar algo del microservicio de KPIs?
 
 
-
 El microservicio queda disponible en http://localhost:4001. Puedes consultar sus endpoints desde PowerShell.
 
   Primero verifica que esté funcionando:

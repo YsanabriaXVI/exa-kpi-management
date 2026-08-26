@@ -149,6 +149,12 @@ export const navigationItems: NavigationItem[] = [
         path: "/app/monitoring-results/pool-input-schedule",
         moduleName: "Monitoring Results",
       },
+      {
+        id: "result-entry",
+        label: "Result Entry",
+        path: "/app/monitoring-results/result-entry",
+        moduleName: "Monitoring Results",
+      },
     ],
   },
   {

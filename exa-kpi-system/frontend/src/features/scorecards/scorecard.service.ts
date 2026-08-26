@@ -154,6 +154,7 @@ const map = (value: ApiScorecard): ScorecardRecord => {
     kpis: value.currentComposition?.kpisSelected ?? 0,
     linkedScorecards: value.currentComposition?.linkedScorecards ?? 0,
     poolSource: `${value.kpiPool.code} · ${value.kpiPool.name}`,
+    poolId: Number(value.kpiPool.id),
     company: value.companies.map((row) => row.name).join(", "),
     status: value.status as ScorecardRecord["status"],
     collaborators: value.departments.reduce(

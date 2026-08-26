@@ -1,0 +1,232 @@
+.monitoring-period-step,
+.monitoring-period-step input,
+.monitoring-period-step select,
+.monitoring-period-step button {
+  font-family: Arial, sans-serif;
+}
+
+.period-resolver-controls ~ .result-entry-live-state,
+.monitoring-period-step > .result-entry-period-grid {
+  display: none;
+}
+
+.period-resolver-controls > label > span {
+  color: #4e5a6c;
+  font: 750 12px Arial, sans-serif;
+}
+
+.resolver-pool-search,
+.resolver-period-select {
+  height: 42px;
+  border-color: #ced5de;
+  border-radius: 7px;
+}
+
+.resolver-pool-search:focus-within,
+.resolver-period-select:focus-within {
+  border-color: #2a8bad;
+  box-shadow: 0 0 0 3px rgba(42, 139, 173, .12);
+}
+
+.resolver-pool-search > input,
+.resolver-period-select > select {
+  color: #283447;
+  font: 400 12px Arial, sans-serif;
+}
+
+.period-readiness-card,
+.period-readiness-card button {
+  font-family: Arial, sans-serif;
+}
+
+.result-entry-page > .entry-context {
+  display: none;
+}
+
+.resolver-pool-autocomplete {
+  position: relative;
+  width: 100%;
+  height: 42px;
+}
+
+.resolver-pool-autocomplete > input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 42px;
+  border: 1px solid #ced5de;
+  border-color: #ced5de;
+  border-radius: 7px;
+  outline: none;
+  color: #283447;
+  background: var(--ems-surface);
+  font: 400 12px Arial, sans-serif;
+}
+
+.resolver-pool-autocomplete > svg {
+  position: absolute;
+  z-index: 2;
+  left: 14px;
+  top: 12px;
+  color: var(--ems-muted);
+  pointer-events: none;
+}
+
+.resolver-pool-autocomplete > input:focus {
+  border-color: #2a8bad;
+  box-shadow: 0 0 0 3px rgba(42, 139, 173, .12);
+}
+
+.resolver-pool-autocomplete > button {
+  position: absolute;
+  z-index: 3;
+  top: 7px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  color: var(--ems-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.resolver-pool-suggestions {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  max-height: 310px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--ems-border);
+  border-radius: 10px;
+  background: var(--ems-surface);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, .18);
+}
+
+.resolver-pool-suggestions > button {
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ems-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+}
+
+.resolver-pool-suggestions > button:hover,
+.resolver-pool-suggestions > button[aria-selected="true"] {
+  background: var(--ems-surface-muted);
+}
+
+.resolver-pool-suggestions > button > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.resolver-pool-suggestions strong,
+.resolver-pool-suggestions small {
+  display: block;
+}
+
+.resolver-pool-suggestions small {
+  overflow: hidden;
+  color: var(--ems-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resolver-pool-no-suggestions {
+  min-height: 74px;
+  padding: 10px;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  color: var(--ems-muted);
+  text-align: center;
+  font: 400 12px Arial, sans-serif;
+}
+
+.resolver-period-select.waiting-pool {
+  cursor: pointer;
+  background: #f7f8fa;
+}
+
+.resolver-period-select.waiting-pool select {
+  pointer-events: none;
+}
+
+.period-readiness-card {
+  max-width: 760px;
+  padding: 22px 24px;
+  border: 1px solid var(--ems-border);
+  border-left: 4px solid #16a34a;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, .06);
+}
+
+.period-readiness-card > header h3 {
+  font: 700 20px Arial, sans-serif;
+}
+
+.period-readiness-card > header p {
+  margin-top: 5px;
+  color: #166534;
+  font: 800 12px Arial, sans-serif;
+}
+
+.readiness-summary-line {
+  margin-top: 20px !important;
+  color: var(--ems-text);
+  font: 600 14px Arial, sans-serif;
+}
+
+.period-readiness-card .readiness-progress {
+  margin-top: 17px;
+  margin-bottom: 19px;
+}
+
+.period-readiness-card .readiness-action p {
+  color: var(--ems-text);
+  font-size: 13px;
+}
+
+.resolver-feedback {
+  min-height: 58px;
+  padding: 12px 15px;
+  border: 1px solid var(--ems-border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ems-muted);
+  background: var(--ems-surface-muted);
+  font: 600 12px Arial, sans-serif;
+}
+
+.resolver-feedback.error {
+  color: #991b1b;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.monitoring-period-selector{display:grid;gap:22px;max-width:900px;margin:0 auto;padding:8px 0 22px}.monitoring-period-selector>header h2,.monitoring-period-selector>header p{margin:0}.monitoring-period-selector>header p{margin-top:6px;color:var(--ems-muted)}.monitoring-period-search{display:grid;gap:8px}.monitoring-period-search>span{color:#4e5a6c;font:750 12px Arial,sans-serif}.monitoring-period-search .resolver-pool-autocomplete{height:50px}.monitoring-period-search .resolver-pool-autocomplete>input{min-height:50px;font-size:14px}.monitoring-period-search .resolver-pool-autocomplete>svg{top:15px}.monitoring-period-search .resolver-pool-autocomplete>button{top:11px}.monitoring-period-suggestions>button>span{gap:4px}.monitoring-period-unselected{min-height:180px;border:1px dashed var(--ems-border);border-radius:12px;display:grid;place-content:center;justify-items:center;gap:5px;color:var(--ems-muted);text-align:center}.monitoring-period-unselected strong{color:var(--ems-text)}.monitoring-period-unselected p{margin:0}.monitoring-period-summary-card{padding:22px 24px;border:1px solid var(--ems-border);border-left:4px solid #16a34a;border-radius:12px;background:var(--ems-surface);box-shadow:0 5px 16px rgba(15,23,42,.06)}.monitoring-period-summary-card>header>div{display:flex;align-items:center;justify-content:space-between;gap:16px}.monitoring-period-summary-card>header>div>strong{font-size:17px}.monitoring-period-summary-card>header>div>span{padding:5px 9px;border-radius:999px;color:#166534;background:#dcfce7;font-size:11px;font-weight:800}.monitoring-period-summary-card h3{margin:15px 0 4px;font-size:15px}.monitoring-period-summary-card p{margin:0;color:var(--ems-muted)}.monitoring-period-summary-card dl{margin:22px 0 16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.monitoring-period-summary-card dl>div{padding:12px;border-radius:9px;background:var(--ems-surface-muted);text-align:center}.monitoring-period-summary-card dt{color:var(--ems-muted);font-size:11px;font-weight:700}.monitoring-period-summary-card dd{margin:3px 0 0;color:var(--ems-text);font-size:23px;font-weight:800}.monitoring-period-progress{height:11px;position:relative;margin-right:50px;border-radius:999px;background:#e2e8f0}.monitoring-period-progress i{display:block;height:100%;border-radius:inherit;background:#16a34a}.monitoring-period-progress span{position:absolute;left:calc(100% + 10px);top:-3px;font-size:12px;font-weight:800}.monitoring-period-readonly-note{margin-top:18px!important;padding:11px 13px;border-radius:8px;color:#475569!important;background:#f1f5f9}.monitoring-period-selector>footer{display:flex;justify-content:flex-end}.monitoring-period-sticky-context{position:sticky;z-index:30;top:0;margin-bottom:14px;padding:11px 16px;border:1px solid var(--ems-border);border-radius:10px;display:flex;align-items:center;gap:24px;background:rgba(255,255,255,.96);box-shadow:0 5px 15px rgba(15,23,42,.07);backdrop-filter:blur(8px)}.monitoring-period-sticky-context>div:first-child{min-width:0;flex:1;display:grid;grid-template-columns:auto 1fr;gap:2px 12px}.monitoring-period-sticky-context>div:first-child small{grid-column:1/-1;color:var(--ems-muted)}.monitoring-period-sticky-context>div:nth-child(2){display:grid;text-align:right}.monitoring-period-sticky-context>div:nth-child(2) span{color:var(--ems-muted);font-size:11px}.monitoring-period-sticky-context>button{border:0;color:#256b82;background:transparent;font-weight:750;cursor:pointer}.validation-workflow-step{display:grid;gap:22px}.validation-workflow-step>header{display:flex;align-items:center;gap:12px}.validation-workflow-step>header>span{width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#166534;background:#dcfce7}.validation-workflow-step h2,.validation-workflow-step p{margin:0}.validation-decision-card{min-height:240px;padding:32px;border:1px solid var(--ems-border);border-radius:13px;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center;background:var(--ems-surface)}.validation-decision-card>div{margin-top:14px;display:flex;gap:10px}.validation-decision-card.validated>svg{color:#16a34a}.submit-results-dialog{max-width:480px;text-align:center}.submit-results-dialog>svg{color:#16a34a}.submit-results-dialog p{color:var(--ems-muted);line-height:1.55}.submit-results-dialog footer{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+
+@media(max-width:700px){.monitoring-period-summary-card dl{grid-template-columns:1fr}.monitoring-period-sticky-context{align-items:flex-start;flex-wrap:wrap}.monitoring-period-sticky-context>div:nth-child(2){text-align:left}.validation-decision-card>div{flex-direction:column}}
+
+.validation-return-reason{width:min(560px,100%);margin-top:10px;display:grid;gap:7px;text-align:left}.validation-return-reason span{color:var(--ems-muted);font-size:12px;font-weight:750}.validation-return-reason textarea{min-height:92px;padding:11px 12px;border:1px solid var(--ems-border);border-radius:8px;resize:vertical;font:inherit}.validation-return-reason textarea:focus{border-color:#2a8bad;outline:0;box-shadow:0 0 0 3px rgba(42,139,173,.12)}
+
+.resolver-feedback .entry-secondary {
+  margin-left: auto;
+}

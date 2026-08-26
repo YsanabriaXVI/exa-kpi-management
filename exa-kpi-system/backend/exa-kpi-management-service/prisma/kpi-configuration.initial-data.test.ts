@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { initialKpiConfigurations } from "./kpi-configuration.initial-data.js";
+import { INITIAL_KPI_REVISION_EFFECTIVE_FROM } from "./import-kpi-configuration-mocks.js";
 
 describe("KPI Configuration initial Traffic Light data", () => {
+  it("starts revisions before the first 2026 operational Input Period", () => {
+    expect(INITIAL_KPI_REVISION_EFFECTIVE_FROM.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+  });
   it("does not persist synthetic PENDING configurations", () => {
     expect(initialKpiConfigurations.some((configuration) => configuration.configCode === "PENDING")).toBe(false);
   });

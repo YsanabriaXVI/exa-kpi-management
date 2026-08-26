@@ -143,6 +143,48 @@ services:
     networks:
       - exa-kpi-network
 
+  exa-monitoring-service:
+    build:
+      context: ./exa-monitoring-service
+      dockerfile: Dockerfile.dev
+    container_name: exa-monitoring-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4004
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      DATABASE_URL: mysql://${MONITORING_MYSQL_USER:-exa_monitoring}:${MONITORING_MYSQL_PASSWORD:-exa_monitoring_dev}@mysql:3306/exa_monitoring
+      KPI_POOL_BASE_URL: http://exa-kpi-pool-service:4002
+      SCORECARDS_BASE_URL: http://exa-scorecards-service:4003
+      KPI_MANAGEMENT_BASE_URL: http://exa-kpi-management-service:4001
+      SERVICE_HTTP_TIMEOUT_MS: 5000
+      NATS_ENABLED: "true"
+      NATS_URL: nats://nats:4222
+      NATS_NAME: exa-monitoring-service
+      NATS_STREAM: MONITORING_EVENTS
+      NATS_SUBJECTS: monitoring.>
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TEMPORARY_ACTOR_USER_ID: ${TEMPORARY_ACTOR_USER_ID:-1}
+    ports:
+      - "${MONITORING_PORT:-4004}:4004"
+    command: ["sh", "-c", "npm run prisma:generate && npm run prisma:migrate:deploy && npm run prisma:seed && npm run dev"]
+    volumes:
+      - ./exa-monitoring-service:/app
+      - monitoring_node_modules:/app/node_modules
+    depends_on:
+      mysql:
+        condition: service_healthy
+      exa-kpi-management-service:
+        condition: service_started
+      exa-kpi-pool-service:
+        condition: service_started
+      exa-scorecards-service:
+        condition: service_started
+      nats:
+        condition: service_healthy
+    networks:
+      - exa-kpi-network
+
   adminer:
     image: adminer:latest
     container_name: exa-kpi-adminer
@@ -162,6 +204,7 @@ volumes:
   kpi_management_node_modules:
   kpi_pool_node_modules:
   scorecards_node_modules:
+  monitoring_node_modules:
 
 networks:
   exa-kpi-network:

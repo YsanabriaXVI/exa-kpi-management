@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   CalendarDays,
@@ -23,6 +24,7 @@ import { isMonitoringPeriodClosed } from "./monitoring-period-state";
 import "./monitoring-results.css";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
+import { monitoringResultsService } from "./monitoring-results.service";
 
 const statusLabels: Record<MonitoringStatus, string> = {
   ACTIVE: "Active",
@@ -339,6 +341,8 @@ function primaryAction(pool: MonitoringPool) {
 export function MonitoringOverview() {
   const [pageSize, setPageSize] = useState(10);
   const navigate = useNavigate();
+  const periodsQuery = useQuery({ queryKey: ["monitoring-periods"], queryFn: monitoringResultsService.listPeriods, retry: false });
+  const [navigationError, setNavigationError] = useState("");
   const [search, setSearch] = useState("");
   const [companiesSelected, setCompaniesSelected] = useState<string[]>([]);
   const [frequencies, setFrequencies] = useState<string[]>([]);
@@ -448,21 +452,13 @@ export function MonitoringOverview() {
     };
   };
   const openPrimaryAction = (pool: MonitoringPool) => {
-    const { effectivePool } = getPoolView(pool);
-    const targetStep =
-      effectivePool.status === "VALIDATED" ||
-      effectivePool.status === "VALIDATED_WITH_WARNINGS"
-        ? 5
-        : effectivePool.status === "ACTIVE"
-          ? 1
-          : effectivePool.status === "CONTINUE_ENTRY"
-            ? 2
-            : effectivePool.status === "SUBMITTED"
-              ? 3
-              : 1;
-    navigate(
-      `/app/monitoring-results/result-entry?poolId=${pool.id}&period=${encodeURIComponent(pool.currentPeriod)}&step=${targetStep}`,
-    );
+    const period = periodsQuery.data?.items.find((item) => item.poolId === String(pool.id));
+    if (!period) {
+      setNavigationError(`No materialized Monitoring Period exists for ${pool.code}.`);
+      return;
+    }
+    setNavigationError("");
+    navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${period.id}`);
   };
 
   return (
@@ -482,6 +478,7 @@ export function MonitoringOverview() {
           </p>
         </div>
       </header>
+      {navigationError && <p className="result-entry-live-error" role="alert">{navigationError}</p>}
 
       <section className="monitor-filters" aria-label="Monitoring filters">
         <div className="monitor-filter-heading">

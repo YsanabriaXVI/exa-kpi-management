@@ -226,7 +226,7 @@ export function ScorecardAssignment() {
   </main>;
   const compositionReadOnly = compositionQuery.data?.status === "FINALIZED";
   const selectionQuery = `?scorecardId=${scorecardId}&period=${periodKey}`;
-  const [poolCode, ...poolNameParts] = scorecard.poolSource.split(/\s*(?:Â·|·)\s*/);
+  const [poolCode, ...poolNameParts] = scorecard.poolSource.split(/\s*·\s*/);
   const poolName = poolNameParts.join(" · ");
   const poolScheduleLabel = scorecard.poolSchedule ? `${formatMonthYear(scorecard.poolSchedule.validFrom)} – ${formatMonthYear(scorecard.poolSchedule.validTo)} · ${scorecard.poolSchedule.frequency}` : "";
   const compositionStatus = formatCompositionStatus(compositionQuery.data?.status ?? selectedPeriod?.scorecardCompositionStatus);

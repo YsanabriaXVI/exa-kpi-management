@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/database/prisma.js";
-import type { BatchLookupKpiConfigurationsBody, InternalKpiConfigurationCatalogQuery, KpiConfigurationBody } from "../schemas/kpi-configuration.schema.js";
+import type { BatchLookupKpiConfigurationsBody, EffectiveKpiConfigurationSnapshotsBody, InternalKpiConfigurationCatalogQuery, KpiConfigurationBody } from "../schemas/kpi-configuration.schema.js";
 import { AppError } from "../utils/app-error.js";
 import { toKpiConfigurationDto } from "../utils/kpi-configuration.dto.js";
 
@@ -38,6 +38,40 @@ async function nextConfigCode(tx: Prisma.TransactionClient, definitionId: bigint
   return `KPC-${definitionNumber}-${String(highestSuffix + 1).padStart(2, "0")}`;
 }
 export const kpiConfigurationService = {
+  async effectiveSnapshots(input: EffectiveKpiConfigurationSnapshotsBody) {
+    const periodStart = new Date(`${input.periodStart}T00:00:00.000Z`);
+    const periodEnd = new Date(`${input.periodEnd}T00:00:00.000Z`);
+    const records = await prisma.kpiConfiguration.findMany({
+      where: { id: { in: input.configurationIds.map(BigInt) }, deletedAt: null },
+      select: {
+        id: true, configCode: true,
+        definition: { select: { id: true, kpiCode: true, kpiName: true, description: true } },
+        measurementUnit: { select: { id: true, code: true, name: true, symbol: true } },
+        primaryDataSource: { select: { id: true, code: true, name: true } },
+        revisions: { where: { effectiveFrom: { lte: periodStart }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodEnd } }] }, orderBy: { revisionNumber: "asc" }, include: { evaluationType: true, thresholds: { orderBy: { displayOrder: "asc" }, include: { trafficLightLevel: true } } } },
+      },
+    });
+    const byId = new Map(records.map((record) => [record.id.toString(), record]));
+    const missing = input.configurationIds.filter((id) => !byId.has(id));
+    if (missing.length) throw new AppError("One or more KPI Configurations do not exist", 422, "KPI_CONFIGURATION_NOT_FOUND", { configurationIds: missing });
+    const uncovered = records.filter((record) => record.revisions.length === 0).map((record) => record.id.toString());
+    if (uncovered.length) throw new AppError("A KPI Configuration has no revision covering the complete Input Period", 409, "KPI_EFFECTIVE_REVISION_NOT_FOUND", { periodStart: input.periodStart, periodEnd: input.periodEnd, configurationIds: uncovered });
+    const overlapping = records.filter((record) => record.revisions.length > 1).map((record) => ({ configurationId: record.id.toString(), effectiveRevisionCount: record.revisions.length }));
+    if (overlapping.length) throw new AppError("A KPI Configuration has overlapping revisions for the Input Period", 409, "KPI_EFFECTIVE_REVISION_OVERLAP", { periodStart: input.periodStart, periodEnd: input.periodEnd, configurations: overlapping });
+    return { data: input.configurationIds.map((id) => {
+      const record = byId.get(id)!; const revision = record.revisions[0]!;
+      return {
+        kpiConfigurationId: id, kpiConfigurationRevisionId: revision.id.toString(), revisionNumber: revision.revisionNumber,
+        effectiveFrom: revision.effectiveFrom.toISOString().slice(0, 10), effectiveTo: revision.effectiveTo?.toISOString().slice(0, 10) ?? null,
+        configCode: record.configCode, kpiDefinitionId: record.definition.id.toString(), kpiCode: record.definition.kpiCode, kpiName: record.definition.kpiName, objective: record.definition.description,
+        goal: revision.targetValue?.toString() ?? null,
+        evaluationType: { id: revision.evaluationType.id.toString(), code: revision.evaluationType.code, name: revision.evaluationType.name },
+        measurementUnit: { id: record.measurementUnit.id.toString(), code: record.measurementUnit.code, name: record.measurementUnit.name, symbol: record.measurementUnit.symbol },
+        dataSource: { id: record.primaryDataSource.id.toString(), code: record.primaryDataSource.code, name: record.primaryDataSource.name },
+        thresholds: revision.thresholds.map((threshold) => ({ id: threshold.id.toString(), trafficLightLevelId: threshold.trafficLightLevel.id.toString(), code: threshold.trafficLightLevel.code, name: threshold.trafficLightLevel.name, rangeMinPercent: threshold.rangeMinPercent.toString(), rangeMaxPercent: threshold.rangeMaxPercent.toString(), includesMin: threshold.includesMin, includesMax: threshold.includesMax, displayOrder: threshold.displayOrder })),
+      };
+    }) };
+  },
   async internalCatalog(query: InternalKpiConfigurationCatalogQuery) {
     const where: Prisma.KpiConfigurationWhereInput = {
       deletedAt: null,

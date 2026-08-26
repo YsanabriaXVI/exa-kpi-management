@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model MonitoringPeriodStatus {
+  id               BigInt             @id @default(autoincrement()) @map("monitoring_period_status_id")
+  code             String             @unique(map: "uq_monitoring_period_status_code") @db.VarChar(40)
+  name             String             @db.VarChar(120)
+  description      String?            @db.Text
+  displayOrder     Int                @default(1) @map("display_order") @db.SmallInt
+  isTerminal       Boolean            @default(false) @map("is_terminal")
+  allowsEntry      Boolean            @default(false) @map("allows_entry")
+  allowsValidation Boolean            @default(false) @map("allows_validation")
+  allowsSubmit     Boolean            @default(false) @map("allows_submit")
+  allowsClose      Boolean            @default(false) @map("allows_close")
+  createdAt        DateTime           @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId  BigInt?            @map("created_by_user_id")
+  updatedAt        DateTime?          @map("updated_at") @db.DateTime(3)
+  updatedByUserId  BigInt?            @map("updated_by_user_id")
+  periods          MonitoringPeriod[]
+
+  @@map("monitoring_period_statuses")
+}
+
+model MonitoringPeriod {
+  id                              BigInt                      @id @default(autoincrement()) @map("monitoring_period_id")
+  kpiPoolExternalId               BigInt                      @map("kpi_pool_id")
+  poolInputPeriodExternalId       BigInt                      @map("pool_input_period_id")
+  poolPeriodCompositionExternalId BigInt                      @map("pool_period_composition_id")
+  inputFrequencyExternalId        BigInt?                     @map("input_frequency_id")
+  poolCodeSnapshot                String                      @map("pool_code_snapshot") @db.VarChar(40)
+  poolNameSnapshot                String                      @map("pool_name_snapshot") @db.VarChar(200)
+  inputFrequencyCodeSnapshot      String?                     @map("input_frequency_code_snapshot") @db.VarChar(40)
+  inputFrequencyNameSnapshot      String?                     @map("input_frequency_name_snapshot") @db.VarChar(120)
+  companiesSnapshot               Json?                       @map("companies_snapshot")
+  sequenceNo                      Int                         @map("sequence_no")
+  periodKey                       String                      @map("period_key") @db.VarChar(30)
+  periodStart                     DateTime                    @map("period_start") @db.Date
+  periodEnd                       DateTime                    @map("period_end") @db.Date
+  periodLabel                     String                      @map("period_label") @db.VarChar(100)
+  statusId                        BigInt                      @map("monitoring_period_status_id")
+  generatedAt                     DateTime                    @default(now()) @map("generated_at") @db.DateTime(3)
+  generatedByUserId               BigInt?                     @map("generated_by_user_id")
+  createdAt                       DateTime                    @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId                 BigInt?                     @map("created_by_user_id")
+  version                         Int                         @default(1)
+  validationStatus               String?                     @map("validation_status") @db.VarChar(40)
+  validationSummary              Json?                       @map("validation_summary")
+  validationRunAt                DateTime?                    @map("validation_run_at") @db.DateTime(3)
+  validationRunByUserId          BigInt?                     @map("validation_run_by_user_id")
+  submittedAt                    DateTime?                    @map("submitted_at") @db.DateTime(3)
+  submittedByUserId              BigInt?                     @map("submitted_by_user_id")
+  validatedAt                    DateTime?                    @map("validated_at") @db.DateTime(3)
+  validatedByUserId              BigInt?                     @map("validated_by_user_id")
+  returnedAt                     DateTime?                    @map("returned_at") @db.DateTime(3)
+  returnedByUserId               BigInt?                     @map("returned_by_user_id")
+  returnReason                   String?                     @map("return_reason") @db.Text
+  closedAt                       DateTime?                    @map("closed_at") @db.DateTime(3)
+  closedByUserId                 BigInt?                     @map("closed_by_user_id")
+  closedWithExceptions           Boolean                     @default(false) @map("closed_with_exceptions")
+  closeExceptionJustification    String?                     @map("close_exception_justification") @db.Text
+  status                          MonitoringPeriodStatus      @relation(fields: [statusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_mp_status")
+  scorecards                      MonitoringPeriodScorecard[]
+  inputs                          MonitoringPeriodInput[]
+  batches                         ResultEntryBatch[]
+  workflowEvents                  MonitoringPeriodWorkflowEvent[]
+
+  @@unique([kpiPoolExternalId, poolInputPeriodExternalId], map: "uq_mp_pool_input_period")
+  @@unique([kpiPoolExternalId, periodKey], map: "uq_mp_pool_period_key")
+  @@unique([kpiPoolExternalId, sequenceNo], map: "uq_mp_pool_sequence")
+  @@index([poolPeriodCompositionExternalId], map: "ix_mp_pool_composition")
+  @@map("monitoring_periods")
+}
+
+model MonitoringPeriodWorkflowEvent {
+  id                 BigInt           @id @default(autoincrement()) @map("monitoring_period_workflow_event_id")
+  monitoringPeriodId BigInt           @map("monitoring_period_id")
+  actionCode         String           @map("action_code") @db.VarChar(40)
+  fromStatusCode     String           @map("from_status_code") @db.VarChar(40)
+  toStatusCode       String           @map("to_status_code") @db.VarChar(40)
+  comment            String?          @db.Text
+  metadata           Json?
+  actorUserId        BigInt?          @map("actor_user_id")
+  occurredAt         DateTime         @default(now()) @map("occurred_at") @db.DateTime(3)
+  period             MonitoringPeriod @relation(fields: [monitoringPeriodId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mpwe_period")
+
+  @@index([monitoringPeriodId, occurredAt], map: "ix_mpwe_period_time")
+  @@map("monitoring_period_workflow_events")
+}
+
+model MonitoringPeriodScorecard {
+  id                                   BigInt                          @id @default(autoincrement()) @map("monitoring_period_scorecard_id")
+  monitoringPeriodId                   BigInt                          @map("monitoring_period_id")
+  scorecardExternalId                  BigInt                          @map("scorecard_id")
+  scorecardPeriodCompositionExternalId BigInt                          @map("scorecard_period_composition_id")
+  scorecardCodeSnapshot                String                          @map("scorecard_code_snapshot") @db.VarChar(40)
+  scorecardNameSnapshot                String                          @map("scorecard_name_snapshot") @db.VarChar(200)
+  departmentsSnapshot                  Json?                           @map("departments_snapshot")
+  ownKpiWeightPercentSnapshot          Decimal                         @default(0) @map("own_kpi_weight_percent_snapshot") @db.Decimal(7, 4)
+  linkedScorecardWeightPercentSnapshot Decimal                         @default(0) @map("linked_scorecard_weight_percent_snapshot") @db.Decimal(7, 4)
+  totalWeightPercentSnapshot           Decimal                         @default(100) @map("total_weight_percent_snapshot") @db.Decimal(7, 4)
+  directScorePercent                   Decimal?                        @map("direct_score_percent") @db.Decimal(12, 6)
+  linkedScorePercent                   Decimal?                        @map("linked_score_percent") @db.Decimal(12, 6)
+  previewScorePercent                  Decimal?                        @map("preview_score_percent") @db.Decimal(12, 6)
+  finalScorePercent                    Decimal?                        @map("final_score_percent") @db.Decimal(12, 6)
+  calculationVersion                  String?                         @map("calculation_version") @db.VarChar(30)
+  calculatedAt                        DateTime?                       @map("calculated_at") @db.DateTime(3)
+  snapshotCreatedAt                    DateTime                        @default(now()) @map("snapshot_created_at") @db.DateTime(3)
+  period                               MonitoringPeriod                @relation(fields: [monitoringPeriodId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mpsc_period")
+  inputs                               MonitoringPeriodInput[]
+  outgoingLinks                        MonitoringPeriodScorecardLink[] @relation("ParentMonitoringScorecard")
+  incomingLinks                        MonitoringPeriodScorecardLink[] @relation("LinkedMonitoringScorecard")
+
+  @@unique([monitoringPeriodId, scorecardExternalId], map: "uq_mpsc_period_scorecard")
+  @@unique([monitoringPeriodId, scorecardPeriodCompositionExternalId], map: "uq_mpsc_period_composition")
+  @@map("monitoring_period_scorecards")
+}
+
+model MonitoringPeriodInput {
+  id                                 BigInt                           @id @default(autoincrement()) @map("monitoring_period_input_id")
+  monitoringPeriodId                 BigInt                           @map("monitoring_period_id")
+  monitoringPeriodScorecardId        BigInt                           @map("monitoring_period_scorecard_id")
+  kpiDefinitionExternalId            BigInt?                          @map("kpi_definition_id")
+  kpiConfigurationExternalId         BigInt                           @map("kpi_configuration_id")
+  kpiConfigurationRevisionExternalId BigInt                           @map("kpi_configuration_revision_id")
+  poolCompositionItemExternalId      BigInt                           @map("pool_composition_item_id")
+  scorecardKpiAssignmentExternalId   BigInt                           @map("scorecard_kpi_assignment_id")
+  configCodeSnapshot                 String                           @map("config_code_snapshot") @db.VarChar(40)
+  kpiCodeSnapshot                    String                           @map("kpi_code_snapshot") @db.VarChar(30)
+  kpiNameSnapshot                    String                           @map("kpi_name_snapshot") @db.VarChar(200)
+  kpiObjectiveSnapshot               String?                          @map("kpi_objective_snapshot") @db.Text
+  goalTextSnapshot                   String?                          @map("goal_text_snapshot") @db.VarChar(255)
+  goalValueSnapshot                  Decimal?                         @map("goal_value_snapshot") @db.Decimal(20, 6)
+  evaluationTypeExternalId           BigInt?                          @map("evaluation_type_id")
+  evaluationTypeCodeSnapshot         String                           @map("evaluation_type_code_snapshot") @db.VarChar(40)
+  scoringMethodCodeSnapshot          String?                          @map("scoring_method_code_snapshot") @db.VarChar(40)
+  scoringRuleConfigSnapshot          Json?                            @map("scoring_rule_config_snapshot")
+  calculationRuleVersionSnapshot     String?                          @map("calculation_rule_version_snapshot") @db.VarChar(30)
+  measurementUnitExternalId          BigInt?                          @map("measurement_unit_id")
+  measurementUnitCodeSnapshot        String?                          @map("measurement_unit_code_snapshot") @db.VarChar(40)
+  measurementUnitNameSnapshot        String?                          @map("measurement_unit_name_snapshot") @db.VarChar(120)
+  measurementUnitSymbolSnapshot      String?                          @map("measurement_unit_symbol_snapshot") @db.VarChar(30)
+  primaryDataSourceExternalId        BigInt?                          @map("primary_data_source_id")
+  primaryDataSourceCodeSnapshot      String?                          @map("primary_data_source_code_snapshot") @db.VarChar(40)
+  primaryDataSourceNameSnapshot      String?                          @map("primary_data_source_name_snapshot") @db.VarChar(150)
+  weightPercentSnapshot              Decimal                          @map("weight_percent_snapshot") @db.Decimal(7, 4)
+  isRequired                         Boolean                          @default(true) @map("is_required")
+  displayOrder                       Int                              @default(1) @map("display_order")
+  generatedAt                        DateTime                         @default(now()) @map("generated_at") @db.DateTime(3)
+  period                             MonitoringPeriod                 @relation(fields: [monitoringPeriodId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mpi_period")
+  scorecard                          MonitoringPeriodScorecard        @relation(fields: [monitoringPeriodScorecardId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_mpi_period_scorecard")
+  thresholds                         MonitoringPeriodInputThreshold[]
+  batchRows                          ResultEntryBatchRow[]
+  result                             KpiResult?
+
+  @@unique([monitoringPeriodId, kpiConfigurationExternalId], map: "uq_mpi_period_configuration")
+  @@unique([monitoringPeriodId, displayOrder], map: "uq_mpi_period_order")
+  @@unique([monitoringPeriodId, scorecardKpiAssignmentExternalId], map: "uq_mpi_scorecard_assignment")
+  @@map("monitoring_period_inputs")
+}
+
+model MonitoringPeriodInputThreshold {
+  id                          BigInt                @id @default(autoincrement()) @map("monitoring_period_input_threshold_id")
+  monitoringPeriodInputId     BigInt                @map("monitoring_period_input_id")
+  trafficLightLevelExternalId BigInt?               @map("traffic_light_level_id")
+  trafficLightCodeSnapshot    String                @map("traffic_light_code_snapshot") @db.VarChar(30)
+  trafficLightNameSnapshot    String?               @map("traffic_light_name_snapshot") @db.VarChar(100)
+  rangeMinPercent             Decimal?              @map("range_min_percent") @db.Decimal(12, 6)
+  rangeMaxPercent             Decimal?              @map("range_max_percent") @db.Decimal(12, 6)
+  includesMin                 Boolean               @default(true) @map("includes_min")
+  includesMax                 Boolean               @default(false) @map("includes_max")
+  displayOrder                Int                   @default(1) @map("display_order") @db.SmallInt
+  input                       MonitoringPeriodInput @relation(fields: [monitoringPeriodInputId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mpit_input")
+
+  @@unique([monitoringPeriodInputId, trafficLightCodeSnapshot], map: "uq_mpit_input_level")
+  @@unique([monitoringPeriodInputId, displayOrder], map: "uq_mpit_input_order")
+  @@map("monitoring_period_input_thresholds")
+}
+
+model MonitoringPeriodScorecardLink {
+  id                                         BigInt                    @id @default(autoincrement()) @map("monitoring_period_scorecard_link_id")
+  monitoringPeriodScorecardId                BigInt                    @map("monitoring_period_scorecard_id")
+  linkedMonitoringPeriodScorecardId          BigInt                    @map("linked_monitoring_period_scorecard_id")
+  scorecardLinkExternalId                    BigInt                    @map("scorecard_linked_scorecard_id")
+  linkedScorecardExternalId                  BigInt                    @map("linked_scorecard_id")
+  linkedScorecardPeriodCompositionExternalId BigInt                    @map("linked_scorecard_period_composition_id")
+  linkedScorecardCodeSnapshot                String                    @map("linked_scorecard_code_snapshot") @db.VarChar(40)
+  linkedScorecardNameSnapshot                String                    @map("linked_scorecard_name_snapshot") @db.VarChar(200)
+  weightPercentSnapshot                      Decimal                   @map("weight_percent_snapshot") @db.Decimal(7, 4)
+  displayOrderSnapshot                       Int                       @map("display_order_snapshot")
+  createdAt                                  DateTime                  @default(now()) @map("created_at") @db.DateTime(3)
+  parent                                     MonitoringPeriodScorecard @relation("ParentMonitoringScorecard", fields: [monitoringPeriodScorecardId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mpscl_parent")
+  linked                                     MonitoringPeriodScorecard @relation("LinkedMonitoringScorecard", fields: [linkedMonitoringPeriodScorecardId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_mpscl_linked_local")
+
+  @@unique([monitoringPeriodScorecardId, linkedScorecardExternalId], map: "uq_mpscl_parent_linked")
+  @@unique([monitoringPeriodScorecardId, scorecardLinkExternalId], map: "uq_mpscl_original_link")
+  @@map("monitoring_period_scorecard_links")
+}
+
+model MonitoringInputMethod {
+  id      BigInt             @id @default(autoincrement()) @map("monitoring_input_method_id")
+  code    String             @unique(map: "uq_monitoring_input_method_code") @db.VarChar(40)
+  name    String             @db.VarChar(120)
+  batches ResultEntryBatch[]
+
+  @@map("monitoring_input_methods")
+}
+
+model ResultEntryBatchStatus {
+  id      BigInt             @id @default(autoincrement()) @map("result_entry_batch_status_id")
+  code    String             @unique(map: "uq_result_entry_batch_status_code") @db.VarChar(40)
+  name    String             @db.VarChar(120)
+  batches ResultEntryBatch[]
+
+  @@map("result_entry_batch_statuses")
+}
+
+model ResultEntryRowStatus {
+  id   BigInt                @id @default(autoincrement()) @map("result_entry_row_status_id")
+  code String                @unique(map: "uq_result_entry_row_status_code") @db.VarChar(40)
+  name String                @db.VarChar(120)
+  rows ResultEntryBatchRow[]
+
+  @@map("result_entry_row_statuses")
+}
+
+model KpiResultStatus {
+  id      BigInt      @id @default(autoincrement()) @map("kpi_result_status_id")
+  code    String      @unique(map: "uq_kpi_result_status_code") @db.VarChar(40)
+  name    String      @db.VarChar(120)
+  results KpiResult[]
+
+  @@map("kpi_result_statuses")
+}
+
+model ResultEntryBatch {
+  id                      BigInt                 @id @default(autoincrement()) @map("result_entry_batch_id")
+  monitoringPeriodId      BigInt                 @map("monitoring_period_id")
+  monitoringInputMethodId BigInt                 @map("monitoring_input_method_id")
+  statusId                BigInt                 @map("result_entry_batch_status_id")
+  batchNo                 Int                    @map("batch_no")
+  totalRows               Int                    @default(0) @map("total_rows")
+  validRows               Int                    @default(0) @map("valid_rows")
+  invalidRows             Int                    @default(0) @map("invalid_rows")
+  startedAt               DateTime               @default(now()) @map("started_at") @db.DateTime(3)
+  finishedAt              DateTime?              @map("finished_at") @db.DateTime(3)
+  createdByUserId         BigInt?                @map("created_by_user_id")
+  period                  MonitoringPeriod       @relation(fields: [monitoringPeriodId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_reb_period")
+  method                  MonitoringInputMethod  @relation(fields: [monitoringInputMethodId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_reb_method")
+  status                  ResultEntryBatchStatus @relation(fields: [statusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_reb_status")
+  rows                    ResultEntryBatchRow[]
+
+  @@unique([monitoringPeriodId, batchNo], map: "uq_reb_period_batch_no")
+  @@map("result_entry_batches")
+}
+
+model ResultEntryBatchRow {
+  id                      BigInt                @id @default(autoincrement()) @map("result_entry_batch_row_id")
+  resultEntryBatchId      BigInt                @map("result_entry_batch_id")
+  monitoringPeriodInputId BigInt                @map("monitoring_period_input_id")
+  statusId                BigInt                @map("result_entry_row_status_id")
+  parsedResultValue       Decimal?              @map("parsed_result_value") @db.Decimal(20, 6)
+  rawComment              String?               @map("raw_comment") @db.Text
+  createdAt               DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  batch                   ResultEntryBatch      @relation(fields: [resultEntryBatchId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_rebr_batch")
+  input                   MonitoringPeriodInput @relation(fields: [monitoringPeriodInputId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_rebr_input")
+  status                  ResultEntryRowStatus  @relation(fields: [statusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_rebr_status")
+  result                  KpiResult?
+  revisions               KpiResultRevision[]
+
+  @@unique([resultEntryBatchId, monitoringPeriodInputId], map: "uq_rebr_batch_input")
+  @@map("result_entry_batch_rows")
+}
+
+model KpiResult {
+  id                      BigInt                @id @default(autoincrement()) @map("kpi_result_id")
+  monitoringPeriodInputId BigInt                @unique(map: "uq_kpi_result_input") @map("monitoring_period_input_id")
+  latestBatchRowId        BigInt                @unique(map: "uq_kpi_result_latest_batch_row") @map("latest_batch_row_id")
+  statusId                BigInt                @map("kpi_result_status_id")
+  resultValue             Decimal?              @map("result_value") @db.Decimal(20, 6)
+  comment                 String?               @db.Text
+  rawAchievementPercent   Decimal?              @map("raw_achievement_percent") @db.Decimal(12, 6)
+  compliancePercent       Decimal?              @map("compliance_percent") @db.Decimal(12, 6)
+  weightedScorePoints     Decimal?              @map("weighted_score_points") @db.Decimal(12, 6)
+  trafficLightCode        String?               @map("traffic_light_code") @db.VarChar(30)
+  calculationStatus       String?               @map("calculation_status") @db.VarChar(40)
+  calculationErrorCode    String?               @map("calculation_error_code") @db.VarChar(80)
+  calculationVersion      String?               @map("calculation_version") @db.VarChar(30)
+  calculatedAt            DateTime?             @map("calculated_at") @db.DateTime(3)
+  revisionNo              Int                   @default(1) @map("revision_no")
+  version                 Int                   @default(1)
+  createdAt               DateTime              @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId         BigInt?               @map("created_by_user_id")
+  updatedAt               DateTime?             @map("updated_at") @db.DateTime(3)
+  updatedByUserId         BigInt?               @map("updated_by_user_id")
+  input                   MonitoringPeriodInput @relation(fields: [monitoringPeriodInputId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kr_input")
+  latestBatchRow          ResultEntryBatchRow   @relation(fields: [latestBatchRowId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kr_latest_row")
+  status                  KpiResultStatus       @relation(fields: [statusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kr_status")
+  revisions               KpiResultRevision[]
+
+  @@map("kpi_results")
+}
+
+model KpiResultRevision {
+  id                    BigInt              @id @default(autoincrement()) @map("kpi_result_revision_id")
+  kpiResultId           BigInt              @map("kpi_result_id")
+  resultEntryBatchRowId BigInt              @map("result_entry_batch_row_id")
+  revisionNo            Int                 @map("revision_no")
+  previousResultValue   Decimal?            @map("previous_result_value") @db.Decimal(20, 6)
+  newResultValue        Decimal?            @map("new_result_value") @db.Decimal(20, 6)
+  previousComment       String?             @map("previous_comment") @db.Text
+  newComment            String?             @map("new_comment") @db.Text
+  changeType            String              @map("change_type") @db.VarChar(40)
+  entrySource           String              @map("entry_source") @db.VarChar(40)
+  changedByUserId       BigInt?             @map("changed_by_user_id")
+  changedAt             DateTime            @default(now()) @map("changed_at") @db.DateTime(3)
+  result                KpiResult           @relation(fields: [kpiResultId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_krr_result")
+  batchRow              ResultEntryBatchRow @relation(fields: [resultEntryBatchRowId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_krr_batch_row")
+
+  @@unique([kpiResultId, revisionNo], map: "uq_krr_result_revision")
+  @@map("kpi_result_revisions")
+}

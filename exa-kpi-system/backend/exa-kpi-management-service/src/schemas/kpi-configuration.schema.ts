@@ -14,6 +14,12 @@ export const kpiConfigurationIdParamsSchema = z.object({ id }).strict();
 export const batchLookupKpiConfigurationsBodySchema = z.object({
   ids: z.array(id).min(1).max(100),
 }).strict().transform(({ ids }) => ({ ids: [...new Set(ids)] }));
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export const effectiveKpiConfigurationSnapshotsBodySchema = z.object({
+  configurationIds: z.array(id).min(1).max(100),
+  periodStart: dateOnly,
+  periodEnd: dateOnly,
+}).strict().refine((value) => value.periodEnd >= value.periodStart, { path: ["periodEnd"], message: "periodEnd must be on or after periodStart" }).transform((value) => ({ ...value, configurationIds: [...new Set(value.configurationIds)] }));
 export const listKpiConfigurationsQuerySchema = paginationSchema.extend({ search: z.string().trim().max(200).optional() }).strict();
 export const internalKpiConfigurationCatalogQuerySchema = paginationSchema.extend({
   search: z.string().trim().max(200).optional(),
@@ -25,4 +31,5 @@ export const kpiConfigurationBodySchema = z.object({
 }).strict();
 export type KpiConfigurationBody = z.infer<typeof kpiConfigurationBodySchema>;
 export type BatchLookupKpiConfigurationsBody = z.infer<typeof batchLookupKpiConfigurationsBodySchema>;
+export type EffectiveKpiConfigurationSnapshotsBody = z.infer<typeof effectiveKpiConfigurationSnapshotsBodySchema>;
 export type InternalKpiConfigurationCatalogQuery = z.infer<typeof internalKpiConfigurationCatalogQuerySchema>;

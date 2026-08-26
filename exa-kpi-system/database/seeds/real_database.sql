@@ -441,491 +441,491 @@
 --   CONSTRAINT `chk_scorecard_schedule_label_not_blank` CHECK (length(trim(period_label)) > 0)
 -- );
 
-CREATE TABLE `monitoring_period_statuses` (
-  `monitoring_period_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `is_terminal` boolean NOT NULL DEFAULT false,
-  `allows_entry` boolean NOT NULL DEFAULT false,
-  `allows_validation` boolean NOT NULL DEFAULT false,
-  `allows_close` boolean NOT NULL DEFAULT false,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_monitoring_period_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_monitoring_period_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_monitoring_period_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `monitoring_period_statuses` (
+--   `monitoring_period_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `is_terminal` boolean NOT NULL DEFAULT false,
+--   `allows_entry` boolean NOT NULL DEFAULT false,
+--   `allows_validation` boolean NOT NULL DEFAULT false,
+--   `allows_close` boolean NOT NULL DEFAULT false,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_monitoring_period_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_monitoring_period_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_monitoring_period_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `monitoring_input_methods` (
-  `monitoring_input_method_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_monitoring_input_methods_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_monitoring_input_methods_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_monitoring_input_methods_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `monitoring_input_methods` (
+--   `monitoring_input_method_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_monitoring_input_methods_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_monitoring_input_methods_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_monitoring_input_methods_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `result_entry_batch_statuses` (
-  `result_entry_batch_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `is_terminal` boolean NOT NULL DEFAULT false,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_result_entry_batch_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_result_entry_batch_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_result_entry_batch_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `result_entry_batch_statuses` (
+--   `result_entry_batch_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `is_terminal` boolean NOT NULL DEFAULT false,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_result_entry_batch_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_result_entry_batch_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_result_entry_batch_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `result_entry_row_statuses` (
-  `result_entry_row_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_result_entry_row_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_result_entry_row_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_result_entry_row_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `result_entry_row_statuses` (
+--   `result_entry_row_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_result_entry_row_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_result_entry_row_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_result_entry_row_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `kpi_result_statuses` (
-  `kpi_result_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `is_final` boolean NOT NULL DEFAULT false,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_kpi_result_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_kpi_result_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_kpi_result_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `kpi_result_statuses` (
+--   `kpi_result_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `is_final` boolean NOT NULL DEFAULT false,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_kpi_result_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_kpi_result_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_kpi_result_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `validation_statuses` (
-  `validation_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `is_successful` boolean NOT NULL DEFAULT false,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_validation_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_validation_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_validation_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `validation_statuses` (
+--   `validation_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `is_successful` boolean NOT NULL DEFAULT false,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_validation_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_validation_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_validation_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `validation_issue_severities` (
-  `validation_issue_severity_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(30) UNIQUE NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `blocks_validation` boolean NOT NULL DEFAULT false,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_validation_issue_severities_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_validation_issue_severities_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_validation_issue_severities_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `validation_issue_severities` (
+--   `validation_issue_severity_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(30) UNIQUE NOT NULL,
+--   `name` varchar(100) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `blocks_validation` boolean NOT NULL DEFAULT false,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_validation_issue_severities_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_validation_issue_severities_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_validation_issue_severities_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `period_closure_types` (
-  `period_closure_type_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `requires_justification` boolean NOT NULL DEFAULT false,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_period_closure_types_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_period_closure_types_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_period_closure_types_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `period_closure_types` (
+--   `period_closure_type_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `requires_justification` boolean NOT NULL DEFAULT false,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_period_closure_types_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_period_closure_types_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_period_closure_types_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `period_reopening_statuses` (
-  `period_reopening_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(40) UNIQUE NOT NULL,
-  `name` varchar(120) NOT NULL,
-  `description` text,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  `is_terminal` boolean NOT NULL DEFAULT false,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_period_reopening_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
-  CONSTRAINT `chk_period_reopening_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
-  CONSTRAINT `chk_period_reopening_statuses_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `period_reopening_statuses` (
+--   `period_reopening_status_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `code` varchar(40) UNIQUE NOT NULL,
+--   `name` varchar(120) NOT NULL,
+--   `description` text,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   `is_terminal` boolean NOT NULL DEFAULT false,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_period_reopening_statuses_code_not_blank` CHECK (length(trim(code)) > 0),
+--   CONSTRAINT `chk_period_reopening_statuses_name_not_blank` CHECK (length(trim(name)) > 0),
+--   CONSTRAINT `chk_period_reopening_statuses_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `monitoring_periods` (
-  `monitoring_period_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `kpi_pool_id` bigint NOT NULL,
-  `input_frequency_id` bigint NOT NULL,
-  `sequence_no` integer NOT NULL,
-  `period_start` date NOT NULL,
-  `period_end` date NOT NULL,
-  `period_label` varchar(100) NOT NULL,
-  `monitoring_period_status_id` bigint NOT NULL,
-  `monitoring_input_method_id` bigint,
-  `previous_monitoring_period_id` bigint,
-  `generated_at` timestamptz NOT NULL DEFAULT (now()),
-  `generated_by_user_id` bigint,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_monitoring_periods_sequence` CHECK (sequence_no > 0),
-  CONSTRAINT `chk_monitoring_periods_dates` CHECK (period_end >= period_start),
-  CONSTRAINT `chk_monitoring_periods_label_not_blank` CHECK (length(trim(period_label)) > 0),
-  CONSTRAINT `chk_monitoring_periods_not_self_previous` CHECK (previous_monitoring_period_id IS NULL OR previous_monitoring_period_id <> monitoring_period_id)
-);
+-- CREATE TABLE `monitoring_periods` (
+--   `monitoring_period_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `kpi_pool_id` bigint NOT NULL,
+--   `input_frequency_id` bigint NOT NULL,
+--   `sequence_no` integer NOT NULL,
+--   `period_start` date NOT NULL,
+--   `period_end` date NOT NULL,
+--   `period_label` varchar(100) NOT NULL,
+--   `monitoring_period_status_id` bigint NOT NULL,
+--   `monitoring_input_method_id` bigint,
+--   `previous_monitoring_period_id` bigint,
+--   `generated_at` timestamptz NOT NULL DEFAULT (now()),
+--   `generated_by_user_id` bigint,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_monitoring_periods_sequence` CHECK (sequence_no > 0),
+--   CONSTRAINT `chk_monitoring_periods_dates` CHECK (period_end >= period_start),
+--   CONSTRAINT `chk_monitoring_periods_label_not_blank` CHECK (length(trim(period_label)) > 0),
+--   CONSTRAINT `chk_monitoring_periods_not_self_previous` CHECK (previous_monitoring_period_id IS NULL OR previous_monitoring_period_id <> monitoring_period_id)
+-- );
 
-CREATE TABLE `monitoring_period_scorecards` (
-  `monitoring_period_scorecard_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint NOT NULL,
-  `scorecard_id` bigint NOT NULL,
-  `scorecard_code_snapshot` varchar(40) NOT NULL,
-  `scorecard_name_snapshot` varchar(200) NOT NULL,
-  `scorecard_valid_from_snapshot` date NOT NULL,
-  `scorecard_valid_to_snapshot` date NOT NULL,
-  `own_kpi_weight_percent_snapshot` numeric(7,4) NOT NULL,
-  `linked_scorecard_weight_percent_snapshot` numeric(7,4) NOT NULL,
-  `total_weight_percent_snapshot` numeric(7,4) NOT NULL,
-  `snapshot_created_at` timestamptz NOT NULL DEFAULT (now()),
-  CONSTRAINT `chk_period_scorecards_code_not_blank` CHECK (length(trim(scorecard_code_snapshot)) > 0),
-  CONSTRAINT `chk_period_scorecards_name_not_blank` CHECK (length(trim(scorecard_name_snapshot)) > 0),
-  CONSTRAINT `chk_period_scorecards_validity` CHECK (scorecard_valid_to_snapshot >= scorecard_valid_from_snapshot),
-  CONSTRAINT `chk_period_scorecards_own_weight` CHECK (own_kpi_weight_percent_snapshot BETWEEN 0 AND 100),
-  CONSTRAINT `chk_period_scorecards_linked_weight` CHECK (linked_scorecard_weight_percent_snapshot BETWEEN 0 AND 100),
-  CONSTRAINT `chk_period_scorecards_total_weight_math` CHECK (total_weight_percent_snapshot = own_kpi_weight_percent_snapshot + linked_scorecard_weight_percent_snapshot),
-  CONSTRAINT `chk_period_scorecards_total_weight_100` CHECK (total_weight_percent_snapshot = 100)
-);
+-- CREATE TABLE `monitoring_period_scorecards` (
+--   `monitoring_period_scorecard_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint NOT NULL,
+--   `scorecard_id` bigint NOT NULL,
+--   `scorecard_code_snapshot` varchar(40) NOT NULL,
+--   `scorecard_name_snapshot` varchar(200) NOT NULL,
+--   `scorecard_valid_from_snapshot` date NOT NULL,
+--   `scorecard_valid_to_snapshot` date NOT NULL,
+--   `own_kpi_weight_percent_snapshot` numeric(7,4) NOT NULL,
+--   `linked_scorecard_weight_percent_snapshot` numeric(7,4) NOT NULL,
+--   `total_weight_percent_snapshot` numeric(7,4) NOT NULL,
+--   `snapshot_created_at` timestamptz NOT NULL DEFAULT (now()),
+--   CONSTRAINT `chk_period_scorecards_code_not_blank` CHECK (length(trim(scorecard_code_snapshot)) > 0),
+--   CONSTRAINT `chk_period_scorecards_name_not_blank` CHECK (length(trim(scorecard_name_snapshot)) > 0),
+--   CONSTRAINT `chk_period_scorecards_validity` CHECK (scorecard_valid_to_snapshot >= scorecard_valid_from_snapshot),
+--   CONSTRAINT `chk_period_scorecards_own_weight` CHECK (own_kpi_weight_percent_snapshot BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_period_scorecards_linked_weight` CHECK (linked_scorecard_weight_percent_snapshot BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_period_scorecards_total_weight_math` CHECK (total_weight_percent_snapshot = own_kpi_weight_percent_snapshot + linked_scorecard_weight_percent_snapshot),
+--   CONSTRAINT `chk_period_scorecards_total_weight_100` CHECK (total_weight_percent_snapshot = 100)
+-- );
 
-CREATE TABLE `monitoring_period_inputs` (
-  `monitoring_period_input_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint NOT NULL,
-  `kpi_pool_kpi_id` bigint NOT NULL,
-  `config_code_snapshot` varchar(40) NOT NULL,
-  `kpi_code_snapshot` varchar(30) NOT NULL,
-  `kpi_name_snapshot` varchar(200) NOT NULL,
-  `target_value_snapshot` numeric(20,6) NOT NULL,
-  `measurement_unit_id` bigint NOT NULL,
-  `evaluation_type_id` bigint NOT NULL,
-  `primary_data_source_id` bigint NOT NULL,
-  `is_required` boolean NOT NULL DEFAULT true,
-  `is_sensitive` boolean NOT NULL DEFAULT false,
-  `display_order` integer NOT NULL DEFAULT 1,
-  `generated_at` timestamptz NOT NULL DEFAULT (now()),
-  CONSTRAINT `chk_period_inputs_config_code_not_blank` CHECK (length(trim(config_code_snapshot)) > 0),
-  CONSTRAINT `chk_period_inputs_kpi_code_not_blank` CHECK (length(trim(kpi_code_snapshot)) > 0),
-  CONSTRAINT `chk_period_inputs_kpi_name_not_blank` CHECK (length(trim(kpi_name_snapshot)) > 0),
-  CONSTRAINT `chk_period_inputs_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `monitoring_period_inputs` (
+--   `monitoring_period_input_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint NOT NULL,
+--   `kpi_pool_kpi_id` bigint NOT NULL,
+--   `config_code_snapshot` varchar(40) NOT NULL,
+--   `kpi_code_snapshot` varchar(30) NOT NULL,
+--   `kpi_name_snapshot` varchar(200) NOT NULL,
+--   `target_value_snapshot` numeric(20,6) NOT NULL,
+--   `measurement_unit_id` bigint NOT NULL,
+--   `evaluation_type_id` bigint NOT NULL,
+--   `primary_data_source_id` bigint NOT NULL,
+--   `is_required` boolean NOT NULL DEFAULT true,
+--   `is_sensitive` boolean NOT NULL DEFAULT false,
+--   `display_order` integer NOT NULL DEFAULT 1,
+--   `generated_at` timestamptz NOT NULL DEFAULT (now()),
+--   CONSTRAINT `chk_period_inputs_config_code_not_blank` CHECK (length(trim(config_code_snapshot)) > 0),
+--   CONSTRAINT `chk_period_inputs_kpi_code_not_blank` CHECK (length(trim(kpi_code_snapshot)) > 0),
+--   CONSTRAINT `chk_period_inputs_kpi_name_not_blank` CHECK (length(trim(kpi_name_snapshot)) > 0),
+--   CONSTRAINT `chk_period_inputs_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `monitoring_period_input_consumers` (
-  `monitoring_period_input_consumer_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_input_id` bigint NOT NULL,
-  `monitoring_period_scorecard_id` bigint NOT NULL,
-  `scorecard_kpi_id` bigint NOT NULL,
-  `weight_percent_snapshot` numeric(7,4) NOT NULL,
-  `display_order_snapshot` integer NOT NULL,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  CONSTRAINT `chk_period_input_consumers_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
-  CONSTRAINT `chk_period_input_consumers_display_order` CHECK (display_order_snapshot > 0)
-);
+-- CREATE TABLE `monitoring_period_input_consumers` (
+--   `monitoring_period_input_consumer_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_input_id` bigint NOT NULL,
+--   `monitoring_period_scorecard_id` bigint NOT NULL,
+--   `scorecard_kpi_id` bigint NOT NULL,
+--   `weight_percent_snapshot` numeric(7,4) NOT NULL,
+--   `display_order_snapshot` integer NOT NULL,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   CONSTRAINT `chk_period_input_consumers_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
+--   CONSTRAINT `chk_period_input_consumers_display_order` CHECK (display_order_snapshot > 0)
+-- );
 
-CREATE TABLE `monitoring_period_input_thresholds` (
-  `monitoring_period_input_threshold_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_input_id` bigint NOT NULL,
-  `traffic_light_level_id` bigint NOT NULL,
-  `range_min_percent` numeric(12,6) NOT NULL,
-  `range_max_percent` numeric(12,6) NOT NULL,
-  `includes_min` boolean NOT NULL DEFAULT true,
-  `includes_max` boolean NOT NULL DEFAULT false,
-  `display_order` smallint NOT NULL DEFAULT 1,
-  CONSTRAINT `chk_period_input_thresholds_range` CHECK (range_max_percent >= range_min_percent),
-  CONSTRAINT `chk_period_input_thresholds_display_order` CHECK (display_order > 0)
-);
+-- CREATE TABLE `monitoring_period_input_thresholds` (
+--   `monitoring_period_input_threshold_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_input_id` bigint NOT NULL,
+--   `traffic_light_level_id` bigint NOT NULL,
+--   `range_min_percent` numeric(12,6) NOT NULL,
+--   `range_max_percent` numeric(12,6) NOT NULL,
+--   `includes_min` boolean NOT NULL DEFAULT true,
+--   `includes_max` boolean NOT NULL DEFAULT false,
+--   `display_order` smallint NOT NULL DEFAULT 1,
+--   CONSTRAINT `chk_period_input_thresholds_range` CHECK (range_max_percent >= range_min_percent),
+--   CONSTRAINT `chk_period_input_thresholds_display_order` CHECK (display_order > 0)
+-- );
 
-CREATE TABLE `monitoring_period_scorecard_links` (
-  `monitoring_period_scorecard_link_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_scorecard_id` bigint NOT NULL,
-  `scorecard_linked_scorecard_id` bigint NOT NULL,
-  `linked_scorecard_id` bigint NOT NULL,
-  `linked_scorecard_code_snapshot` varchar(40) NOT NULL,
-  `linked_scorecard_name_snapshot` varchar(200) NOT NULL,
-  `weight_percent_snapshot` numeric(7,4) NOT NULL,
-  `display_order_snapshot` integer NOT NULL,
-  `resolution_policy_code` varchar(50) NOT NULL DEFAULT 'SAME_PERIOD_ELSE_LATEST_CLOSED',
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  CONSTRAINT `chk_period_scorecard_links_code_not_blank` CHECK (length(trim(linked_scorecard_code_snapshot)) > 0),
-  CONSTRAINT `chk_period_scorecard_links_name_not_blank` CHECK (length(trim(linked_scorecard_name_snapshot)) > 0),
-  CONSTRAINT `chk_period_scorecard_links_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
-  CONSTRAINT `chk_period_scorecard_links_display_order` CHECK (display_order_snapshot > 0),
-  CONSTRAINT `chk_period_scorecard_links_resolution_policy` CHECK (resolution_policy_code IN ('SAME_PERIOD_ELSE_LATEST_CLOSED', 'LATEST_CLOSED_ONLY', 'REQUIRE_EXCEPTION'))
-);
+-- CREATE TABLE `monitoring_period_scorecard_links` (
+--   `monitoring_period_scorecard_link_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_scorecard_id` bigint NOT NULL,
+--   `scorecard_linked_scorecard_id` bigint NOT NULL,
+--   `linked_scorecard_id` bigint NOT NULL,
+--   `linked_scorecard_code_snapshot` varchar(40) NOT NULL,
+--   `linked_scorecard_name_snapshot` varchar(200) NOT NULL,
+--   `weight_percent_snapshot` numeric(7,4) NOT NULL,
+--   `display_order_snapshot` integer NOT NULL,
+--   `resolution_policy_code` varchar(50) NOT NULL DEFAULT 'SAME_PERIOD_ELSE_LATEST_CLOSED',
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   CONSTRAINT `chk_period_scorecard_links_code_not_blank` CHECK (length(trim(linked_scorecard_code_snapshot)) > 0),
+--   CONSTRAINT `chk_period_scorecard_links_name_not_blank` CHECK (length(trim(linked_scorecard_name_snapshot)) > 0),
+--   CONSTRAINT `chk_period_scorecard_links_weight` CHECK (weight_percent_snapshot > 0 AND weight_percent_snapshot <= 100),
+--   CONSTRAINT `chk_period_scorecard_links_display_order` CHECK (display_order_snapshot > 0),
+--   CONSTRAINT `chk_period_scorecard_links_resolution_policy` CHECK (resolution_policy_code IN ('SAME_PERIOD_ELSE_LATEST_CLOSED', 'LATEST_CLOSED_ONLY', 'REQUIRE_EXCEPTION'))
+-- );
 
-CREATE TABLE `monitoring_period_templates` (
-  `monitoring_period_template_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint UNIQUE NOT NULL,
-  `template_file_name` varchar(255) NOT NULL,
-  `storage_key` varchar(500) UNIQUE NOT NULL,
-  `mime_type` varchar(150) NOT NULL DEFAULT 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  `expected_row_count` integer NOT NULL,
-  `expected_column_count` integer NOT NULL,
-  `generated_at` timestamptz NOT NULL DEFAULT (now()),
-  `generated_by_user_id` bigint,
-  CONSTRAINT `chk_monitoring_templates_file_name_not_blank` CHECK (length(trim(template_file_name)) > 0),
-  CONSTRAINT `chk_monitoring_templates_storage_key_not_blank` CHECK (length(trim(storage_key)) > 0),
-  CONSTRAINT `chk_monitoring_templates_mime_type_not_blank` CHECK (length(trim(mime_type)) > 0),
-  CONSTRAINT `chk_monitoring_templates_row_count` CHECK (expected_row_count > 0),
-  CONSTRAINT `chk_monitoring_templates_column_count` CHECK (expected_column_count > 0)
-);
+-- CREATE TABLE `monitoring_period_templates` (
+--   `monitoring_period_template_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint UNIQUE NOT NULL,
+--   `template_file_name` varchar(255) NOT NULL,
+--   `storage_key` varchar(500) UNIQUE NOT NULL,
+--   `mime_type` varchar(150) NOT NULL DEFAULT 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+--   `expected_row_count` integer NOT NULL,
+--   `expected_column_count` integer NOT NULL,
+--   `generated_at` timestamptz NOT NULL DEFAULT (now()),
+--   `generated_by_user_id` bigint,
+--   CONSTRAINT `chk_monitoring_templates_file_name_not_blank` CHECK (length(trim(template_file_name)) > 0),
+--   CONSTRAINT `chk_monitoring_templates_storage_key_not_blank` CHECK (length(trim(storage_key)) > 0),
+--   CONSTRAINT `chk_monitoring_templates_mime_type_not_blank` CHECK (length(trim(mime_type)) > 0),
+--   CONSTRAINT `chk_monitoring_templates_row_count` CHECK (expected_row_count > 0),
+--   CONSTRAINT `chk_monitoring_templates_column_count` CHECK (expected_column_count > 0)
+-- );
 
-CREATE TABLE `result_entry_batches` (
-  `result_entry_batch_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint NOT NULL,
-  `monitoring_input_method_id` bigint NOT NULL,
-  `monitoring_period_template_id` bigint,
-  `uploaded_file_name` varchar(255),
-  `uploaded_storage_key` varchar(500) UNIQUE,
-  `uploaded_mime_type` varchar(150),
-  `uploaded_size_bytes` bigint,
-  `result_entry_batch_status_id` bigint NOT NULL,
-  `batch_no` integer NOT NULL,
-  `rows_received` integer NOT NULL DEFAULT 0,
-  `rows_valid` integer NOT NULL DEFAULT 0,
-  `rows_with_warnings` integer NOT NULL DEFAULT 0,
-  `rows_with_errors` integer NOT NULL DEFAULT 0,
-  `started_at` timestamptz NOT NULL DEFAULT (now()),
-  `finished_at` timestamptz,
-  `submitted_by_user_id` bigint,
-  `notes` text,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  `created_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_result_entry_batches_batch_no` CHECK (batch_no > 0),
-  CONSTRAINT `chk_result_entry_batches_rows_received` CHECK (rows_received >= 0),
-  CONSTRAINT `chk_result_entry_batches_rows_valid` CHECK (rows_valid >= 0),
-  CONSTRAINT `chk_result_entry_batches_rows_warning` CHECK (rows_with_warnings >= 0),
-  CONSTRAINT `chk_result_entry_batches_rows_error` CHECK (rows_with_errors >= 0),
-  CONSTRAINT `chk_result_entry_batches_row_counts` CHECK (rows_valid + rows_with_warnings + rows_with_errors <= rows_received),
-  CONSTRAINT `chk_result_entry_batches_timestamps` CHECK (finished_at IS NULL OR finished_at >= started_at),
-  CONSTRAINT `chk_result_entry_batches_uploaded_size` CHECK (uploaded_size_bytes IS NULL OR uploaded_size_bytes > 0),
-  CONSTRAINT `chk_result_entry_batches_file_metadata_consistency` CHECK ((uploaded_file_name IS NULL
-      AND uploaded_storage_key IS NULL
-      AND uploaded_mime_type IS NULL
-      AND uploaded_size_bytes IS NULL)
-      OR
-      (uploaded_file_name IS NOT NULL
-      AND uploaded_storage_key IS NOT NULL
-      AND uploaded_mime_type IS NOT NULL
-      AND uploaded_size_bytes IS NOT NULL)),
-  CONSTRAINT `chk_result_entry_batches_file_name_not_blank` CHECK (uploaded_file_name IS NULL OR length(trim(uploaded_file_name)) > 0),
-  CONSTRAINT `chk_result_entry_batches_storage_key_not_blank` CHECK (uploaded_storage_key IS NULL OR length(trim(uploaded_storage_key)) > 0),
-  CONSTRAINT `chk_result_entry_batches_mime_type_not_blank` CHECK (uploaded_mime_type IS NULL OR length(trim(uploaded_mime_type)) > 0)
-);
+-- CREATE TABLE `result_entry_batches` (
+--   `result_entry_batch_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint NOT NULL,
+--   `monitoring_input_method_id` bigint NOT NULL,
+--   `monitoring_period_template_id` bigint,
+--   `uploaded_file_name` varchar(255),
+--   `uploaded_storage_key` varchar(500) UNIQUE,
+--   `uploaded_mime_type` varchar(150),
+--   `uploaded_size_bytes` bigint,
+--   `result_entry_batch_status_id` bigint NOT NULL,
+--   `batch_no` integer NOT NULL,
+--   `rows_received` integer NOT NULL DEFAULT 0,
+--   `rows_valid` integer NOT NULL DEFAULT 0,
+--   `rows_with_warnings` integer NOT NULL DEFAULT 0,
+--   `rows_with_errors` integer NOT NULL DEFAULT 0,
+--   `started_at` timestamptz NOT NULL DEFAULT (now()),
+--   `finished_at` timestamptz,
+--   `submitted_by_user_id` bigint,
+--   `notes` text,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   `created_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_result_entry_batches_batch_no` CHECK (batch_no > 0),
+--   CONSTRAINT `chk_result_entry_batches_rows_received` CHECK (rows_received >= 0),
+--   CONSTRAINT `chk_result_entry_batches_rows_valid` CHECK (rows_valid >= 0),
+--   CONSTRAINT `chk_result_entry_batches_rows_warning` CHECK (rows_with_warnings >= 0),
+--   CONSTRAINT `chk_result_entry_batches_rows_error` CHECK (rows_with_errors >= 0),
+--   CONSTRAINT `chk_result_entry_batches_row_counts` CHECK (rows_valid + rows_with_warnings + rows_with_errors <= rows_received),
+--   CONSTRAINT `chk_result_entry_batches_timestamps` CHECK (finished_at IS NULL OR finished_at >= started_at),
+--   CONSTRAINT `chk_result_entry_batches_uploaded_size` CHECK (uploaded_size_bytes IS NULL OR uploaded_size_bytes > 0),
+--   CONSTRAINT `chk_result_entry_batches_file_metadata_consistency` CHECK ((uploaded_file_name IS NULL
+--       AND uploaded_storage_key IS NULL
+--       AND uploaded_mime_type IS NULL
+--       AND uploaded_size_bytes IS NULL)
+--       OR
+--       (uploaded_file_name IS NOT NULL
+--       AND uploaded_storage_key IS NOT NULL
+--       AND uploaded_mime_type IS NOT NULL
+--       AND uploaded_size_bytes IS NOT NULL)),
+--   CONSTRAINT `chk_result_entry_batches_file_name_not_blank` CHECK (uploaded_file_name IS NULL OR length(trim(uploaded_file_name)) > 0),
+--   CONSTRAINT `chk_result_entry_batches_storage_key_not_blank` CHECK (uploaded_storage_key IS NULL OR length(trim(uploaded_storage_key)) > 0),
+--   CONSTRAINT `chk_result_entry_batches_mime_type_not_blank` CHECK (uploaded_mime_type IS NULL OR length(trim(uploaded_mime_type)) > 0)
+-- );
 
-CREATE TABLE `result_entry_batch_rows` (
-  `result_entry_batch_row_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `result_entry_batch_id` bigint NOT NULL,
-  `monitoring_period_input_id` bigint NOT NULL,
-  `source_row_number` integer,
-  `raw_result_value` varchar(250),
-  `parsed_result_value` numeric(20,6),
-  `raw_comment` text,
-  `result_entry_row_status_id` bigint NOT NULL,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  CONSTRAINT `chk_result_entry_batch_rows_source_row_number` CHECK (source_row_number IS NULL OR source_row_number > 0)
-);
+-- CREATE TABLE `result_entry_batch_rows` (
+--   `result_entry_batch_row_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `result_entry_batch_id` bigint NOT NULL,
+--   `monitoring_period_input_id` bigint NOT NULL,
+--   `source_row_number` integer,
+--   `raw_result_value` varchar(250),
+--   `parsed_result_value` numeric(20,6),
+--   `raw_comment` text,
+--   `result_entry_row_status_id` bigint NOT NULL,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   CONSTRAINT `chk_result_entry_batch_rows_source_row_number` CHECK (source_row_number IS NULL OR source_row_number > 0)
+-- );
 
-CREATE TABLE `kpi_results` (
-  `kpi_result_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_input_id` bigint UNIQUE NOT NULL,
-  `latest_result_entry_batch_row_id` bigint NOT NULL,
-  `result_value` numeric(20,6) NOT NULL,
-  `result_comment` text,
-  `compliance_rate_percent` numeric(12,6) NOT NULL,
-  `score_percent` numeric(7,4) NOT NULL,
-  `extra_points_percent` numeric(12,6) NOT NULL DEFAULT 0,
-  `traffic_light_level_id` bigint NOT NULL,
-  `kpi_result_status_id` bigint NOT NULL,
-  `revision_no` integer NOT NULL DEFAULT 1,
-  `entered_at` timestamptz NOT NULL DEFAULT (now()),
-  `entered_by_user_id` bigint,
-  `updated_at` timestamptz,
-  `updated_by_user_id` bigint,
-  CONSTRAINT `chk_kpi_results_compliance_nonnegative` CHECK (compliance_rate_percent >= 0),
-  CONSTRAINT `chk_kpi_results_score_range` CHECK (score_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_kpi_results_extra_points_nonnegative` CHECK (extra_points_percent >= 0),
-  CONSTRAINT `chk_kpi_results_revision_no` CHECK (revision_no > 0)
-);
+-- CREATE TABLE `kpi_results` (
+--   `kpi_result_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_input_id` bigint UNIQUE NOT NULL,
+--   `latest_result_entry_batch_row_id` bigint NOT NULL,
+--   `result_value` numeric(20,6) NOT NULL,
+--   `result_comment` text,
+--   `compliance_rate_percent` numeric(12,6) NOT NULL,
+--   `score_percent` numeric(7,4) NOT NULL,
+--   `extra_points_percent` numeric(12,6) NOT NULL DEFAULT 0,
+--   `traffic_light_level_id` bigint NOT NULL,
+--   `kpi_result_status_id` bigint NOT NULL,
+--   `revision_no` integer NOT NULL DEFAULT 1,
+--   `entered_at` timestamptz NOT NULL DEFAULT (now()),
+--   `entered_by_user_id` bigint,
+--   `updated_at` timestamptz,
+--   `updated_by_user_id` bigint,
+--   CONSTRAINT `chk_kpi_results_compliance_nonnegative` CHECK (compliance_rate_percent >= 0),
+--   CONSTRAINT `chk_kpi_results_score_range` CHECK (score_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_kpi_results_extra_points_nonnegative` CHECK (extra_points_percent >= 0),
+--   CONSTRAINT `chk_kpi_results_revision_no` CHECK (revision_no > 0)
+-- );
 
-CREATE TABLE `kpi_result_revisions` (
-  `kpi_result_revision_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `kpi_result_id` bigint NOT NULL,
-  `revision_no` integer NOT NULL,
-  `result_entry_batch_row_id` bigint NOT NULL,
-  `result_value` numeric(20,6) NOT NULL,
-  `result_comment` text,
-  `compliance_rate_percent` numeric(12,6) NOT NULL,
-  `score_percent` numeric(7,4) NOT NULL,
-  `extra_points_percent` numeric(12,6) NOT NULL DEFAULT 0,
-  `traffic_light_level_id` bigint NOT NULL,
-  `kpi_result_status_id` bigint NOT NULL,
-  `revision_reason` text,
-  `changed_at` timestamptz NOT NULL DEFAULT (now()),
-  `changed_by_user_id` bigint,
-  CONSTRAINT `chk_kpi_result_revisions_revision_no` CHECK (revision_no > 0),
-  CONSTRAINT `chk_kpi_result_revisions_compliance_nonnegative` CHECK (compliance_rate_percent >= 0),
-  CONSTRAINT `chk_kpi_result_revisions_score_range` CHECK (score_percent BETWEEN 0 AND 100),
-  CONSTRAINT `chk_kpi_result_revisions_extra_points_nonnegative` CHECK (extra_points_percent >= 0)
-);
+-- CREATE TABLE `kpi_result_revisions` (
+--   `kpi_result_revision_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `kpi_result_id` bigint NOT NULL,
+--   `revision_no` integer NOT NULL,
+--   `result_entry_batch_row_id` bigint NOT NULL,
+--   `result_value` numeric(20,6) NOT NULL,
+--   `result_comment` text,
+--   `compliance_rate_percent` numeric(12,6) NOT NULL,
+--   `score_percent` numeric(7,4) NOT NULL,
+--   `extra_points_percent` numeric(12,6) NOT NULL DEFAULT 0,
+--   `traffic_light_level_id` bigint NOT NULL,
+--   `kpi_result_status_id` bigint NOT NULL,
+--   `revision_reason` text,
+--   `changed_at` timestamptz NOT NULL DEFAULT (now()),
+--   `changed_by_user_id` bigint,
+--   CONSTRAINT `chk_kpi_result_revisions_revision_no` CHECK (revision_no > 0),
+--   CONSTRAINT `chk_kpi_result_revisions_compliance_nonnegative` CHECK (compliance_rate_percent >= 0),
+--   CONSTRAINT `chk_kpi_result_revisions_score_range` CHECK (score_percent BETWEEN 0 AND 100),
+--   CONSTRAINT `chk_kpi_result_revisions_extra_points_nonnegative` CHECK (extra_points_percent >= 0)
+-- );
 
-CREATE TABLE `validation_runs` (
-  `validation_run_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint NOT NULL,
-  `trigger_result_entry_batch_id` bigint,
-  `run_no` integer NOT NULL,
-  `validation_status_id` bigint NOT NULL,
-  `expected_input_count` integer NOT NULL DEFAULT 0,
-  `entered_result_count` integer NOT NULL DEFAULT 0,
-  `missing_result_count` integer NOT NULL DEFAULT 0,
-  `valid_result_count` integer NOT NULL DEFAULT 0,
-  `warning_count` integer NOT NULL DEFAULT 0,
-  `error_count` integer NOT NULL DEFAULT 0,
-  `critical_error_count` integer NOT NULL DEFAULT 0,
-  `started_at` timestamptz NOT NULL DEFAULT (now()),
-  `finished_at` timestamptz,
-  `executed_by_user_id` bigint,
-  `summary_json` jsonb NOT NULL DEFAULT ('{}'::jsonb),
-  CONSTRAINT `chk_validation_runs_run_no` CHECK (run_no > 0),
-  CONSTRAINT `chk_validation_runs_expected_count` CHECK (expected_input_count >= 0),
-  CONSTRAINT `chk_validation_runs_entered_count` CHECK (entered_result_count >= 0),
-  CONSTRAINT `chk_validation_runs_missing_count` CHECK (missing_result_count >= 0),
-  CONSTRAINT `chk_validation_runs_valid_count` CHECK (valid_result_count >= 0),
-  CONSTRAINT `chk_validation_runs_warning_count` CHECK (warning_count >= 0),
-  CONSTRAINT `chk_validation_runs_error_count` CHECK (error_count >= 0),
-  CONSTRAINT `chk_validation_runs_critical_count` CHECK (critical_error_count >= 0),
-  CONSTRAINT `chk_validation_runs_expected_balance` CHECK (entered_result_count + missing_result_count = expected_input_count),
-  CONSTRAINT `chk_validation_runs_valid_not_over_entered` CHECK (valid_result_count <= entered_result_count),
-  CONSTRAINT `chk_validation_runs_critical_not_over_errors` CHECK (critical_error_count <= error_count),
-  CONSTRAINT `chk_validation_runs_timestamps` CHECK (finished_at IS NULL OR finished_at >= started_at)
-);
+-- CREATE TABLE `validation_runs` (
+--   `validation_run_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint NOT NULL,
+--   `trigger_result_entry_batch_id` bigint,
+--   `run_no` integer NOT NULL,
+--   `validation_status_id` bigint NOT NULL,
+--   `expected_input_count` integer NOT NULL DEFAULT 0,
+--   `entered_result_count` integer NOT NULL DEFAULT 0,
+--   `missing_result_count` integer NOT NULL DEFAULT 0,
+--   `valid_result_count` integer NOT NULL DEFAULT 0,
+--   `warning_count` integer NOT NULL DEFAULT 0,
+--   `error_count` integer NOT NULL DEFAULT 0,
+--   `critical_error_count` integer NOT NULL DEFAULT 0,
+--   `started_at` timestamptz NOT NULL DEFAULT (now()),
+--   `finished_at` timestamptz,
+--   `executed_by_user_id` bigint,
+--   `summary_json` jsonb NOT NULL DEFAULT ('{}'::jsonb),
+--   CONSTRAINT `chk_validation_runs_run_no` CHECK (run_no > 0),
+--   CONSTRAINT `chk_validation_runs_expected_count` CHECK (expected_input_count >= 0),
+--   CONSTRAINT `chk_validation_runs_entered_count` CHECK (entered_result_count >= 0),
+--   CONSTRAINT `chk_validation_runs_missing_count` CHECK (missing_result_count >= 0),
+--   CONSTRAINT `chk_validation_runs_valid_count` CHECK (valid_result_count >= 0),
+--   CONSTRAINT `chk_validation_runs_warning_count` CHECK (warning_count >= 0),
+--   CONSTRAINT `chk_validation_runs_error_count` CHECK (error_count >= 0),
+--   CONSTRAINT `chk_validation_runs_critical_count` CHECK (critical_error_count >= 0),
+--   CONSTRAINT `chk_validation_runs_expected_balance` CHECK (entered_result_count + missing_result_count = expected_input_count),
+--   CONSTRAINT `chk_validation_runs_valid_not_over_entered` CHECK (valid_result_count <= entered_result_count),
+--   CONSTRAINT `chk_validation_runs_critical_not_over_errors` CHECK (critical_error_count <= error_count),
+--   CONSTRAINT `chk_validation_runs_timestamps` CHECK (finished_at IS NULL OR finished_at >= started_at)
+-- );
 
-CREATE TABLE `validation_issues` (
-  `validation_issue_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `validation_run_id` bigint NOT NULL,
-  `validation_issue_severity_id` bigint NOT NULL,
-  `monitoring_period_input_id` bigint,
-  `result_entry_batch_row_id` bigint,
-  `kpi_result_id` bigint,
-  `issue_code` varchar(100) NOT NULL,
-  `field_name` varchar(100),
-  `issue_message` text NOT NULL,
-  `current_value_text` text,
-  `expected_value_text` text,
-  `is_resolved` boolean NOT NULL DEFAULT false,
-  `resolved_at` timestamptz,
-  `resolved_by_user_id` bigint,
-  `resolution_notes` text,
-  `created_at` timestamptz NOT NULL DEFAULT (now()),
-  CONSTRAINT `chk_validation_issues_code_not_blank` CHECK (length(trim(issue_code)) > 0),
-  CONSTRAINT `chk_validation_issues_message_not_blank` CHECK (length(trim(issue_message)) > 0),
-  CONSTRAINT `chk_validation_issues_resolution_consistency` CHECK ((is_resolved = false AND resolved_at IS NULL AND resolved_by_user_id IS NULL)
-      OR (is_resolved = true AND resolved_at IS NOT NULL))
-);
+-- CREATE TABLE `validation_issues` (
+--   `validation_issue_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `validation_run_id` bigint NOT NULL,
+--   `validation_issue_severity_id` bigint NOT NULL,
+--   `monitoring_period_input_id` bigint,
+--   `result_entry_batch_row_id` bigint,
+--   `kpi_result_id` bigint,
+--   `issue_code` varchar(100) NOT NULL,
+--   `field_name` varchar(100),
+--   `issue_message` text NOT NULL,
+--   `current_value_text` text,
+--   `expected_value_text` text,
+--   `is_resolved` boolean NOT NULL DEFAULT false,
+--   `resolved_at` timestamptz,
+--   `resolved_by_user_id` bigint,
+--   `resolution_notes` text,
+--   `created_at` timestamptz NOT NULL DEFAULT (now()),
+--   CONSTRAINT `chk_validation_issues_code_not_blank` CHECK (length(trim(issue_code)) > 0),
+--   CONSTRAINT `chk_validation_issues_message_not_blank` CHECK (length(trim(issue_message)) > 0),
+--   CONSTRAINT `chk_validation_issues_resolution_consistency` CHECK ((is_resolved = false AND resolved_at IS NULL AND resolved_by_user_id IS NULL)
+--       OR (is_resolved = true AND resolved_at IS NOT NULL))
+-- );
 
-CREATE TABLE `monitoring_period_status_history` (
-  `monitoring_period_status_history_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint NOT NULL,
-  `from_monitoring_period_status_id` bigint,
-  `to_monitoring_period_status_id` bigint NOT NULL,
-  `change_reason` text,
-  `changed_at` timestamptz NOT NULL DEFAULT (now()),
-  `changed_by_user_id` bigint,
-  CONSTRAINT `chk_period_status_history_different_statuses` CHECK (from_monitoring_period_status_id IS NULL OR from_monitoring_period_status_id <> to_monitoring_period_status_id)
-);
+-- CREATE TABLE `monitoring_period_status_history` (
+--   `monitoring_period_status_history_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint NOT NULL,
+--   `from_monitoring_period_status_id` bigint,
+--   `to_monitoring_period_status_id` bigint NOT NULL,
+--   `change_reason` text,
+--   `changed_at` timestamptz NOT NULL DEFAULT (now()),
+--   `changed_by_user_id` bigint,
+--   CONSTRAINT `chk_period_status_history_different_statuses` CHECK (from_monitoring_period_status_id IS NULL OR from_monitoring_period_status_id <> to_monitoring_period_status_id)
+-- );
 
-CREATE TABLE `period_closures` (
-  `period_closure_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint NOT NULL,
-  `period_closure_type_id` bigint NOT NULL,
-  `validation_run_id` bigint NOT NULL,
-  `closure_no` integer NOT NULL,
-  `expected_input_count` integer NOT NULL,
-  `entered_result_count` integer NOT NULL,
-  `missing_result_count` integer NOT NULL,
-  `warning_count` integer NOT NULL,
-  `error_count` integer NOT NULL,
-  `affected_scorecard_count` integer NOT NULL,
-  `justification` text,
-  `confirmation_acknowledged` boolean NOT NULL,
-  `closed_at` timestamptz NOT NULL DEFAULT (now()),
-  `closed_by_user_id` bigint NOT NULL,
-  CONSTRAINT `chk_period_closures_closure_no` CHECK (closure_no > 0),
-  CONSTRAINT `chk_period_closures_expected_count` CHECK (expected_input_count >= 0),
-  CONSTRAINT `chk_period_closures_entered_count` CHECK (entered_result_count >= 0),
-  CONSTRAINT `chk_period_closures_missing_count` CHECK (missing_result_count >= 0),
-  CONSTRAINT `chk_period_closures_warning_count` CHECK (warning_count >= 0),
-  CONSTRAINT `chk_period_closures_error_count` CHECK (error_count >= 0),
-  CONSTRAINT `chk_period_closures_scorecard_count` CHECK (affected_scorecard_count >= 0),
-  CONSTRAINT `chk_period_closures_expected_balance` CHECK (entered_result_count + missing_result_count = expected_input_count),
-  CONSTRAINT `chk_period_closures_confirmation` CHECK (confirmation_acknowledged = true),
-  CONSTRAINT `chk_period_closures_justification_not_blank` CHECK (justification IS NULL OR length(trim(justification)) > 0)
-);
+-- CREATE TABLE `period_closures` (
+--   `period_closure_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint NOT NULL,
+--   `period_closure_type_id` bigint NOT NULL,
+--   `validation_run_id` bigint NOT NULL,
+--   `closure_no` integer NOT NULL,
+--   `expected_input_count` integer NOT NULL,
+--   `entered_result_count` integer NOT NULL,
+--   `missing_result_count` integer NOT NULL,
+--   `warning_count` integer NOT NULL,
+--   `error_count` integer NOT NULL,
+--   `affected_scorecard_count` integer NOT NULL,
+--   `justification` text,
+--   `confirmation_acknowledged` boolean NOT NULL,
+--   `closed_at` timestamptz NOT NULL DEFAULT (now()),
+--   `closed_by_user_id` bigint NOT NULL,
+--   CONSTRAINT `chk_period_closures_closure_no` CHECK (closure_no > 0),
+--   CONSTRAINT `chk_period_closures_expected_count` CHECK (expected_input_count >= 0),
+--   CONSTRAINT `chk_period_closures_entered_count` CHECK (entered_result_count >= 0),
+--   CONSTRAINT `chk_period_closures_missing_count` CHECK (missing_result_count >= 0),
+--   CONSTRAINT `chk_period_closures_warning_count` CHECK (warning_count >= 0),
+--   CONSTRAINT `chk_period_closures_error_count` CHECK (error_count >= 0),
+--   CONSTRAINT `chk_period_closures_scorecard_count` CHECK (affected_scorecard_count >= 0),
+--   CONSTRAINT `chk_period_closures_expected_balance` CHECK (entered_result_count + missing_result_count = expected_input_count),
+--   CONSTRAINT `chk_period_closures_confirmation` CHECK (confirmation_acknowledged = true),
+--   CONSTRAINT `chk_period_closures_justification_not_blank` CHECK (justification IS NULL OR length(trim(justification)) > 0)
+-- );
 
-CREATE TABLE `period_reopenings` (
-  `period_reopening_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `monitoring_period_id` bigint NOT NULL,
-  `period_closure_id` bigint NOT NULL,
-  `period_reopening_status_id` bigint NOT NULL,
-  `request_reason` text NOT NULL,
-  `requested_at` timestamptz NOT NULL DEFAULT (now()),
-  `requested_by_user_id` bigint NOT NULL,
-  `decided_at` timestamptz,
-  `decided_by_user_id` bigint,
-  `decision_notes` text,
-  `reopened_at` timestamptz,
-  `reopened_by_user_id` bigint,
-  CONSTRAINT `chk_period_reopenings_reason_not_blank` CHECK (length(trim(request_reason)) > 0),
-  CONSTRAINT `chk_period_reopenings_decision_consistency` CHECK ((decided_at IS NULL AND decided_by_user_id IS NULL)
-      OR (decided_at IS NOT NULL AND decided_by_user_id IS NOT NULL)),
-  CONSTRAINT `chk_period_reopenings_reopened_consistency` CHECK ((reopened_at IS NULL AND reopened_by_user_id IS NULL)
-      OR (reopened_at IS NOT NULL AND reopened_by_user_id IS NOT NULL)),
-  CONSTRAINT `chk_period_reopenings_decision_time` CHECK (decided_at IS NULL OR decided_at >= requested_at),
-  CONSTRAINT `chk_period_reopenings_reopened_time` CHECK (reopened_at IS NULL OR reopened_at >= requested_at)
-);
+-- CREATE TABLE `period_reopenings` (
+--   `period_reopening_id` bigint PRIMARY KEY AUTO_INCREMENT,
+--   `monitoring_period_id` bigint NOT NULL,
+--   `period_closure_id` bigint NOT NULL,
+--   `period_reopening_status_id` bigint NOT NULL,
+--   `request_reason` text NOT NULL,
+--   `requested_at` timestamptz NOT NULL DEFAULT (now()),
+--   `requested_by_user_id` bigint NOT NULL,
+--   `decided_at` timestamptz,
+--   `decided_by_user_id` bigint,
+--   `decision_notes` text,
+--   `reopened_at` timestamptz,
+--   `reopened_by_user_id` bigint,
+--   CONSTRAINT `chk_period_reopenings_reason_not_blank` CHECK (length(trim(request_reason)) > 0),
+--   CONSTRAINT `chk_period_reopenings_decision_consistency` CHECK ((decided_at IS NULL AND decided_by_user_id IS NULL)
+--       OR (decided_at IS NOT NULL AND decided_by_user_id IS NOT NULL)),
+--   CONSTRAINT `chk_period_reopenings_reopened_consistency` CHECK ((reopened_at IS NULL AND reopened_by_user_id IS NULL)
+--       OR (reopened_at IS NOT NULL AND reopened_by_user_id IS NOT NULL)),
+--   CONSTRAINT `chk_period_reopenings_decision_time` CHECK (decided_at IS NULL OR decided_at >= requested_at),
+--   CONSTRAINT `chk_period_reopenings_reopened_time` CHECK (reopened_at IS NULL OR reopened_at >= requested_at)
+-- );
 
 -- CREATE TABLE `scorecard_results` (
 --   `scorecard_result_id` bigint PRIMARY KEY AUTO_INCREMENT,
@@ -1417,193 +1417,193 @@ CREATE TABLE `vw_scorecard_analysis_base` (
 
 -- CREATE UNIQUE INDEX `uq_scorecard_schedule_preview` ON `scorecard_result_schedule_preview` (`scorecard_id`, `sequence_no`);
 
-CREATE UNIQUE INDEX `uq_scorecard_schedule_period_start` ON `scorecard_result_schedule_preview` (`scorecard_id`, `period_start`);
+-- CREATE UNIQUE INDEX `uq_scorecard_schedule_period_start` ON `scorecard_result_schedule_preview` (`scorecard_id`, `period_start`);
 
-CREATE UNIQUE INDEX `uq_monitoring_period_pool_sequence` ON `monitoring_periods` (`kpi_pool_id`, `sequence_no`);
+-- CREATE UNIQUE INDEX `uq_monitoring_period_pool_sequence` ON `monitoring_periods` (`kpi_pool_id`, `sequence_no`);
 
-CREATE UNIQUE INDEX `uq_monitoring_period_pool_dates` ON `monitoring_periods` (`kpi_pool_id`, `period_start`, `period_end`);
+-- CREATE UNIQUE INDEX `uq_monitoring_period_pool_dates` ON `monitoring_periods` (`kpi_pool_id`, `period_start`, `period_end`);
 
-CREATE UNIQUE INDEX `uq_monitoring_period_previous` ON `monitoring_periods` (`previous_monitoring_period_id`);
+-- CREATE UNIQUE INDEX `uq_monitoring_period_previous` ON `monitoring_periods` (`previous_monitoring_period_id`);
 
-CREATE INDEX `ix_monitoring_periods_status` ON `monitoring_periods` (`monitoring_period_status_id`);
+-- CREATE INDEX `ix_monitoring_periods_status` ON `monitoring_periods` (`monitoring_period_status_id`);
 
-CREATE INDEX `ix_monitoring_periods_input_method` ON `monitoring_periods` (`monitoring_input_method_id`);
+-- CREATE INDEX `ix_monitoring_periods_input_method` ON `monitoring_periods` (`monitoring_input_method_id`);
 
-CREATE INDEX `ix_monitoring_periods_dates` ON `monitoring_periods` (`period_start`, `period_end`);
+-- CREATE INDEX `ix_monitoring_periods_dates` ON `monitoring_periods` (`period_start`, `period_end`);
 
-CREATE UNIQUE INDEX `uq_monitoring_period_method_pair` ON `monitoring_periods` (`monitoring_period_id`, `monitoring_input_method_id`);
+-- CREATE UNIQUE INDEX `uq_monitoring_period_method_pair` ON `monitoring_periods` (`monitoring_period_id`, `monitoring_input_method_id`);
 
-CREATE UNIQUE INDEX `uq_monitoring_period_scorecard` ON `monitoring_period_scorecards` (`monitoring_period_id`, `scorecard_id`);
+-- CREATE UNIQUE INDEX `uq_monitoring_period_scorecard` ON `monitoring_period_scorecards` (`monitoring_period_id`, `scorecard_id`);
 
-CREATE INDEX `ix_monitoring_period_scorecards_scorecard` ON `monitoring_period_scorecards` (`scorecard_id`);
+-- CREATE INDEX `ix_monitoring_period_scorecards_scorecard` ON `monitoring_period_scorecards` (`scorecard_id`);
 
-CREATE UNIQUE INDEX `uq_monitoring_period_pool_kpi_input` ON `monitoring_period_inputs` (`monitoring_period_id`, `kpi_pool_kpi_id`);
+-- CREATE UNIQUE INDEX `uq_monitoring_period_pool_kpi_input` ON `monitoring_period_inputs` (`monitoring_period_id`, `kpi_pool_kpi_id`);
 
-CREATE UNIQUE INDEX `uq_monitoring_period_input_order` ON `monitoring_period_inputs` (`monitoring_period_id`, `display_order`);
+-- CREATE UNIQUE INDEX `uq_monitoring_period_input_order` ON `monitoring_period_inputs` (`monitoring_period_id`, `display_order`);
 
-CREATE INDEX `ix_monitoring_period_inputs_pool_kpi` ON `monitoring_period_inputs` (`kpi_pool_kpi_id`);
+-- CREATE INDEX `ix_monitoring_period_inputs_pool_kpi` ON `monitoring_period_inputs` (`kpi_pool_kpi_id`);
 
-CREATE INDEX `ix_monitoring_period_inputs_measurement_unit` ON `monitoring_period_inputs` (`measurement_unit_id`);
+-- CREATE INDEX `ix_monitoring_period_inputs_measurement_unit` ON `monitoring_period_inputs` (`measurement_unit_id`);
 
-CREATE INDEX `ix_monitoring_period_inputs_evaluation_type` ON `monitoring_period_inputs` (`evaluation_type_id`);
+-- CREATE INDEX `ix_monitoring_period_inputs_evaluation_type` ON `monitoring_period_inputs` (`evaluation_type_id`);
 
-CREATE INDEX `ix_monitoring_period_inputs_data_source` ON `monitoring_period_inputs` (`primary_data_source_id`);
+-- CREATE INDEX `ix_monitoring_period_inputs_data_source` ON `monitoring_period_inputs` (`primary_data_source_id`);
 
-CREATE INDEX `ix_monitoring_period_inputs_sensitive` ON `monitoring_period_inputs` (`monitoring_period_id`, `is_sensitive`);
+-- CREATE INDEX `ix_monitoring_period_inputs_sensitive` ON `monitoring_period_inputs` (`monitoring_period_id`, `is_sensitive`);
 
-CREATE UNIQUE INDEX `uq_period_input_scorecard_consumer` ON `monitoring_period_input_consumers` (`monitoring_period_input_id`, `monitoring_period_scorecard_id`);
+-- CREATE UNIQUE INDEX `uq_period_input_scorecard_consumer` ON `monitoring_period_input_consumers` (`monitoring_period_input_id`, `monitoring_period_scorecard_id`);
 
-CREATE INDEX `ix_period_input_consumers_scorecard_kpi` ON `monitoring_period_input_consumers` (`scorecard_kpi_id`);
+-- CREATE INDEX `ix_period_input_consumers_scorecard_kpi` ON `monitoring_period_input_consumers` (`scorecard_kpi_id`);
 
-CREATE INDEX `ix_period_input_consumers_period_scorecard` ON `monitoring_period_input_consumers` (`monitoring_period_scorecard_id`);
+-- CREATE INDEX `ix_period_input_consumers_period_scorecard` ON `monitoring_period_input_consumers` (`monitoring_period_scorecard_id`);
 
-CREATE UNIQUE INDEX `uq_period_input_threshold_level` ON `monitoring_period_input_thresholds` (`monitoring_period_input_id`, `traffic_light_level_id`);
+-- CREATE UNIQUE INDEX `uq_period_input_threshold_level` ON `monitoring_period_input_thresholds` (`monitoring_period_input_id`, `traffic_light_level_id`);
 
-CREATE UNIQUE INDEX `uq_period_input_threshold_order` ON `monitoring_period_input_thresholds` (`monitoring_period_input_id`, `display_order`);
+-- CREATE UNIQUE INDEX `uq_period_input_threshold_order` ON `monitoring_period_input_thresholds` (`monitoring_period_input_id`, `display_order`);
 
-CREATE UNIQUE INDEX `uq_period_scorecard_linked_scorecard` ON `monitoring_period_scorecard_links` (`monitoring_period_scorecard_id`, `linked_scorecard_id`);
+-- CREATE UNIQUE INDEX `uq_period_scorecard_linked_scorecard` ON `monitoring_period_scorecard_links` (`monitoring_period_scorecard_id`, `linked_scorecard_id`);
 
-CREATE INDEX `ix_period_scorecard_links_original_link` ON `monitoring_period_scorecard_links` (`scorecard_linked_scorecard_id`);
+-- CREATE INDEX `ix_period_scorecard_links_original_link` ON `monitoring_period_scorecard_links` (`scorecard_linked_scorecard_id`);
 
-CREATE INDEX `ix_period_scorecard_links_linked_scorecard` ON `monitoring_period_scorecard_links` (`linked_scorecard_id`);
+-- CREATE INDEX `ix_period_scorecard_links_linked_scorecard` ON `monitoring_period_scorecard_links` (`linked_scorecard_id`);
 
-CREATE INDEX `ix_monitoring_templates_generated_by` ON `monitoring_period_templates` (`generated_by_user_id`);
+-- CREATE INDEX `ix_monitoring_templates_generated_by` ON `monitoring_period_templates` (`generated_by_user_id`);
 
-CREATE UNIQUE INDEX `uq_result_entry_period_batch_no` ON `result_entry_batches` (`monitoring_period_id`, `batch_no`);
+-- CREATE UNIQUE INDEX `uq_result_entry_period_batch_no` ON `result_entry_batches` (`monitoring_period_id`, `batch_no`);
 
-CREATE INDEX `ix_result_entry_batches_status` ON `result_entry_batches` (`result_entry_batch_status_id`);
+-- CREATE INDEX `ix_result_entry_batches_status` ON `result_entry_batches` (`result_entry_batch_status_id`);
 
-CREATE INDEX `ix_result_entry_batches_template` ON `result_entry_batches` (`monitoring_period_template_id`);
+-- CREATE INDEX `ix_result_entry_batches_template` ON `result_entry_batches` (`monitoring_period_template_id`);
 
-CREATE INDEX `ix_result_entry_batches_submitted_by` ON `result_entry_batches` (`submitted_by_user_id`);
+-- CREATE INDEX `ix_result_entry_batches_submitted_by` ON `result_entry_batches` (`submitted_by_user_id`);
 
-CREATE INDEX `ix_result_entry_batches_period_created` ON `result_entry_batches` (`monitoring_period_id`, `created_at`);
+-- CREATE INDEX `ix_result_entry_batches_period_created` ON `result_entry_batches` (`monitoring_period_id`, `created_at`);
 
-CREATE UNIQUE INDEX `uq_result_entry_batch_period_input` ON `result_entry_batch_rows` (`result_entry_batch_id`, `monitoring_period_input_id`);
+-- CREATE UNIQUE INDEX `uq_result_entry_batch_period_input` ON `result_entry_batch_rows` (`result_entry_batch_id`, `monitoring_period_input_id`);
 
-CREATE UNIQUE INDEX `uq_result_entry_batch_source_row` ON `result_entry_batch_rows` (`result_entry_batch_id`, `source_row_number`);
+-- CREATE UNIQUE INDEX `uq_result_entry_batch_source_row` ON `result_entry_batch_rows` (`result_entry_batch_id`, `source_row_number`);
 
-CREATE INDEX `ix_result_entry_batch_rows_status` ON `result_entry_batch_rows` (`result_entry_row_status_id`);
+-- CREATE INDEX `ix_result_entry_batch_rows_status` ON `result_entry_batch_rows` (`result_entry_row_status_id`);
 
-CREATE INDEX `ix_result_entry_batch_rows_period_input` ON `result_entry_batch_rows` (`monitoring_period_input_id`);
+-- CREATE INDEX `ix_result_entry_batch_rows_period_input` ON `result_entry_batch_rows` (`monitoring_period_input_id`);
 
-CREATE INDEX `ix_kpi_results_latest_batch_row` ON `kpi_results` (`latest_result_entry_batch_row_id`);
+-- CREATE INDEX `ix_kpi_results_latest_batch_row` ON `kpi_results` (`latest_result_entry_batch_row_id`);
 
-CREATE INDEX `ix_kpi_results_traffic_light` ON `kpi_results` (`traffic_light_level_id`);
+-- CREATE INDEX `ix_kpi_results_traffic_light` ON `kpi_results` (`traffic_light_level_id`);
 
-CREATE INDEX `ix_kpi_results_status` ON `kpi_results` (`kpi_result_status_id`);
+-- CREATE INDEX `ix_kpi_results_status` ON `kpi_results` (`kpi_result_status_id`);
 
-CREATE INDEX `ix_kpi_results_entered_by` ON `kpi_results` (`entered_by_user_id`);
+-- CREATE INDEX `ix_kpi_results_entered_by` ON `kpi_results` (`entered_by_user_id`);
 
-CREATE UNIQUE INDEX `uq_kpi_result_revision_no` ON `kpi_result_revisions` (`kpi_result_id`, `revision_no`);
+-- CREATE UNIQUE INDEX `uq_kpi_result_revision_no` ON `kpi_result_revisions` (`kpi_result_id`, `revision_no`);
 
-CREATE INDEX `ix_kpi_result_revisions_batch_row` ON `kpi_result_revisions` (`result_entry_batch_row_id`);
+-- CREATE INDEX `ix_kpi_result_revisions_batch_row` ON `kpi_result_revisions` (`result_entry_batch_row_id`);
 
-CREATE INDEX `ix_kpi_result_revisions_changed_by` ON `kpi_result_revisions` (`changed_by_user_id`);
+-- CREATE INDEX `ix_kpi_result_revisions_changed_by` ON `kpi_result_revisions` (`changed_by_user_id`);
 
-CREATE UNIQUE INDEX `uq_validation_period_run_no` ON `validation_runs` (`monitoring_period_id`, `run_no`);
+-- CREATE UNIQUE INDEX `uq_validation_period_run_no` ON `validation_runs` (`monitoring_period_id`, `run_no`);
 
-CREATE INDEX `ix_validation_runs_status` ON `validation_runs` (`validation_status_id`);
+-- CREATE INDEX `ix_validation_runs_status` ON `validation_runs` (`validation_status_id`);
 
-CREATE INDEX `ix_validation_runs_trigger_batch` ON `validation_runs` (`trigger_result_entry_batch_id`);
+-- CREATE INDEX `ix_validation_runs_trigger_batch` ON `validation_runs` (`trigger_result_entry_batch_id`);
 
-CREATE INDEX `ix_validation_runs_executed_by` ON `validation_runs` (`executed_by_user_id`);
+-- CREATE INDEX `ix_validation_runs_executed_by` ON `validation_runs` (`executed_by_user_id`);
 
-CREATE INDEX `ix_validation_runs_period_started` ON `validation_runs` (`monitoring_period_id`, `started_at`);
+-- CREATE INDEX `ix_validation_runs_period_started` ON `validation_runs` (`monitoring_period_id`, `started_at`);
 
-CREATE INDEX `ix_validation_issues_severity` ON `validation_issues` (`validation_issue_severity_id`);
+-- CREATE INDEX `ix_validation_issues_severity` ON `validation_issues` (`validation_issue_severity_id`);
 
-CREATE INDEX `ix_validation_issues_period_input` ON `validation_issues` (`monitoring_period_input_id`);
+-- CREATE INDEX `ix_validation_issues_period_input` ON `validation_issues` (`monitoring_period_input_id`);
 
-CREATE INDEX `ix_validation_issues_batch_row` ON `validation_issues` (`result_entry_batch_row_id`);
+-- CREATE INDEX `ix_validation_issues_batch_row` ON `validation_issues` (`result_entry_batch_row_id`);
 
-CREATE INDEX `ix_validation_issues_kpi_result` ON `validation_issues` (`kpi_result_id`);
+-- CREATE INDEX `ix_validation_issues_kpi_result` ON `validation_issues` (`kpi_result_id`);
 
-CREATE INDEX `ix_validation_issues_run_code` ON `validation_issues` (`validation_run_id`, `issue_code`);
+-- CREATE INDEX `ix_validation_issues_run_code` ON `validation_issues` (`validation_run_id`, `issue_code`);
 
-CREATE INDEX `ix_validation_issues_run_resolved` ON `validation_issues` (`validation_run_id`, `is_resolved`);
+-- CREATE INDEX `ix_validation_issues_run_resolved` ON `validation_issues` (`validation_run_id`, `is_resolved`);
 
-CREATE INDEX `ix_period_status_history_period_changed` ON `monitoring_period_status_history` (`monitoring_period_id`, `changed_at`);
+-- CREATE INDEX `ix_period_status_history_period_changed` ON `monitoring_period_status_history` (`monitoring_period_id`, `changed_at`);
 
-CREATE INDEX `ix_period_status_history_from` ON `monitoring_period_status_history` (`from_monitoring_period_status_id`);
+-- CREATE INDEX `ix_period_status_history_from` ON `monitoring_period_status_history` (`from_monitoring_period_status_id`);
 
-CREATE INDEX `ix_period_status_history_to` ON `monitoring_period_status_history` (`to_monitoring_period_status_id`);
+-- CREATE INDEX `ix_period_status_history_to` ON `monitoring_period_status_history` (`to_monitoring_period_status_id`);
 
-CREATE INDEX `ix_period_status_history_changed_by` ON `monitoring_period_status_history` (`changed_by_user_id`);
+-- CREATE INDEX `ix_period_status_history_changed_by` ON `monitoring_period_status_history` (`changed_by_user_id`);
 
-CREATE UNIQUE INDEX `uq_period_closure_no` ON `period_closures` (`monitoring_period_id`, `closure_no`);
+-- CREATE UNIQUE INDEX `uq_period_closure_no` ON `period_closures` (`monitoring_period_id`, `closure_no`);
 
-CREATE INDEX `ix_period_closures_validation_run` ON `period_closures` (`validation_run_id`);
+-- CREATE INDEX `ix_period_closures_validation_run` ON `period_closures` (`validation_run_id`);
 
-CREATE INDEX `ix_period_closures_type` ON `period_closures` (`period_closure_type_id`);
+-- CREATE INDEX `ix_period_closures_type` ON `period_closures` (`period_closure_type_id`);
 
-CREATE INDEX `ix_period_closures_closed_by` ON `period_closures` (`closed_by_user_id`);
+-- CREATE INDEX `ix_period_closures_closed_by` ON `period_closures` (`closed_by_user_id`);
 
-CREATE INDEX `ix_period_closures_period_closed` ON `period_closures` (`monitoring_period_id`, `closed_at`);
+-- CREATE INDEX `ix_period_closures_period_closed` ON `period_closures` (`monitoring_period_id`, `closed_at`);
 
-CREATE INDEX `ix_period_reopenings_closure` ON `period_reopenings` (`period_closure_id`);
+-- CREATE INDEX `ix_period_reopenings_closure` ON `period_reopenings` (`period_closure_id`);
 
-CREATE INDEX `ix_period_reopenings_status` ON `period_reopenings` (`period_reopening_status_id`);
+-- CREATE INDEX `ix_period_reopenings_status` ON `period_reopenings` (`period_reopening_status_id`);
 
-CREATE INDEX `ix_period_reopenings_requested_by` ON `period_reopenings` (`requested_by_user_id`);
+-- CREATE INDEX `ix_period_reopenings_requested_by` ON `period_reopenings` (`requested_by_user_id`);
 
-CREATE INDEX `ix_period_reopenings_decided_by` ON `period_reopenings` (`decided_by_user_id`);
+-- CREATE INDEX `ix_period_reopenings_decided_by` ON `period_reopenings` (`decided_by_user_id`);
 
-CREATE INDEX `ix_period_reopenings_period_requested` ON `period_reopenings` (`monitoring_period_id`, `requested_at`);
+-- CREATE INDEX `ix_period_reopenings_period_requested` ON `period_reopenings` (`monitoring_period_id`, `requested_at`);
 
-CREATE UNIQUE INDEX `uq_closure_period_scorecard_result` ON `scorecard_results` (`period_closure_id`, `monitoring_period_scorecard_id`);
+-- CREATE UNIQUE INDEX `uq_closure_period_scorecard_result` ON `scorecard_results` (`period_closure_id`, `monitoring_period_scorecard_id`);
 
-CREATE INDEX `ix_scorecard_results_scorecard` ON `scorecard_results` (`scorecard_id`);
+-- CREATE INDEX `ix_scorecard_results_scorecard` ON `scorecard_results` (`scorecard_id`);
 
-CREATE INDEX `ix_scorecard_results_scorecard_calculated` ON `scorecard_results` (`scorecard_id`, `calculated_at`);
+-- CREATE INDEX `ix_scorecard_results_scorecard_calculated` ON `scorecard_results` (`scorecard_id`, `calculated_at`);
 
-CREATE UNIQUE INDEX `uq_scorecard_result_kpi_consumer` ON `scorecard_kpi_result_items` (`scorecard_result_id`, `monitoring_period_input_consumer_id`);
+-- CREATE UNIQUE INDEX `uq_scorecard_result_kpi_consumer` ON `scorecard_kpi_result_items` (`scorecard_result_id`, `monitoring_period_input_consumer_id`);
 
-CREATE INDEX `ix_scorecard_kpi_items_kpi_result` ON `scorecard_kpi_result_items` (`kpi_result_id`);
+-- CREATE INDEX `ix_scorecard_kpi_items_kpi_result` ON `scorecard_kpi_result_items` (`kpi_result_id`);
 
-CREATE UNIQUE INDEX `uq_scorecard_result_link_item` ON `scorecard_link_result_items` (`scorecard_result_id`, `monitoring_period_scorecard_link_id`);
+-- CREATE UNIQUE INDEX `uq_scorecard_result_link_item` ON `scorecard_link_result_items` (`scorecard_result_id`, `monitoring_period_scorecard_link_id`);
 
-CREATE INDEX `ix_scorecard_link_items_linked_result` ON `scorecard_link_result_items` (`linked_scorecard_result_id`);
+-- CREATE INDEX `ix_scorecard_link_items_linked_result` ON `scorecard_link_result_items` (`linked_scorecard_result_id`);
 
-CREATE INDEX `ix_scorecard_link_items_resolution` ON `scorecard_link_result_items` (`resolution_code`);
+-- CREATE INDEX `ix_scorecard_link_items_resolution` ON `scorecard_link_result_items` (`resolution_code`);
 
-CREATE INDEX `ix_roles_is_active` ON `roles` (`is_active`);
+-- CREATE INDEX `ix_roles_is_active` ON `roles` (`is_active`);
 
-CREATE INDEX `ix_permissions_module` ON `permissions` (`module_code`);
+-- CREATE INDEX `ix_permissions_module` ON `permissions` (`module_code`);
 
-CREATE INDEX `ix_permissions_is_active` ON `permissions` (`is_active`);
+-- CREATE INDEX `ix_permissions_is_active` ON `permissions` (`is_active`);
 
-CREATE UNIQUE INDEX `uq_user_role` ON `user_roles` (`user_id`, `role_id`);
+-- CREATE UNIQUE INDEX `uq_user_role` ON `user_roles` (`user_id`, `role_id`);
 
-CREATE INDEX `ix_user_roles_role` ON `user_roles` (`role_id`);
+-- CREATE INDEX `ix_user_roles_role` ON `user_roles` (`role_id`);
 
-CREATE INDEX `ix_user_roles_assigned_by` ON `user_roles` (`assigned_by_user_id`);
+-- CREATE INDEX `ix_user_roles_assigned_by` ON `user_roles` (`assigned_by_user_id`);
 
-CREATE UNIQUE INDEX `uq_role_permission` ON `role_permissions` (`role_id`, `permission_id`);
+-- CREATE UNIQUE INDEX `uq_role_permission` ON `role_permissions` (`role_id`, `permission_id`);
 
-CREATE INDEX `ix_role_permissions_permission` ON `role_permissions` (`permission_id`);
+-- CREATE INDEX `ix_role_permissions_permission` ON `role_permissions` (`permission_id`);
 
-CREATE INDEX `ix_role_permissions_assigned_by` ON `role_permissions` (`assigned_by_user_id`);
+-- CREATE INDEX `ix_role_permissions_assigned_by` ON `role_permissions` (`assigned_by_user_id`);
 
-CREATE UNIQUE INDEX `uq_user_access_scope` ON `user_access_scopes` (`user_id`, `company_id`, `department_id`);
+-- CREATE UNIQUE INDEX `uq_user_access_scope` ON `user_access_scopes` (`user_id`, `company_id`, `department_id`);
 
-CREATE INDEX `ix_user_access_scopes_company` ON `user_access_scopes` (`company_id`);
+-- CREATE INDEX `ix_user_access_scopes_company` ON `user_access_scopes` (`company_id`);
 
-CREATE INDEX `ix_user_access_scopes_department` ON `user_access_scopes` (`department_id`);
+-- CREATE INDEX `ix_user_access_scopes_department` ON `user_access_scopes` (`department_id`);
 
-CREATE INDEX `ix_user_access_scopes_created_by` ON `user_access_scopes` (`created_by_user_id`);
+-- CREATE INDEX `ix_user_access_scopes_created_by` ON `user_access_scopes` (`created_by_user_id`);
 
-CREATE UNIQUE INDEX `uq_period_scorecard_department` ON `monitoring_period_scorecard_departments` (`monitoring_period_scorecard_id`, `department_id`);
+-- CREATE UNIQUE INDEX `uq_period_scorecard_department` ON `monitoring_period_scorecard_departments` (`monitoring_period_scorecard_id`, `department_id`);
 
-CREATE INDEX `ix_period_sc_departments_original_assignment` ON `monitoring_period_scorecard_departments` (`scorecard_department_id`);
+-- CREATE INDEX `ix_period_sc_departments_original_assignment` ON `monitoring_period_scorecard_departments` (`scorecard_department_id`);
 
-CREATE INDEX `ix_period_sc_departments_department` ON `monitoring_period_scorecard_departments` (`department_id`);
+-- CREATE INDEX `ix_period_sc_departments_department` ON `monitoring_period_scorecard_departments` (`department_id`);
 
-CREATE UNIQUE INDEX `uq_period_scorecard_department_employee` ON `monitoring_period_scorecard_employees` (`monitoring_period_scorecard_department_id`, `employee_id`);
+-- CREATE UNIQUE INDEX `uq_period_scorecard_department_employee` ON `monitoring_period_scorecard_employees` (`monitoring_period_scorecard_department_id`, `employee_id`);
 
-CREATE INDEX `ix_period_sc_employees_original_assignment` ON `monitoring_period_scorecard_employees` (`scorecard_employee_id`);
+-- CREATE INDEX `ix_period_sc_employees_original_assignment` ON `monitoring_period_scorecard_employees` (`scorecard_employee_id`);
 
-CREATE INDEX `ix_period_sc_employees_employee` ON `monitoring_period_scorecard_employees` (`employee_id`);
+-- CREATE INDEX `ix_period_sc_employees_employee` ON `monitoring_period_scorecard_employees` (`employee_id`);
 
 ALTER TABLE `companies` COMMENT = 'Stores the companies that belong to the EXA Group.
 Examples: EXA, CONMOXA.
@@ -2478,398 +2478,398 @@ ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_input_frequency` FOREIGN 
 
 -- ALTER TABLE `kpi_pool_kpis` ADD CONSTRAINT `fk_kpi_pool_kpis_configuration_definition` FOREIGN KEY (`kpi_configuration_id`, `kpi_definition_id`) REFERENCES `kpi_configurations` (`kpi_configuration_id`, `kpi_definition_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_pool_frequency` FOREIGN KEY (`kpi_pool_id`, `input_frequency_id`) REFERENCES `kpi_pools` (`kpi_pool_id`, `input_frequency_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_pool_frequency` FOREIGN KEY (`kpi_pool_id`, `input_frequency_id`) REFERENCES `kpi_pools` (`kpi_pool_id`, `input_frequency_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_status` FOREIGN KEY (`scorecard_status_id`) REFERENCES `scorecard_statuses` (`scorecard_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_status` FOREIGN KEY (`scorecard_status_id`) REFERENCES `scorecard_statuses` (`scorecard_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_department` FOREIGN KEY (`scorecard_department_id`) REFERENCES `scorecard_departments` (`scorecard_department_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_department` FOREIGN KEY (`scorecard_department_id`) REFERENCES `scorecard_departments` (`scorecard_department_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_pool_kpi` FOREIGN KEY (`kpi_pool_kpi_id`) REFERENCES `kpi_pool_kpis` (`kpi_pool_kpi_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_pool_kpi` FOREIGN KEY (`kpi_pool_kpi_id`) REFERENCES `kpi_pool_kpis` (`kpi_pool_kpi_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_linked_scorecard` FOREIGN KEY (`linked_scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_linked_scorecard` FOREIGN KEY (`linked_scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_kpi_availability` ADD CONSTRAINT `fk_scorecard_kpi_availability_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE;
+-- ALTER TABLE `scorecard_kpi_availability` ADD CONSTRAINT `fk_scorecard_kpi_availability_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE;
 
-ALTER TABLE `scorecard_kpi_availability` ADD CONSTRAINT `fk_scorecard_kpi_availability_pool_kpi` FOREIGN KEY (`kpi_pool_kpi_id`) REFERENCES `kpi_pool_kpis` (`kpi_pool_kpi_id`) ON DELETE RESTRICT;
+-- ALTER TABLE `scorecard_kpi_availability` ADD CONSTRAINT `fk_scorecard_kpi_availability_pool_kpi` FOREIGN KEY (`kpi_pool_kpi_id`) REFERENCES `kpi_pool_kpis` (`kpi_pool_kpi_id`) ON DELETE RESTRICT;
 
-ALTER TABLE `scorecard_kpi_availability` ADD CONSTRAINT `fk_scorecard_kpi_availability_status` FOREIGN KEY (`scorecard_kpi_availability_status_id`) REFERENCES `scorecard_kpi_availability_statuses` (`scorecard_kpi_availability_status_id`) ON DELETE RESTRICT;
+-- ALTER TABLE `scorecard_kpi_availability` ADD CONSTRAINT `fk_scorecard_kpi_availability_status` FOREIGN KEY (`scorecard_kpi_availability_status_id`) REFERENCES `scorecard_kpi_availability_statuses` (`scorecard_kpi_availability_status_id`) ON DELETE RESTRICT;
 
-ALTER TABLE `scorecard_composition_summary` ADD CONSTRAINT `fk_scorecard_composition_summary_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE;
+-- ALTER TABLE `scorecard_composition_summary` ADD CONSTRAINT `fk_scorecard_composition_summary_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE;
 
-ALTER TABLE `scorecard_result_schedule_preview` ADD CONSTRAINT `fk_scorecard_schedule_preview_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE;
+-- ALTER TABLE `scorecard_result_schedule_preview` ADD CONSTRAINT `fk_scorecard_schedule_preview_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE CASCADE;
 
-ALTER TABLE `scorecard_statuses` ADD CONSTRAINT `fk_scorecard_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_statuses` ADD CONSTRAINT `fk_scorecard_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_statuses` ADD CONSTRAINT `fk_scorecard_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_statuses` ADD CONSTRAINT `fk_scorecard_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecards` ADD CONSTRAINT `fk_scorecards_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_departments` ADD CONSTRAINT `fk_scorecard_departments_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_employees` ADD CONSTRAINT `fk_scorecard_employees_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_kpis` ADD CONSTRAINT `fk_scorecard_kpis_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_linked_scorecards` ADD CONSTRAINT `fk_scorecard_links_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_pool` FOREIGN KEY (`kpi_pool_id`) REFERENCES `kpi_pools` (`kpi_pool_id`) ON DELETE CASCADE;
+-- -- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_pool` FOREIGN KEY (`kpi_pool_id`) REFERENCES `kpi_pools` (`kpi_pool_id`) ON DELETE CASCADE;
 
--- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_definition` FOREIGN KEY (`kpi_definition_id`) REFERENCES `kpi_definitions` (`kpi_definition_id`) ON DELETE RESTRICT;
+-- -- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_definition` FOREIGN KEY (`kpi_definition_id`) REFERENCES `kpi_definitions` (`kpi_definition_id`) ON DELETE RESTRICT;
 
--- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_configuration` FOREIGN KEY (`kpi_configuration_id`) REFERENCES `kpi_configurations` (`kpi_configuration_id`) ON DELETE RESTRICT;
+-- -- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_configuration` FOREIGN KEY (`kpi_configuration_id`) REFERENCES `kpi_configurations` (`kpi_configuration_id`) ON DELETE RESTRICT;
 
--- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_status` FOREIGN KEY (`kpi_pool_availability_status_id`) REFERENCES `kpi_pool_availability_statuses` (`kpi_pool_availability_status_id`) ON DELETE RESTRICT;
+-- -- ALTER TABLE `kpi_pool_configuration_availability` ADD CONSTRAINT `fk_pool_availability_status` FOREIGN KEY (`kpi_pool_availability_status_id`) REFERENCES `kpi_pool_availability_statuses` (`kpi_pool_availability_status_id`) ON DELETE RESTRICT;
 
--- ALTER TABLE `kpi_definitions` ADD CONSTRAINT `fk_kpi_definitions_category` FOREIGN KEY (`kpi_category_id`) REFERENCES `kpi_categories` (`kpi_category_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_definitions` ADD CONSTRAINT `fk_kpi_definitions_category` FOREIGN KEY (`kpi_category_id`) REFERENCES `kpi_categories` (`kpi_category_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `traffic_light_levels` ADD CONSTRAINT `fk_traffic_light_levels_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `traffic_light_levels` ADD CONSTRAINT `fk_traffic_light_levels_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `traffic_light_levels` ADD CONSTRAINT `fk_traffic_light_levels_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `traffic_light_levels` ADD CONSTRAINT `fk_traffic_light_levels_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `data_sources` ADD CONSTRAINT `fk_data_sources_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `data_sources` ADD CONSTRAINT `fk_data_sources_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `data_sources` ADD CONSTRAINT `fk_data_sources_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `data_sources` ADD CONSTRAINT `fk_data_sources_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_definitions` ADD CONSTRAINT `fk_kpi_definitions_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_definitions` ADD CONSTRAINT `fk_kpi_definitions_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_definitions` ADD CONSTRAINT `fk_kpi_definitions_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_definitions` ADD CONSTRAINT `fk_kpi_definitions_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`company_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`company_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_parent` FOREIGN KEY (`parent_department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_parent` FOREIGN KEY (`parent_department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`company_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`company_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `users` ADD CONSTRAINT `fk_users_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE SET NULL ON UPDATE CASCADE;
+-- ALTER TABLE `users` ADD CONSTRAINT `fk_users_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_categories` ADD CONSTRAINT `fk_kpi_categories_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_categories` ADD CONSTRAINT `fk_kpi_categories_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_categories` ADD CONSTRAINT `fk_kpi_categories_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_categories` ADD CONSTRAINT `fk_kpi_categories_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `measurement_units` ADD CONSTRAINT `fk_measurement_units_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `measurement_units` ADD CONSTRAINT `fk_measurement_units_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `measurement_units` ADD CONSTRAINT `fk_measurement_units_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `measurement_units` ADD CONSTRAINT `fk_measurement_units_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `input_frequencies` ADD CONSTRAINT `fk_input_frequencies_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `input_frequencies` ADD CONSTRAINT `fk_input_frequencies_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `input_frequencies` ADD CONSTRAINT `fk_input_frequencies_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `input_frequencies` ADD CONSTRAINT `fk_input_frequencies_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_definition` FOREIGN KEY (`kpi_definition_id`) REFERENCES `kpi_definitions` (`kpi_definition_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_definition` FOREIGN KEY (`kpi_definition_id`) REFERENCES `kpi_definitions` (`kpi_definition_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_measurement_unit` FOREIGN KEY (`measurement_unit_id`) REFERENCES `measurement_units` (`measurement_unit_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_measurement_unit` FOREIGN KEY (`measurement_unit_id`) REFERENCES `measurement_units` (`measurement_unit_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_frequency` FOREIGN KEY (`input_frequency_id`) REFERENCES `input_frequencies` (`input_frequency_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_frequency` FOREIGN KEY (`input_frequency_id`) REFERENCES `input_frequencies` (`input_frequency_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_primary_source` FOREIGN KEY (`primary_data_source_id`) REFERENCES `data_sources` (`data_source_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_primary_source` FOREIGN KEY (`primary_data_source_id`) REFERENCES `data_sources` (`data_source_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_status` FOREIGN KEY (`kpi_configuration_status_id`) REFERENCES `kpi_configuration_statuses` (`kpi_configuration_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_status` FOREIGN KEY (`kpi_configuration_status_id`) REFERENCES `kpi_configuration_statuses` (`kpi_configuration_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_configuration` FOREIGN KEY (`kpi_configuration_id`) REFERENCES `kpi_configurations` (`kpi_configuration_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_configuration` FOREIGN KEY (`kpi_configuration_id`) REFERENCES `kpi_configurations` (`kpi_configuration_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_traffic_light` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_traffic_light` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- ALTER TABLE `kpi_configuration_statuses` ADD CONSTRAINT `fk_kpi_configuration_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_configuration_statuses` ADD CONSTRAINT `fk_kpi_configuration_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_configuration_statuses` ADD CONSTRAINT `fk_kpi_configuration_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_configuration_statuses` ADD CONSTRAINT `fk_kpi_configuration_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_evaluation_type` FOREIGN KEY (`evaluation_type_id`) REFERENCES `evaluation_types` (`evaluation_type_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- -- ALTER TABLE `kpi_configurations` ADD CONSTRAINT `fk_kpi_configurations_evaluation_type` FOREIGN KEY (`evaluation_type_id`) REFERENCES `evaluation_types` (`evaluation_type_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_pools` ADD CONSTRAINT `fk_kpi_pools_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_pools` ADD CONSTRAINT `fk_kpi_pools_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_pools` ADD CONSTRAINT `fk_kpi_pools_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_pools` ADD CONSTRAINT `fk_kpi_pools_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_pool_companies` ADD CONSTRAINT `fk_kpi_pool_companies_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_pool_companies` ADD CONSTRAINT `fk_kpi_pool_companies_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_pool_companies` ADD CONSTRAINT `fk_kpi_pool_companies_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_pool_companies` ADD CONSTRAINT `fk_kpi_pool_companies_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_pool_kpis` ADD CONSTRAINT `fk_kpi_pool_kpis_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_pool_kpis` ADD CONSTRAINT `fk_kpi_pool_kpis_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_pool_kpis` ADD CONSTRAINT `fk_kpi_pool_kpis_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_pool_kpis` ADD CONSTRAINT `fk_kpi_pool_kpis_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `companies` ADD CONSTRAINT `fk_companies_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `companies` ADD CONSTRAINT `fk_companies_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `companies` ADD CONSTRAINT `fk_companies_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `companies` ADD CONSTRAINT `fk_companies_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `departments` ADD CONSTRAINT `fk_departments_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `employees` ADD CONSTRAINT `fk_employees_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `employees` ADD CONSTRAINT `fk_employees_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `employees` ADD CONSTRAINT `fk_employees_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `employees` ADD CONSTRAINT `fk_employees_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `employee_assignments` ADD CONSTRAINT `fk_employee_assignments_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `kpi_configuration_thresholds` ADD CONSTRAINT `fk_kpi_thresholds_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `evaluation_types` ADD CONSTRAINT `fk_evaluation_types_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `evaluation_types` ADD CONSTRAINT `fk_evaluation_types_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
--- ALTER TABLE `evaluation_types` ADD CONSTRAINT `fk_evaluation_types_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- -- ALTER TABLE `evaluation_types` ADD CONSTRAINT `fk_evaluation_types_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `user_roles` ADD CONSTRAINT `fk_user_roles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `user_roles` ADD CONSTRAINT `fk_user_roles_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `user_roles` ADD CONSTRAINT `fk_user_roles_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `user_roles` ADD CONSTRAINT `fk_user_roles_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_permission` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`permission_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`company_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`company_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `users` ADD CONSTRAINT `fk_users_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `users` ADD CONSTRAINT `fk_users_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `users` ADD CONSTRAINT `fk_users_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `users` ADD CONSTRAINT `fk_users_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `roles` ADD CONSTRAINT `fk_roles_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `roles` ADD CONSTRAINT `fk_roles_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `roles` ADD CONSTRAINT `fk_roles_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `roles` ADD CONSTRAINT `fk_roles_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `permissions` ADD CONSTRAINT `fk_permissions_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `permissions` ADD CONSTRAINT `fk_permissions_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `permissions` ADD CONSTRAINT `fk_permissions_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `permissions` ADD CONSTRAINT `fk_permissions_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `user_roles` ADD CONSTRAINT `fk_user_roles_assigned_by` FOREIGN KEY (`assigned_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `user_roles` ADD CONSTRAINT `fk_user_roles_assigned_by` FOREIGN KEY (`assigned_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_assigned_by` FOREIGN KEY (`assigned_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `role_permissions` ADD CONSTRAINT `fk_role_permissions_assigned_by` FOREIGN KEY (`assigned_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `user_access_scopes` ADD CONSTRAINT `fk_user_access_scopes_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_pool_frequency` FOREIGN KEY (`kpi_pool_id`, `input_frequency_id`) REFERENCES `kpi_pools` (`kpi_pool_id`, `input_frequency_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_pool_frequency` FOREIGN KEY (`kpi_pool_id`, `input_frequency_id`) REFERENCES `kpi_pools` (`kpi_pool_id`, `input_frequency_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_status` FOREIGN KEY (`monitoring_period_status_id`) REFERENCES `monitoring_period_statuses` (`monitoring_period_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_status` FOREIGN KEY (`monitoring_period_status_id`) REFERENCES `monitoring_period_statuses` (`monitoring_period_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_input_method` FOREIGN KEY (`monitoring_input_method_id`) REFERENCES `monitoring_input_methods` (`monitoring_input_method_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_input_method` FOREIGN KEY (`monitoring_input_method_id`) REFERENCES `monitoring_input_methods` (`monitoring_input_method_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_previous` FOREIGN KEY (`previous_monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_previous` FOREIGN KEY (`previous_monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecards` ADD CONSTRAINT `fk_period_scorecards_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecards` ADD CONSTRAINT `fk_period_scorecards_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecards` ADD CONSTRAINT `fk_period_scorecards_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecards` ADD CONSTRAINT `fk_period_scorecards_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_pool_kpi` FOREIGN KEY (`kpi_pool_kpi_id`) REFERENCES `kpi_pool_kpis` (`kpi_pool_kpi_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_pool_kpi` FOREIGN KEY (`kpi_pool_kpi_id`) REFERENCES `kpi_pool_kpis` (`kpi_pool_kpi_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_measurement_unit` FOREIGN KEY (`measurement_unit_id`) REFERENCES `measurement_units` (`measurement_unit_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_measurement_unit` FOREIGN KEY (`measurement_unit_id`) REFERENCES `measurement_units` (`measurement_unit_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_evaluation_type` FOREIGN KEY (`evaluation_type_id`) REFERENCES `evaluation_types` (`evaluation_type_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_evaluation_type` FOREIGN KEY (`evaluation_type_id`) REFERENCES `evaluation_types` (`evaluation_type_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_data_source` FOREIGN KEY (`primary_data_source_id`) REFERENCES `data_sources` (`data_source_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_inputs` ADD CONSTRAINT `fk_period_inputs_data_source` FOREIGN KEY (`primary_data_source_id`) REFERENCES `data_sources` (`data_source_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_input_consumers` ADD CONSTRAINT `fk_period_input_consumers_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_input_consumers` ADD CONSTRAINT `fk_period_input_consumers_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_input_consumers` ADD CONSTRAINT `fk_period_input_consumers_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_input_consumers` ADD CONSTRAINT `fk_period_input_consumers_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_input_consumers` ADD CONSTRAINT `fk_period_input_consumers_scorecard_kpi` FOREIGN KEY (`scorecard_kpi_id`) REFERENCES `scorecard_kpis` (`scorecard_kpi_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_input_consumers` ADD CONSTRAINT `fk_period_input_consumers_scorecard_kpi` FOREIGN KEY (`scorecard_kpi_id`) REFERENCES `scorecard_kpis` (`scorecard_kpi_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_input_thresholds` ADD CONSTRAINT `fk_period_input_thresholds_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_input_thresholds` ADD CONSTRAINT `fk_period_input_thresholds_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_input_thresholds` ADD CONSTRAINT `fk_period_input_thresholds_level` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_input_thresholds` ADD CONSTRAINT `fk_period_input_thresholds_level` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_links` ADD CONSTRAINT `fk_period_scorecard_links_period_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_links` ADD CONSTRAINT `fk_period_scorecard_links_period_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_links` ADD CONSTRAINT `fk_period_scorecard_links_original_link` FOREIGN KEY (`scorecard_linked_scorecard_id`) REFERENCES `scorecard_linked_scorecards` (`scorecard_linked_scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_links` ADD CONSTRAINT `fk_period_scorecard_links_original_link` FOREIGN KEY (`scorecard_linked_scorecard_id`) REFERENCES `scorecard_linked_scorecards` (`scorecard_linked_scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_links` ADD CONSTRAINT `fk_period_scorecard_links_linked_scorecard` FOREIGN KEY (`linked_scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_links` ADD CONSTRAINT `fk_period_scorecard_links_linked_scorecard` FOREIGN KEY (`linked_scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_templates` ADD CONSTRAINT `fk_monitoring_templates_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_templates` ADD CONSTRAINT `fk_monitoring_templates_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_period_method` FOREIGN KEY (`monitoring_period_id`, `monitoring_input_method_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`, `monitoring_input_method_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_period_method` FOREIGN KEY (`monitoring_period_id`, `monitoring_input_method_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`, `monitoring_input_method_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_template` FOREIGN KEY (`monitoring_period_template_id`) REFERENCES `monitoring_period_templates` (`monitoring_period_template_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_template` FOREIGN KEY (`monitoring_period_template_id`) REFERENCES `monitoring_period_templates` (`monitoring_period_template_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_status` FOREIGN KEY (`result_entry_batch_status_id`) REFERENCES `result_entry_batch_statuses` (`result_entry_batch_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_status` FOREIGN KEY (`result_entry_batch_status_id`) REFERENCES `result_entry_batch_statuses` (`result_entry_batch_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `result_entry_batch_rows` ADD CONSTRAINT `fk_result_entry_rows_batch` FOREIGN KEY (`result_entry_batch_id`) REFERENCES `result_entry_batches` (`result_entry_batch_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `result_entry_batch_rows` ADD CONSTRAINT `fk_result_entry_rows_batch` FOREIGN KEY (`result_entry_batch_id`) REFERENCES `result_entry_batches` (`result_entry_batch_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `result_entry_batch_rows` ADD CONSTRAINT `fk_result_entry_rows_period_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `result_entry_batch_rows` ADD CONSTRAINT `fk_result_entry_rows_period_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `result_entry_batch_rows` ADD CONSTRAINT `fk_result_entry_rows_status` FOREIGN KEY (`result_entry_row_status_id`) REFERENCES `result_entry_row_statuses` (`result_entry_row_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `result_entry_batch_rows` ADD CONSTRAINT `fk_result_entry_rows_status` FOREIGN KEY (`result_entry_row_status_id`) REFERENCES `result_entry_row_statuses` (`result_entry_row_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_period_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_period_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_latest_batch_row` FOREIGN KEY (`latest_result_entry_batch_row_id`) REFERENCES `result_entry_batch_rows` (`result_entry_batch_row_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_latest_batch_row` FOREIGN KEY (`latest_result_entry_batch_row_id`) REFERENCES `result_entry_batch_rows` (`result_entry_batch_row_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_traffic_light` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_traffic_light` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_status` FOREIGN KEY (`kpi_result_status_id`) REFERENCES `kpi_result_statuses` (`kpi_result_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_status` FOREIGN KEY (`kpi_result_status_id`) REFERENCES `kpi_result_statuses` (`kpi_result_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_result` FOREIGN KEY (`kpi_result_id`) REFERENCES `kpi_results` (`kpi_result_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_result` FOREIGN KEY (`kpi_result_id`) REFERENCES `kpi_results` (`kpi_result_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_batch_row` FOREIGN KEY (`result_entry_batch_row_id`) REFERENCES `result_entry_batch_rows` (`result_entry_batch_row_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_batch_row` FOREIGN KEY (`result_entry_batch_row_id`) REFERENCES `result_entry_batch_rows` (`result_entry_batch_row_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_traffic_light` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_traffic_light` FOREIGN KEY (`traffic_light_level_id`) REFERENCES `traffic_light_levels` (`traffic_light_level_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_status` FOREIGN KEY (`kpi_result_status_id`) REFERENCES `kpi_result_statuses` (`kpi_result_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_status` FOREIGN KEY (`kpi_result_status_id`) REFERENCES `kpi_result_statuses` (`kpi_result_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_trigger_batch` FOREIGN KEY (`trigger_result_entry_batch_id`) REFERENCES `result_entry_batches` (`result_entry_batch_id`) ON DELETE SET NULL ON UPDATE CASCADE;
+-- ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_trigger_batch` FOREIGN KEY (`trigger_result_entry_batch_id`) REFERENCES `result_entry_batches` (`result_entry_batch_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
-ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_status` FOREIGN KEY (`validation_status_id`) REFERENCES `validation_statuses` (`validation_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_status` FOREIGN KEY (`validation_status_id`) REFERENCES `validation_statuses` (`validation_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_run` FOREIGN KEY (`validation_run_id`) REFERENCES `validation_runs` (`validation_run_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_run` FOREIGN KEY (`validation_run_id`) REFERENCES `validation_runs` (`validation_run_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_severity` FOREIGN KEY (`validation_issue_severity_id`) REFERENCES `validation_issue_severities` (`validation_issue_severity_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_severity` FOREIGN KEY (`validation_issue_severity_id`) REFERENCES `validation_issue_severities` (`validation_issue_severity_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_period_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_period_input` FOREIGN KEY (`monitoring_period_input_id`) REFERENCES `monitoring_period_inputs` (`monitoring_period_input_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_batch_row` FOREIGN KEY (`result_entry_batch_row_id`) REFERENCES `result_entry_batch_rows` (`result_entry_batch_row_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_batch_row` FOREIGN KEY (`result_entry_batch_row_id`) REFERENCES `result_entry_batch_rows` (`result_entry_batch_row_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_kpi_result` FOREIGN KEY (`kpi_result_id`) REFERENCES `kpi_results` (`kpi_result_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_kpi_result` FOREIGN KEY (`kpi_result_id`) REFERENCES `kpi_results` (`kpi_result_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_from` FOREIGN KEY (`from_monitoring_period_status_id`) REFERENCES `monitoring_period_statuses` (`monitoring_period_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_from` FOREIGN KEY (`from_monitoring_period_status_id`) REFERENCES `monitoring_period_statuses` (`monitoring_period_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_to` FOREIGN KEY (`to_monitoring_period_status_id`) REFERENCES `monitoring_period_statuses` (`monitoring_period_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_to` FOREIGN KEY (`to_monitoring_period_status_id`) REFERENCES `monitoring_period_statuses` (`monitoring_period_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_type` FOREIGN KEY (`period_closure_type_id`) REFERENCES `period_closure_types` (`period_closure_type_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_type` FOREIGN KEY (`period_closure_type_id`) REFERENCES `period_closure_types` (`period_closure_type_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_validation_run` FOREIGN KEY (`validation_run_id`) REFERENCES `validation_runs` (`validation_run_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_validation_run` FOREIGN KEY (`validation_run_id`) REFERENCES `validation_runs` (`validation_run_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_period` FOREIGN KEY (`monitoring_period_id`) REFERENCES `monitoring_periods` (`monitoring_period_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_closure` FOREIGN KEY (`period_closure_id`) REFERENCES `period_closures` (`period_closure_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_closure` FOREIGN KEY (`period_closure_id`) REFERENCES `period_closures` (`period_closure_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_status` FOREIGN KEY (`period_reopening_status_id`) REFERENCES `period_reopening_statuses` (`period_reopening_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_status` FOREIGN KEY (`period_reopening_status_id`) REFERENCES `period_reopening_statuses` (`period_reopening_status_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_closure` FOREIGN KEY (`period_closure_id`) REFERENCES `period_closures` (`period_closure_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_closure` FOREIGN KEY (`period_closure_id`) REFERENCES `period_closures` (`period_closure_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_period_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_period_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_scorecard` FOREIGN KEY (`scorecard_id`) REFERENCES `scorecards` (`scorecard_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_kpi_result_items` ADD CONSTRAINT `fk_scorecard_kpi_items_result` FOREIGN KEY (`scorecard_result_id`) REFERENCES `scorecard_results` (`scorecard_result_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_kpi_result_items` ADD CONSTRAINT `fk_scorecard_kpi_items_result` FOREIGN KEY (`scorecard_result_id`) REFERENCES `scorecard_results` (`scorecard_result_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_kpi_result_items` ADD CONSTRAINT `fk_scorecard_kpi_items_consumer` FOREIGN KEY (`monitoring_period_input_consumer_id`) REFERENCES `monitoring_period_input_consumers` (`monitoring_period_input_consumer_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_kpi_result_items` ADD CONSTRAINT `fk_scorecard_kpi_items_consumer` FOREIGN KEY (`monitoring_period_input_consumer_id`) REFERENCES `monitoring_period_input_consumers` (`monitoring_period_input_consumer_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_kpi_result_items` ADD CONSTRAINT `fk_scorecard_kpi_items_kpi_result` FOREIGN KEY (`kpi_result_id`) REFERENCES `kpi_results` (`kpi_result_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_kpi_result_items` ADD CONSTRAINT `fk_scorecard_kpi_items_kpi_result` FOREIGN KEY (`kpi_result_id`) REFERENCES `kpi_results` (`kpi_result_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_link_result_items` ADD CONSTRAINT `fk_scorecard_link_items_result` FOREIGN KEY (`scorecard_result_id`) REFERENCES `scorecard_results` (`scorecard_result_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_link_result_items` ADD CONSTRAINT `fk_scorecard_link_items_result` FOREIGN KEY (`scorecard_result_id`) REFERENCES `scorecard_results` (`scorecard_result_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_link_result_items` ADD CONSTRAINT `fk_scorecard_link_items_period_link` FOREIGN KEY (`monitoring_period_scorecard_link_id`) REFERENCES `monitoring_period_scorecard_links` (`monitoring_period_scorecard_link_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_link_result_items` ADD CONSTRAINT `fk_scorecard_link_items_period_link` FOREIGN KEY (`monitoring_period_scorecard_link_id`) REFERENCES `monitoring_period_scorecard_links` (`monitoring_period_scorecard_link_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `scorecard_link_result_items` ADD CONSTRAINT `fk_scorecard_link_items_linked_result` FOREIGN KEY (`linked_scorecard_result_id`) REFERENCES `scorecard_results` (`scorecard_result_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `scorecard_link_result_items` ADD CONSTRAINT `fk_scorecard_link_items_linked_result` FOREIGN KEY (`linked_scorecard_result_id`) REFERENCES `scorecard_results` (`scorecard_result_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_statuses` ADD CONSTRAINT `fk_monitoring_period_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_period_statuses` ADD CONSTRAINT `fk_monitoring_period_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_period_statuses` ADD CONSTRAINT `fk_monitoring_period_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_period_statuses` ADD CONSTRAINT `fk_monitoring_period_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_input_methods` ADD CONSTRAINT `fk_monitoring_input_methods_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_input_methods` ADD CONSTRAINT `fk_monitoring_input_methods_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_input_methods` ADD CONSTRAINT `fk_monitoring_input_methods_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_input_methods` ADD CONSTRAINT `fk_monitoring_input_methods_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `result_entry_batch_statuses` ADD CONSTRAINT `fk_batch_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `result_entry_batch_statuses` ADD CONSTRAINT `fk_batch_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `result_entry_batch_statuses` ADD CONSTRAINT `fk_batch_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `result_entry_batch_statuses` ADD CONSTRAINT `fk_batch_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `result_entry_row_statuses` ADD CONSTRAINT `fk_row_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `result_entry_row_statuses` ADD CONSTRAINT `fk_row_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `result_entry_row_statuses` ADD CONSTRAINT `fk_row_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `result_entry_row_statuses` ADD CONSTRAINT `fk_row_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_result_statuses` ADD CONSTRAINT `fk_kpi_result_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_result_statuses` ADD CONSTRAINT `fk_kpi_result_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_result_statuses` ADD CONSTRAINT `fk_kpi_result_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_result_statuses` ADD CONSTRAINT `fk_kpi_result_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `validation_statuses` ADD CONSTRAINT `fk_validation_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `validation_statuses` ADD CONSTRAINT `fk_validation_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `validation_statuses` ADD CONSTRAINT `fk_validation_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `validation_statuses` ADD CONSTRAINT `fk_validation_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `validation_issue_severities` ADD CONSTRAINT `fk_validation_severities_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `validation_issue_severities` ADD CONSTRAINT `fk_validation_severities_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `validation_issue_severities` ADD CONSTRAINT `fk_validation_severities_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `validation_issue_severities` ADD CONSTRAINT `fk_validation_severities_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `period_closure_types` ADD CONSTRAINT `fk_closure_types_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `period_closure_types` ADD CONSTRAINT `fk_closure_types_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `period_closure_types` ADD CONSTRAINT `fk_closure_types_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `period_closure_types` ADD CONSTRAINT `fk_closure_types_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `period_reopening_statuses` ADD CONSTRAINT `fk_reopening_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `period_reopening_statuses` ADD CONSTRAINT `fk_reopening_statuses_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `period_reopening_statuses` ADD CONSTRAINT `fk_reopening_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `period_reopening_statuses` ADD CONSTRAINT `fk_reopening_statuses_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_generated_by` FOREIGN KEY (`generated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_generated_by` FOREIGN KEY (`generated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_periods` ADD CONSTRAINT `fk_monitoring_periods_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_period_templates` ADD CONSTRAINT `fk_monitoring_templates_generated_by` FOREIGN KEY (`generated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_period_templates` ADD CONSTRAINT `fk_monitoring_templates_generated_by` FOREIGN KEY (`generated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_submitted_by` FOREIGN KEY (`submitted_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_submitted_by` FOREIGN KEY (`submitted_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `result_entry_batches` ADD CONSTRAINT `fk_result_entry_batches_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_entered_by` FOREIGN KEY (`entered_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_entered_by` FOREIGN KEY (`entered_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_results` ADD CONSTRAINT `fk_kpi_results_updated_by` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_changed_by` FOREIGN KEY (`changed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `kpi_result_revisions` ADD CONSTRAINT `fk_kpi_result_revisions_changed_by` FOREIGN KEY (`changed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_executed_by` FOREIGN KEY (`executed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `validation_runs` ADD CONSTRAINT `fk_validation_runs_executed_by` FOREIGN KEY (`executed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_resolved_by` FOREIGN KEY (`resolved_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `validation_issues` ADD CONSTRAINT `fk_validation_issues_resolved_by` FOREIGN KEY (`resolved_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_changed_by` FOREIGN KEY (`changed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `monitoring_period_status_history` ADD CONSTRAINT `fk_period_status_history_changed_by` FOREIGN KEY (`changed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_closed_by` FOREIGN KEY (`closed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT;
+-- ALTER TABLE `period_closures` ADD CONSTRAINT `fk_period_closures_closed_by` FOREIGN KEY (`closed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT;
 
-ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_requested_by` FOREIGN KEY (`requested_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT;
+-- ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_requested_by` FOREIGN KEY (`requested_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT;
 
-ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_decided_by` FOREIGN KEY (`decided_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_decided_by` FOREIGN KEY (`decided_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_reopened_by` FOREIGN KEY (`reopened_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `period_reopenings` ADD CONSTRAINT `fk_period_reopenings_reopened_by` FOREIGN KEY (`reopened_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_calculated_by` FOREIGN KEY (`calculated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
+-- ALTER TABLE `scorecard_results` ADD CONSTRAINT `fk_scorecard_results_calculated_by` FOREIGN KEY (`calculated_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
-ALTER TABLE `monitoring_period_scorecard_departments` ADD CONSTRAINT `fk_period_sc_departments_period_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_departments` ADD CONSTRAINT `fk_period_sc_departments_period_scorecard` FOREIGN KEY (`monitoring_period_scorecard_id`) REFERENCES `monitoring_period_scorecards` (`monitoring_period_scorecard_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_departments` ADD CONSTRAINT `fk_period_sc_departments_original_assignment` FOREIGN KEY (`scorecard_department_id`) REFERENCES `scorecard_departments` (`scorecard_department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_departments` ADD CONSTRAINT `fk_period_sc_departments_original_assignment` FOREIGN KEY (`scorecard_department_id`) REFERENCES `scorecard_departments` (`scorecard_department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_departments` ADD CONSTRAINT `fk_period_sc_departments_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_departments` ADD CONSTRAINT `fk_period_sc_departments_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_employees` ADD CONSTRAINT `fk_period_sc_employees_period_department` FOREIGN KEY (`monitoring_period_scorecard_department_id`) REFERENCES `monitoring_period_scorecard_departments` (`monitoring_period_scorecard_department_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_employees` ADD CONSTRAINT `fk_period_sc_employees_period_department` FOREIGN KEY (`monitoring_period_scorecard_department_id`) REFERENCES `monitoring_period_scorecard_departments` (`monitoring_period_scorecard_department_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_employees` ADD CONSTRAINT `fk_period_sc_employees_original_assignment` FOREIGN KEY (`scorecard_employee_id`) REFERENCES `scorecard_employees` (`scorecard_employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_employees` ADD CONSTRAINT `fk_period_sc_employees_original_assignment` FOREIGN KEY (`scorecard_employee_id`) REFERENCES `scorecard_employees` (`scorecard_employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE `monitoring_period_scorecard_employees` ADD CONSTRAINT `fk_period_sc_employees_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+-- ALTER TABLE `monitoring_period_scorecard_employees` ADD CONSTRAINT `fk_period_sc_employees_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`employee_id`) ON DELETE RESTRICT ON UPDATE CASCADE;

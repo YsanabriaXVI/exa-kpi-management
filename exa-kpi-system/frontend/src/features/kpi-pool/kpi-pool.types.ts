@@ -29,6 +29,9 @@ export type ManageablePoolKpi = PoolKpi & {
 };
 
 export type PoolInputPeriod = {
+  poolPeriodId: string | null;
+  poolCompositionId: string | null;
+  periodKey: string;
   start: string;
   end: string;
   configurationStatus: "EDITABLE" | "POOL_COMPOSITION_LOCKED" | "FUTURE_NOT_AVAILABLE";

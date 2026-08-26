@@ -1,0 +1,1 @@
+import type { RequestHandler } from "express"; import { env } from "../config/env.js"; export const temporaryIdentity:RequestHandler=(request,_response,next)=>{request.identity={actorUserId:env.TEMPORARY_ACTOR_USER_ID};next();};

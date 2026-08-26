@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -12,6 +13,7 @@ import {
   FileSpreadsheet,
   Keyboard,
   LockKeyhole,
+  LoaderCircle,
   Maximize2,
   Search,
   Settings2,
@@ -28,13 +30,21 @@ import {
 } from "../../components/SortableTableHeader";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
+import { ActionToast } from "../../components/ActionToast";
 import {
   attachedScorecards,
-  kpiResults,
+  kpiResults as mockKpiResults,
   monitoringPools,
 } from "./monitoring-results.data";
 import { saveMonitoringPeriodClosure } from "./monitoring-period-state";
+import { monitoringResultsService } from "./monitoring-results.service";
+import type { ResultEntryInput } from "./monitoring-results.service";
+import type { ExcelImportPreview } from "./monitoring-results.service";
+import { kpiPoolService } from "../kpi-pool/kpi-pool.service";
+import { scorecardService } from "../scorecards/scorecard.service";
 import "./monitoring-results.css";
+import "./result-entry-resolver.css";
+import "./result-entry-resolver-fixes.css";
 
 type InputMethod = "manual" | "excel";
 type EntryWorkflowStatus = "Draft" | "Submitted" | "Validated" | "Closed";
@@ -230,12 +240,13 @@ function CompactCommentTextarea({ value, disabled, onChange, onExpand }: { value
 }
 
 const steps = [
-  "Input Method",
-  "Input Data",
+  "Result Entry",
   "Validate",
-  "Result Preview",
+  "Review & Submit",
+  "Validation",
   "Close Period",
 ] as const;
+const stepNumbers = [1, 2, 3, 4, 5] as const;
 const mockPermissions = new Set<PermissionCode>([
   "MONITORING_ENTER_RESULTS",
   "MONITORING_VALIDATE_RESULTS",
@@ -243,10 +254,10 @@ const mockPermissions = new Set<PermissionCode>([
   "MONITORING_CLOSE_WITH_EXCEPTIONS",
 ]);
 
-function initialDraft(): DraftSnapshot {
+function initialDraft(items: typeof mockKpiResults = mockKpiResults): DraftSnapshot {
   return {
     results: Object.fromEntries(
-      kpiResults.map((kpi) => [kpi.code, kpi.result === "—" ? "" : kpi.result]),
+      items.map((kpi) => [kpi.code, kpi.result === "—" ? "" : kpi.result]),
     ),
     comments: {},
     sources: {},
@@ -267,39 +278,140 @@ function measurementUnitLabel(unit: string) {
   return labels[unit] ?? `${unit} · ${unit}`;
 }
 
+function normalizeResolverPoolSearch(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[.\u2014\u2013\u00b7_/-]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function ResultEntry() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const pool =
-    monitoringPools.find(
-      (item) => item.id === Number(searchParams.get("poolId")),
-    ) ?? monitoringPools[0];
-  const inputPeriod = searchParams.get("period") ?? pool.currentPeriod;
-  const storageKey = `monitoring-result-draft:${pool.id}:${inputPeriod}`;
+  const [selectedMonitoringPeriodId, setSelectedMonitoringPeriodId] = useState(searchParams.get("monitoringPeriodId") ?? "");
+  const [selectedPoolId, setSelectedPoolId] = useState(searchParams.get("poolId") ?? "");
+  const [selectedPoolPeriodId, setSelectedPoolPeriodId] = useState(searchParams.get("poolInputPeriodId") ?? "");
+  const [poolSearch, setPoolSearch] = useState("");
+  const [poolSuggestionsOpen, setPoolSuggestionsOpen] = useState(false);
+  const [resolverToast, setResolverToast] = useState("");
+  const resolverPoolRef = useRef<HTMLDivElement>(null);
+  const periodsQuery = useQuery({ queryKey: ["monitoring-periods"], queryFn: monitoringResultsService.listPeriods, retry: false });
+  const poolsQuery = useQuery({ queryKey: ["result-entry-pools"], queryFn: kpiPoolService.list, retry: false });
+  const scorecardsQuery = useQuery({ queryKey: ["result-entry-scorecards"], queryFn: scorecardService.list, retry: false });
+  const poolPeriodsQuery = useQuery({ queryKey: ["result-entry-pool-periods", selectedPoolId], queryFn: () => kpiPoolService.getInputPeriods(Number(selectedPoolId)), enabled: Boolean(selectedPoolId), retry: false });
+  const selectedMonitoringPeriod = periodsQuery.data?.items.find((item) => item.id === selectedMonitoringPeriodId) ?? null;
+  const selectedPoolRecord = poolsQuery.data?.find((item) => String(item.id) === selectedPoolId) ?? null;
+  const poolPeriodOptions = poolPeriodsQuery.data?.data ?? [];
+  const selectedPoolPeriod: any = poolPeriodOptions.find((item) => {
+    const materialized = periodsQuery.data?.items.find((period) => period.poolId === selectedPoolId && period.periodStart === item.start);
+    return (item.poolPeriodId ?? materialized?.poolInputPeriodId ?? item.start) === selectedPoolPeriodId;
+  }) ?? null;
+  const selectedReadiness = selectedPoolPeriod ? periodsQuery.data?.items.find((period) => period.poolId === selectedPoolId && period.periodStart === selectedPoolPeriod.start) ?? null : null;
+  const resolvedReadiness: any = selectedReadiness ?? selectedMonitoringPeriod;
+  const resolvedPeriodStart = selectedPoolPeriod?.start ?? resolvedReadiness?.periodStart ?? null;
+  const resolverPoolOptions = useMemo(() => {
+    const options = new Map<string, { id: number; code: string; name: string; companies: string[] }>();
+    for (const item of poolsQuery.data ?? []) {
+      options.set(String(item.id), { id: item.id, code: item.code, name: item.name, companies: item.companies });
+    }
+    for (const period of periodsQuery.data?.items ?? []) {
+      if (!options.has(period.poolId)) {
+        options.set(period.poolId, {
+          id: Number(period.poolId),
+          code: period.poolCode,
+          name: period.poolName,
+          companies: [],
+        });
+      }
+    }
+    return [...options.values()];
+  }, [periodsQuery.data, poolsQuery.data]);
+  const matchingPools = useMemo(() => {
+    const terms = normalizeResolverPoolSearch(poolSearch).split(" ").filter(Boolean);
+    return resolverPoolOptions.filter((item) => {
+      const candidate = normalizeResolverPoolSearch(`${item.code} ${item.name} ${item.companies.join(" ")}`);
+      return terms.every((term) => candidate.includes(term));
+    });
+  }, [poolSearch, resolverPoolOptions]);
+  const matchingScorecards = useMemo(() => {
+    const terms = normalizeResolverPoolSearch(poolSearch).split(" ").filter(Boolean);
+    return (scorecardsQuery.data ?? []).filter((item) => {
+      const candidate = normalizeResolverPoolSearch(`${item.code} ${item.name} ${item.poolSource} ${item.company}`);
+      return terms.every((term) => candidate.includes(term));
+    });
+  }, [poolSearch, scorecardsQuery.data]);
+  const matchingMonitoringPeriods = useMemo(() => {
+    const terms = normalizeResolverPoolSearch(poolSearch).split(" ").filter(Boolean);
+    return (periodsQuery.data?.items ?? []).filter((item) => {
+      const captureCandidate = item.status === "DRAFT" || item.id === selectedMonitoringPeriodId;
+      const candidate = normalizeResolverPoolSearch(`${item.code} ${item.poolCode} ${item.poolName} ${item.periodLabel} ${item.periodKey} ${item.status}`);
+      return captureCandidate && terms.every((term) => candidate.includes(term));
+    });
+  }, [periodsQuery.data, poolSearch, selectedMonitoringPeriodId]);
+  useEffect(() => {
+    const close = (event: MouseEvent) => { if (!resolverPoolRef.current?.contains(event.target as Node)) setPoolSuggestionsOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setPoolSuggestionsOpen(false); };
+    document.addEventListener("mousedown", close); document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", escape); };
+  }, []);
+  useEffect(() => {
+    if (selectedMonitoringPeriodId || !periodsQuery.data?.items.length) return;
+    const legacyPoolId = searchParams.get("poolId");
+    const requestedPoolPeriodId = searchParams.get("poolInputPeriodId");
+    const legacyPeriod = searchParams.get("period")?.toLowerCase();
+    if (!legacyPoolId) return;
+    const candidates = periodsQuery.data.items.filter((item) => item.poolId === legacyPoolId);
+    const resolved = candidates.find((item) => requestedPoolPeriodId ? item.poolInputPeriodId === requestedPoolPeriodId : !legacyPeriod || item.periodLabel.toLowerCase() === legacyPeriod || item.periodKey === legacyPeriod) ?? (!requestedPoolPeriodId && candidates.length === 1 ? candidates[0] : null);
+    if (resolved) {
+      setSelectedMonitoringPeriodId(resolved.id);
+      navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${resolved.id}`, { replace: true });
+    }
+  }, [navigate, periodsQuery.data, searchParams, selectedMonitoringPeriodId]);
+  useEffect(() => {
+    if (!selectedMonitoringPeriod) return;
+    setSelectedPoolId(selectedMonitoringPeriod.poolId);
+    setSelectedPoolPeriodId(selectedMonitoringPeriod.poolInputPeriodId);
+    setPoolSearch(`${selectedMonitoringPeriod.poolCode} · ${selectedMonitoringPeriod.poolName}`);
+  }, [selectedMonitoringPeriod?.id]);
+  const fallbackPool = monitoringPools.find((item) => item.id === Number(selectedMonitoringPeriod?.poolId)) ?? monitoringPools[0];
+  const pool = selectedMonitoringPeriod ? { ...fallbackPool, id: Number(selectedMonitoringPeriod.poolId), code: selectedMonitoringPeriod.poolCode, name: selectedMonitoringPeriod.poolName, currentPeriod: selectedMonitoringPeriod.periodLabel, kpiLines: selectedMonitoringPeriod.expected } : fallbackPool;
+  const inputPeriod = selectedMonitoringPeriod?.periodLabel ?? "No Monitoring Period selected";
+  const resultEntryQuery = useQuery({ queryKey: ["monitoring-result-entry", selectedMonitoringPeriodId], queryFn: () => monitoringResultsService.getResultEntry(selectedMonitoringPeriodId), enabled: Boolean(selectedMonitoringPeriodId), retry: false });
+  const readinessSummary: any = resultEntryQuery.data?.summary ?? (resolvedReadiness ? { expected: resolvedReadiness.expected ?? 0, entered: resolvedReadiness.entered ?? 0, pending: resolvedReadiness.pending ?? resolvedReadiness.expected ?? 0 } : null);
+  const readinessPercent = readinessSummary?.expected ? Math.round(readinessSummary.entered / readinessSummary.expected * 100) : 0;
+  const activeKpiResults = useMemo(() => {
+    if (!resultEntryQuery.data) return mockKpiResults;
+    return resultEntryQuery.data.inputs.map((input: ResultEntryInput) => ({
+      code: input.kpiCode, name: input.kpiName, unit: input.unit ?? "", dataSource: input.dataSource ?? "", goal: input.goal ?? "",
+      result: input.resultValue ?? "—", compliance: input.scoring?.compliancePercent == null ? null : Number(input.scoring.compliancePercent), score: input.scoring?.weightedScorePoints == null ? null : Number(input.scoring.weightedScorePoints), method: "Manual" as const,
+      entryStatus: input.entryStatus === "ENTERED" ? "Entered" as const : "Pending" as const,
+      validation: input.resultValue === null ? "Missing" as const : input.scoring?.status === "NOT_CALCULABLE" ? "Warning" as const : "Valid" as const,
+      trafficLight: input.scoring?.trafficLight === "GREEN" ? "Excellent" as const : input.scoring?.trafficLight === "YELLOW" ? "Warning" as const : "Caution" as const,
+    }));
+  }, [resultEntryQuery.data]);
+  useEffect(() => {
+    if (!resultEntryQuery.data) return;
+    const inputs = resultEntryQuery.data.inputs;
+    setDraft((current) => ({ ...current, results: Object.fromEntries(inputs.map((input) => [input.kpiCode, input.resultValue ?? ""])), comments: Object.fromEntries(inputs.map((input) => [input.kpiCode, input.comment ?? ""])) }));
+    setSelectedKpi(inputs[0]?.kpiCode ?? "");
+  }, [resultEntryQuery.dataUpdatedAt]);
+  const storageKey = `monitoring-result-draft:${selectedMonitoringPeriodId || "unselected"}`;
   const requestedStep = Number(searchParams.get("step"));
   const initialStatus: EntryWorkflowStatus =
-    pool.status === "CLOSED"
-      ? "Closed"
-      : pool.status === "VALIDATED" || pool.status === "VALIDATED_WITH_WARNINGS"
-        ? "Validated"
-        : pool.status === "SUBMITTED"
-          ? "Submitted"
+    selectedMonitoringPeriod?.status === "DRAFT"
+      ? "Draft"
+      : selectedMonitoringPeriod?.status === "SUBMITTED"
+        ? "Submitted"
+        : selectedMonitoringPeriod?.status === "VALIDATED"
+          ? "Validated"
+          : selectedMonitoringPeriod?.status === "CLOSED"
+            ? "Closed"
           : "Draft";
-  const initialStep =
-    requestedStep === 5 && (initialStatus === "Validated" || initialStatus === "Closed")
-      ? 5
-      : requestedStep === 4 && initialStatus !== "Draft"
-        ? 4
-        : requestedStep === 3 && initialStatus !== "Closed"
-          ? 3
-          : requestedStep === 2 && initialStatus === "Draft"
-            ? 2
-            : 1;
+  // The wizard always starts at the real Monitoring Period gate; legacy step query parameters cannot bypass it.
+  const initialStep = 1;
   const [step, setStep] = useState(
     initialStep,
   );
+  const [wizardStarted, setWizardStarted] = useState(false);
   const [method, setMethod] = useState<InputMethod>("manual");
-  const [selectedKpi, setSelectedKpi] = useState(kpiResults[0].code);
+  const [selectedKpi, setSelectedKpi] = useState(activeKpiResults[0].code);
   const [draft, setDraft] = useState<DraftSnapshot>(() => {
     const stored = window.localStorage.getItem(storageKey);
     if (!stored) return initialDraft();
@@ -317,9 +429,33 @@ export function ResultEntry() {
   );
   const [validationRun, setValidationRun] = useState(initialStatus !== "Draft");
   const [status, setStatus] = useState<EntryWorkflowStatus>(initialStatus);
+  useEffect(() => {
+    if (!selectedMonitoringPeriod) return;
+    const nextStatus: EntryWorkflowStatus = selectedMonitoringPeriod.status === "CLOSED"
+      ? "Closed"
+      : selectedMonitoringPeriod.status === "VALIDATED"
+        ? "Validated"
+        : selectedMonitoringPeriod.status === "SUBMITTED"
+          ? "Submitted"
+          : "Draft";
+    setStatus(nextStatus);
+  }, [selectedMonitoringPeriod?.id, selectedMonitoringPeriod?.status]);
+  useEffect(() => {
+    const live=resultEntryQuery.data?.monitoringPeriod;
+    if(!live)return;
+    setStatus(live.status==="CLOSED"?"Closed":live.status==="VALIDATED"?"Validated":live.status==="SUBMITTED"?"Submitted":"Draft");
+    setValidationRun(Boolean(live.validationRunAt));
+    if(live.returnReason)setReturnReason(live.returnReason);
+  },[resultEntryQuery.data?.monitoringPeriod.status,resultEntryQuery.data?.monitoringPeriod.validationRunAt]);
   const [uploaded, setUploaded] = useState(false);
+  const [excelPreview, setExcelPreview] = useState<ExcelImportPreview | null>(null);
+  const [excelBusy, setExcelBusy] = useState(false);
+  const [excelError, setExcelError] = useState("");
+  const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
   const [previewTab, setPreviewTab] = useState<"kpis" | "scorecards">("kpis");
   const [closureComment, setClosureComment] = useState("");
+  const [showSubmitConfirmation, setShowSubmitConfirmation] = useState(false);
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
   const [closeDialogPosition, setCloseDialogPosition] = useState({ x: 0, y: 0 });
   const closeDialogDrag = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -365,19 +501,19 @@ export function ResultEntry() {
   const [scorecardKpiSearches, setScorecardKpiSearches] = useState<Record<string, string>>({});
   const [scorecardKpiSorts, setScorecardKpiSorts] = useState<Record<string, { key: ScorecardKpiSortKey; direction: SortDirection }>>({});
 
-  const selected = kpiResults.find((kpi) => kpi.code === selectedKpi)!;
+  const selected = activeKpiResults.find((kpi) => kpi.code === selectedKpi)!;
   const expandedCommentKpi = expandedCommentCode
-    ? kpiResults.find((kpi) => kpi.code === expandedCommentCode)
+    ? activeKpiResults.find((kpi) => kpi.code === expandedCommentCode)
     : null;
   const entered = Object.values(draft.results).filter((value) =>
     value.trim(),
   ).length;
   const missingKpis = useMemo(
-    () => kpiResults.filter((kpi) => !draft.results[kpi.code]?.trim()),
+    () => activeKpiResults.filter((kpi) => !draft.results[kpi.code]?.trim()),
     [draft.results],
   );
   const sortedMissingKpis = useMemo(() => [...missingKpis].sort((left, right) => {
-    const value = (kpi: (typeof kpiResults)[number]) => {
+    const value = (kpi: (typeof activeKpiResults)[number]) => {
       if (missingResultSort.key === "result") return draft.results[kpi.code] ?? "";
       if (missingResultSort.key === "validation") return "Missing";
       return kpi[missingResultSort.key];
@@ -386,21 +522,22 @@ export function ResultEntry() {
   }), [draft.results, missingKpis, missingResultSort]);
   const criticalKpis = useMemo(
     () =>
-      kpiResults.filter((kpi) =>
+      activeKpiResults.filter((kpi) =>
         isInvalidResult(draft.results[kpi.code] ?? ""),
       ),
     [draft.results],
   );
   const missing = missingKpis.length;
-  const hasBlockingErrors = criticalKpis.length > 0;
-  const completionPercentage = kpiResults.length ? Math.round((entered / kpiResults.length) * 100) : 0;
+  const persistedValidation = resultEntryQuery.data?.monitoringPeriod.validationSummary;
+  const hasBlockingErrors = criticalKpis.length > 0 || Boolean(persistedValidation?.errors);
+  const completionPercentage = activeKpiResults.length ? Math.round((entered / activeKpiResults.length) * 100) : 0;
   const trafficLightCounts = {
-    green: kpiResults.filter((kpi) => kpi.trafficLight === "Excellent").length,
-    yellow: kpiResults.filter((kpi) => kpi.trafficLight === "Warning").length,
-    red: kpiResults.filter((kpi) => kpi.trafficLight === "Caution").length,
+    green: activeKpiResults.filter((kpi) => kpi.trafficLight === "Excellent").length,
+    yellow: activeKpiResults.filter((kpi) => kpi.trafficLight === "Warning").length,
+    red: activeKpiResults.filter((kpi) => kpi.trafficLight === "Caution").length,
   };
-  const validationWarningCount = kpiResults.filter((kpi) => kpi.validation === "Warning" && !criticalKpis.some((critical) => critical.code === kpi.code) && !missingKpis.some((missingKpi) => missingKpi.code === kpi.code)).length;
-  const validationValidCount = Math.max(0, kpiResults.length - criticalKpis.length - missingKpis.length - validationWarningCount);
+  const validationWarningCount = activeKpiResults.filter((kpi) => kpi.validation === "Warning" && !criticalKpis.some((critical) => critical.code === kpi.code) && !missingKpis.some((missingKpi) => missingKpi.code === kpi.code)).length;
+  const validationValidCount = Math.max(0, activeKpiResults.length - criticalKpis.length - missingKpis.length - validationWarningCount);
   const validationFindings = useMemo(() => [...criticalKpis, ...missingKpis].map((kpi, index) => {
     const critical = criticalKpis.some((item) => item.code === kpi.code);
     return {
@@ -413,7 +550,7 @@ export function ResultEntry() {
     };
   }).sort((left, right) => compareSortValues(left[validationSort.key], right[validationSort.key], validationSort.direction)), [criticalKpis, draft.results, missingKpis, validationSort]);
   const manualDirty = false;
-  const readOnly = status !== "Draft";
+  const readOnly = !selectedMonitoringPeriod || status !== "Draft";
   const canEnter = mockPermissions.has("MONITORING_ENTER_RESULTS");
   const canValidate = mockPermissions.has("MONITORING_VALIDATE_RESULTS");
   const canClose = mockPermissions.has("MONITORING_CLOSE_PERIOD");
@@ -425,7 +562,7 @@ export function ResultEntry() {
     if (!value.trim()) return "Pending";
     return isInvalidResult(value) ? "Incorrect" : "Entered";
   };
-  const manualFilteredRows = useMemo(() => kpiResults.filter((kpi) => {
+  const manualFilteredRows = useMemo(() => activeKpiResults.filter((kpi) => {
     const term = manualSearch.trim().toLowerCase();
     const resultStatus = manualStatus(kpi.code);
     return (!term || `${kpi.code} ${kpi.name} ${kpi.goal} ${kpi.unit} ${kpi.dataSource}`.toLowerCase().includes(term))
@@ -433,7 +570,7 @@ export function ResultEntry() {
       && (!manualUnits.length || manualUnits.includes(kpi.unit))
       && (!manualSources.length || manualSources.includes(kpi.dataSource));
   }).sort((left, right) => {
-    const value = (item: (typeof kpiResults)[number]) => {
+    const value = (item: (typeof activeKpiResults)[number]) => {
       if (manualSort.key === "result") return draft.results[item.code] ?? "";
       if (manualSort.key === "comment") return draft.comments[item.code] ?? "";
       if (manualSort.key === "status") return manualStatus(item.code);
@@ -445,13 +582,13 @@ export function ResultEntry() {
   const manualPageStart = (manualPage - 1) * manualPageSize;
   const manualRows = manualFilteredRows.slice(manualPageStart, manualPageStart + manualPageSize);
   const manualStatusCounts = {
-    entered: kpiResults.filter((kpi) => manualStatus(kpi.code) === "Entered").length,
-    incorrect: kpiResults.filter((kpi) => manualStatus(kpi.code) === "Incorrect").length,
-    pending: kpiResults.filter((kpi) => manualStatus(kpi.code) === "Pending").length,
+    entered: activeKpiResults.filter((kpi) => manualStatus(kpi.code) === "Entered").length,
+    incorrect: activeKpiResults.filter((kpi) => manualStatus(kpi.code) === "Incorrect").length,
+    pending: activeKpiResults.filter((kpi) => manualStatus(kpi.code) === "Pending").length,
   };
-  const manualUnitOptions = [...new Set(kpiResults.map((kpi) => kpi.unit))].sort().map((value) => ({ value, label: measurementUnitLabel(value) }));
-  const manualSourceOptions = [...new Set(kpiResults.map((kpi) => kpi.dataSource))].sort().map((value) => ({ value, label: value }));
-  const previewFilteredRows = useMemo(() => kpiResults.filter((kpi) => {
+  const manualUnitOptions = [...new Set(activeKpiResults.map((kpi) => kpi.unit))].sort().map((value) => ({ value, label: measurementUnitLabel(value) }));
+  const manualSourceOptions = [...new Set(activeKpiResults.map((kpi) => kpi.dataSource))].sort().map((value) => ({ value, label: value }));
+  const previewFilteredRows = useMemo(() => activeKpiResults.filter((kpi) => {
     const term = previewSearch.trim().toLowerCase();
     const resultStatus = manualStatus(kpi.code);
     return (!term || `${kpi.code} ${kpi.name} ${kpi.goal} ${kpi.unit} ${kpi.dataSource} ${kpi.trafficLight}`.toLowerCase().includes(term))
@@ -460,7 +597,7 @@ export function ResultEntry() {
       && (!previewUnits.length || previewUnits.includes(kpi.unit))
       && (!previewSources.length || previewSources.includes(kpi.dataSource));
   }).sort((left, right) => {
-    const value = (item: (typeof kpiResults)[number]) => {
+    const value = (item: (typeof activeKpiResults)[number]) => {
       if (previewSort.key === "status") return manualStatus(item.code);
       if (previewSort.key === "result") return draft.results[item.code] ?? "";
       if (previewSort.key === "comment") return draft.comments[item.code] ?? "";
@@ -471,11 +608,15 @@ export function ResultEntry() {
   const previewTotalPages = Math.max(1, Math.ceil(previewFilteredRows.length / previewPageSize));
   const previewPageStart = (previewPage - 1) * previewPageSize;
   const previewRows = previewFilteredRows.slice(previewPageStart, previewPageStart + previewPageSize);
+  const liveScorecards = resultEntryQuery.data?.scorecards ?? [];
+  const estimatedScores = liveScorecards.flatMap((scorecard) => scorecard.previewScorePercent == null ? [] : [Number(scorecard.previewScorePercent)]);
+  const estimatedPoolScore = estimatedScores.length ? estimatedScores.reduce((sum, value) => sum + value, 0) / estimatedScores.length : null;
   const scorecardPreviewRows = useMemo(() => attachedScorecards.map((scorecard) => {
     const enteredCount = scorecard.kpis.filter((kpi) => Boolean(draft.results[kpi.code]?.trim())).length;
     const missingCount = scorecard.kpis.length - enteredCount;
-    return { scorecard, expected: scorecard.kpis.length, entered: enteredCount, missing: missingCount, kpiStatus: missingCount ? "With Missing" : "Completed" };
-  }), [draft.results]);
+    const live = liveScorecards.find((item) => item.code === scorecard.code);
+    return { scorecard: { ...scorecard, previewScore: live?.previewScorePercent == null ? scorecard.previewScore : Number(live.previewScorePercent) }, expected: scorecard.kpis.length, entered: enteredCount, missing: missingCount, kpiStatus: missingCount ? "With Missing" : "Completed" };
+  }), [draft.results, liveScorecards]);
   const scorecardCompletedCount = scorecardPreviewRows.filter((row) => row.kpiStatus === "Completed").length;
   const scorecardMissingCount = scorecardPreviewRows.length - scorecardCompletedCount;
   const scorecardDepartmentOptions = [...new Set(attachedScorecards.flatMap((scorecard) => scorecard.departments))].sort().map((value) => ({ value, label: value }));
@@ -544,28 +685,19 @@ export function ResultEntry() {
   ).length;
 
   const stepAvailable = (number: number) => {
-    if (status === "Closed") return number === 4 || number === 5;
+    if (!selectedMonitoringPeriod) return false;
     if (number === 1) return status === "Draft" && canEnter;
-    if (number === 2) return status === "Draft" && canEnter && Boolean(method);
-    if (number === 3) return entered > 0 && canValidate;
-    if (number === 4)
-      return status !== "Draft" || (validationRun && !hasBlockingErrors);
-    return (
-      status === "Validated" &&
-      !hasBlockingErrors &&
-      canClose &&
-      (missing === 0 || canCloseWithExceptions)
-    );
+    if (number === 2) return status === "Draft" && entered > 0 && canValidate;
+    if (number === 3) return status !== "Draft" || (validationRun && !hasBlockingErrors);
+    if (number === 4) return status === "Submitted" || status === "Validated" || status === "Closed";
+    return status === "Validated" || status === "Closed";
   };
 
   const stepComplete = (number: number) => {
-    if (number === 1) return Boolean(method);
-    if (number === 2) return entered > 0;
-    if (number === 3) return validationRun && !hasBlockingErrors;
-    if (number === 4)
-      return (
-        status === "Submitted" || status === "Validated" || status === "Closed"
-      );
+    if (number === 1) return entered > 0;
+    if (number === 2) return validationRun && !hasBlockingErrors;
+    if (number === 3) return status === "Submitted" || status === "Validated" || status === "Closed";
+    if (number === 4) return status === "Validated" || status === "Closed";
     return status === "Closed";
   };
 
@@ -585,10 +717,23 @@ export function ResultEntry() {
     setDraftMessage("");
   }
 
-  function saveAllManualChanges() {
-    persistDraft(draft);
-    setManualChangesPending(false);
-    setShowSaveAllConfirm(false);
+  async function saveAllManualChanges() {
+    if(!resultEntryQuery.data||!selectedMonitoringPeriodId)return;
+    const changes=resultEntryQuery.data.inputs.flatMap((input)=>{
+      const raw=(draft.results[input.kpiCode]??"").trim();
+      const resultValue=raw===""?null:raw;
+      const comment=(draft.comments[input.kpiCode]??"").trim()||null;
+      const sameValue=resultValue===null?input.resultValue===null:input.resultValue!==null&&Number(resultValue)===Number(input.resultValue);
+      if(sameValue&&comment===(input.comment?.trim()||null))return [];
+      return [{monitoringPeriodInputId:input.id,resultValue,comment,version:input.version}];
+    });
+    if(!changes.length){setManualChangesPending(false);setShowSaveAllConfirm(false);return;}
+    const invalid=changes.find((change)=>change.resultValue!==null&&!/^-?\d+(\.\d+)?$/.test(change.resultValue));
+    if(invalid){setShowSaveAllConfirm(false);setResolverToast("Every Result must be a valid number before saving.");return;}
+    setWorkflowBusy(true);
+    try{await monitoringResultsService.saveChanges(selectedMonitoringPeriodId,changes);persistDraft(draft);setManualChangesPending(false);setShowSaveAllConfirm(false);setValidationRun(false);await refreshWorkflow();}
+    catch(error){setResolverToast(error instanceof Error?error.message:"Manual results could not be saved.");}
+    finally{setWorkflowBusy(false);}
   }
 
   function sortManualRows(key: ManualSortKey) {
@@ -611,7 +756,7 @@ export function ResultEntry() {
   }
 
   useEffect(() => {
-    if (step !== 2 || method !== "manual" || readOnly) return;
+    if (!wizardStarted || step !== 1 || method !== "manual" || readOnly) return;
     const saveShortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && ["s", "g"].includes(event.key.toLowerCase())) {
         event.preventDefault();
@@ -620,7 +765,7 @@ export function ResultEntry() {
     };
     window.addEventListener("keydown", saveShortcut);
     return () => window.removeEventListener("keydown", saveShortcut);
-  }, [method, readOnly, step]);
+  }, [method, readOnly, step, wizardStarted]);
 
   function selectKpi(code: string) {
     setSelectedKpi(code);
@@ -667,35 +812,46 @@ export function ResultEntry() {
     setSwitchTarget(null);
   }
 
-  function confirmImport() {
-    const nextResults = { ...draft.results };
-    const nextSources = { ...draft.sources };
-    for (const [code, value] of Object.entries(importedValues)) {
-      if (!value.trim()) continue;
-      nextResults[code] = value;
-      nextSources[code] = "EXCEL";
-    }
-    const nextDraft: DraftSnapshot = {
-      ...draft,
-      results: nextResults,
-      sources: nextSources,
-    };
-    setDraft(nextDraft);
-    persistDraft(nextDraft);
-    setUploaded(true);
-    setShowImportSummary(false);
+  async function confirmImport() {
+    if (!excelPreview?.changes.length || !selectedMonitoringPeriodId) return;
+    setExcelBusy(true); setExcelError("");
+    try { await monitoringResultsService.confirmExcel(selectedMonitoringPeriodId, excelPreview.changes); await resultEntryQuery.refetch(); setUploaded(true); setShowImportSummary(false); setExcelPreview(null); }
+    catch (error) { setExcelError(error instanceof Error ? error.message : "Excel import could not be confirmed."); }
+    finally { setExcelBusy(false); }
   }
 
-  function runValidation() {
-    if (status !== "Draft" || !canValidate || entered === 0) return;
-    setValidationRun(true);
+  async function downloadExcelTemplate() {
+    if (!selectedMonitoringPeriodId) return; setExcelBusy(true); setExcelError("");
+    try { const blob=await monitoringResultsService.downloadExcelTemplate(selectedMonitoringPeriodId); const url=URL.createObjectURL(blob); const link=document.createElement("a"); link.href=url; link.download=`${pool.code}_${selectedMonitoringPeriod?.periodKey ?? "results"}.xlsx`; link.click(); URL.revokeObjectURL(url); }
+    catch(error){setExcelError(error instanceof Error?error.message:"Excel template could not be downloaded.");} finally{setExcelBusy(false);}
   }
 
-  function returnForCorrection(code?: string) {
-    setStatus("Draft");
-    setMethod("manual");
-    if (code) selectKpi(code);
-    setStep(2);
+  async function previewExcelFile(file: File) {
+    if (!selectedMonitoringPeriodId) return; setExcelBusy(true); setExcelError("");
+    try { const preview=await monitoringResultsService.previewExcel(selectedMonitoringPeriodId,file); setExcelPreview(preview); setShowImportSummary(true); }
+    catch(error){setExcelError(error instanceof Error?error.message:"Excel file could not be validated.");} finally{setExcelBusy(false);}
+  }
+
+  async function refreshWorkflow() {
+    await Promise.all([resultEntryQuery.refetch(), periodsQuery.refetch()]);
+  }
+
+  async function runValidation() {
+    const version=resultEntryQuery.data?.monitoringPeriod.version;
+    if (status !== "Draft" || !canValidate || entered === 0 || version===undefined) return;
+    setWorkflowBusy(true);
+    try { await monitoringResultsService.validate(selectedMonitoringPeriodId,version); setValidationRun(true); await refreshWorkflow(); }
+    catch(error){setResolverToast(error instanceof Error?error.message:"Validation could not be completed.");}
+    finally{setWorkflowBusy(false);}
+  }
+
+  async function returnForCorrection(code?: string) {
+    const version=resultEntryQuery.data?.monitoringPeriod.version;
+    if(version===undefined||returnReason.trim().length<10){setResolverToast("Enter a correction reason of at least 10 characters.");return;}
+    setWorkflowBusy(true);
+    try { await monitoringResultsService.returnForCorrection(selectedMonitoringPeriodId,version,returnReason.trim()); setStatus("Draft"); setValidationRun(false); setMethod("manual"); setReturnReason(""); if(code)selectKpi(code); setStep(1); await refreshWorkflow(); }
+    catch(error){setResolverToast(error instanceof Error?error.message:"The Monitoring Period could not be returned.");}
+    finally{setWorkflowBusy(false);}
   }
 
   function navigateStep(number: number) {
@@ -704,32 +860,78 @@ export function ResultEntry() {
   }
 
   function goNext() {
-    if (step === 1 && stepAvailable(2)) setStep(2);
-    else if (step === 2 && stepAvailable(3)) setStep(3);
-    else if (step === 3 && stepAvailable(4)) setStep(4);
-    else if (step === 4 && stepAvailable(5)) setStep(5);
+    if (step < 5 && stepAvailable(step + 1)) setStep(step + 1);
   }
 
-  function submitResults() {
-    if (status !== "Draft" || !validationRun || hasBlockingErrors) return;
-    setStatus("Submitted");
+  function selectResolverPool(id: string) {
+    const nextPool = poolsQuery.data?.find((item) => String(item.id) === id);
+    setSelectedPoolId(id); setSelectedPoolPeriodId(""); setSelectedMonitoringPeriodId("");
+    setPoolSearch(nextPool ? `${nextPool.code} — ${nextPool.name}` : "");
+    setPoolSuggestionsOpen(false);
+    navigate(`/app/monitoring-results/result-entry?poolId=${id}`, { replace: true });
   }
 
-  function approveSubmittedResults() {
-    if (status !== "Submitted" || !canValidate || hasBlockingErrors) return;
-    setStatus("Validated");
+  function selectResolverScorecard(scorecardId: number) {
+    const scorecard = scorecardsQuery.data?.find((item) => item.id === scorecardId);
+    if (!scorecard?.poolId) return;
+    setSelectedPoolId(String(scorecard.poolId)); setSelectedPoolPeriodId(""); setSelectedMonitoringPeriodId("");
+    setPoolSearch(`${scorecard.code} · ${scorecard.name}`); setPoolSuggestionsOpen(false);
+    navigate(`/app/monitoring-results/result-entry?poolId=${scorecard.poolId}`, { replace: true });
   }
 
-  function closePeriod() {
+  function selectResolverPeriod(value: string) {
+    setSelectedPoolPeriodId(value);
+    const option = poolPeriodOptions.find((item) => {
+      const materialized = periodsQuery.data?.items.find((period) => period.poolId === selectedPoolId && period.periodStart === item.start);
+      return (item.poolPeriodId ?? materialized?.poolInputPeriodId ?? item.start) === value;
+    });
+    const materialized = option ? periodsQuery.data?.items.find((period) => period.poolId === selectedPoolId && period.periodStart === option.start) : null;
+    setSelectedMonitoringPeriodId(materialized?.id ?? "");
+    const query = new URLSearchParams({ poolId: selectedPoolId, poolInputPeriodId: value });
+    if (materialized) query.set("monitoringPeriodId", materialized.id);
+    navigate(`/app/monitoring-results/result-entry?${query}`, { replace: true });
+  }
+
+  function selectMonitoringPeriod(id: string) {
+    const period = periodsQuery.data?.items.find((item) => item.id === id);
+    if (!period) return;
+    setSelectedMonitoringPeriodId(period.id);
+    setSelectedPoolId(period.poolId);
+    setSelectedPoolPeriodId(period.poolInputPeriodId);
+    setPoolSearch(`${period.code} · ${period.periodLabel} · ${period.status}`);
+    setPoolSuggestionsOpen(false);
+    setWizardStarted(false);
+    setStep(1);
+    navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${period.id}`, { replace: true });
+  }
+
+  async function submitResults() {
+    const version=resultEntryQuery.data?.monitoringPeriod.version;
+    if (status !== "Draft" || !validationRun || hasBlockingErrors || version===undefined) return;
+    setWorkflowBusy(true);
+    try { await monitoringResultsService.submit(selectedMonitoringPeriodId,version); setStatus("Submitted"); setStep(4); setShowSubmitConfirmation(false); await refreshWorkflow(); }
+    catch(error){setResolverToast(error instanceof Error?error.message:"Results could not be submitted.");}
+    finally{setWorkflowBusy(false);}
+  }
+
+  async function approveSubmittedResults() {
+    const version=resultEntryQuery.data?.monitoringPeriod.version;
+    if (status !== "Submitted" || !canValidate || hasBlockingErrors || version===undefined) return;
+    setWorkflowBusy(true);
+    try { await monitoringResultsService.approve(selectedMonitoringPeriodId,version); setStatus("Validated"); await refreshWorkflow(); }
+    catch(error){setResolverToast(error instanceof Error?error.message:"Results could not be validated.");}
+    finally{setWorkflowBusy(false);}
+  }
+
+  async function closePeriod() {
+    const version=resultEntryQuery.data?.monitoringPeriod.version;
     if (!stepAvailable(5)) return;
     if (missing > 0 && !closureComment.trim()) return;
-    saveMonitoringPeriodClosure(
-      pool.id,
-      inputPeriod,
-      missing > 0 ? "with-exceptions" : "normal",
-    );
-    setShowCloseConfirmation(false);
-    setStatus("Closed");
+    if(version===undefined)return;
+    setWorkflowBusy(true);
+    try { await monitoringResultsService.close(selectedMonitoringPeriodId,version,missing>0,missing>0?closureComment.trim():null); saveMonitoringPeriodClosure(pool.id,inputPeriod,missing>0?"with-exceptions":"normal"); setShowCloseConfirmation(false); setStatus("Closed"); await refreshWorkflow(); }
+    catch(error){setResolverToast(error instanceof Error?error.message:"The Monitoring Period could not be closed.");}
+    finally{setWorkflowBusy(false);}
   }
 
   const validationLabel = !validationRun
@@ -750,14 +952,14 @@ export function ResultEntry() {
         <div>
           <h1>Result Entry</h1>
           <p>
-            Enter, validate, preview and close KPI results for {inputPeriod}.
+            {selectedMonitoringPeriod ? "Enter, review or correct KPI results for the selected Monitoring Period." : "Select a Monitoring Period to enter, review or correct KPI results."}
           </p>
         </div>
       </header>
 
-      <ol className="entry-stepper">
+      {wizardStarted && <ol className="entry-stepper">
         {steps.map((label, index) => {
-          const number = index + 1;
+          const number = stepNumbers[index];
           const available = stepAvailable(number);
           const complete = stepComplete(number);
           const state =
@@ -775,17 +977,17 @@ export function ResultEntry() {
                 onClick={() => navigateStep(number)}
               >
                 <span>
-                  {complete && number !== step ? <Check size={20} strokeWidth={3.5} /> : number}
+                  {complete && number !== step ? <Check size={20} strokeWidth={3.5} /> : index + 1}
                 </span>
                 <strong>{label}</strong>
               </button>
-              {number < steps.length && <i />}
+              {index < steps.length - 1 && <i />}
             </li>
           );
         })}
-      </ol>
+      </ol>}
 
-      <section className="entry-context" aria-label="Result entry context">
+      {false && step > 1 && selectedMonitoringPeriod && <section className="entry-context" aria-label="Result entry context">
         <article className="entry-context-block pool-context-block">
           <header>
             <span>Pool &amp; Period Context</span>
@@ -802,7 +1004,7 @@ export function ResultEntry() {
           <header>
             <span>Result Entry Context</span>
             <span className={`result-draft-state status-${status.toLowerCase()}`}>
-              {status} · {entered}/{kpiResults.length} entered
+              {status} · {entered}/{activeKpiResults.length} entered
             </span>
           </header>
           <div className="entry-context-grid">
@@ -812,10 +1014,45 @@ export function ResultEntry() {
             <div><small>Attached Scorecards</small><strong>{attachedScorecards.length}</strong></div>
           </div>
         </article>
-      </section>
+      </section>}
+
+      {wizardStarted && selectedMonitoringPeriod && readinessSummary && <section className="monitoring-period-sticky-context" aria-label="Selected Monitoring Period"><div><strong>{selectedMonitoringPeriod.code}</strong><span>{selectedMonitoringPeriod.periodLabel} · {selectedMonitoringPeriod.status}</span><small>{selectedMonitoringPeriod.poolCode} · {selectedMonitoringPeriod.poolName}</small></div><div><strong>{readinessSummary.entered}/{readinessSummary.expected} Entered</strong><span>{readinessSummary.pending} Pending</span></div><button type="button" onClick={() => setWizardStarted(false)}>Change Period</button></section>}
 
       <section className="entry-workspace">
-        {step === 1 && (
+        {!wizardStarted && (
+          <div className="monitoring-period-selector">
+            <header><h2>Select Monitoring Period</h2><p>Choose the specific Monitoring Period you want to enter, review or correct.</p></header>
+            <div className="period-resolver-controls monitoring-period-controls">
+              <label><span>KPI Pool</span><div className="resolver-pool-autocomplete" ref={resolverPoolRef}><Search size={18}/><input value={poolSearch} placeholder="Search Pool code or name..." role="combobox" autoComplete="off" aria-expanded={poolSuggestionsOpen} aria-controls="kpi-pool-suggestions" onClick={() => setPoolSuggestionsOpen(true)} onFocus={() => setPoolSuggestionsOpen(true)} onChange={(event) => { setPoolSearch(event.target.value); setPoolSuggestionsOpen(true); if (selectedPoolId) { setSelectedPoolId(""); setSelectedPoolPeriodId(""); setSelectedMonitoringPeriodId(""); } }}/>{poolSearch && <button type="button" aria-label="Clear KPI Pool" onClick={() => { setPoolSearch(""); setSelectedPoolId(""); setSelectedPoolPeriodId(""); setSelectedMonitoringPeriodId(""); setPoolSuggestionsOpen(true); }}><X size={15}/></button>}{poolSuggestionsOpen && <div className="resolver-pool-suggestions" id="kpi-pool-suggestions" role="listbox">{poolsQuery.isLoading && periodsQuery.isLoading ? <div className="resolver-pool-no-suggestions">Loading KPI Pools...</div> : matchingPools.length ? matchingPools.map((item) => <button type="button" role="option" aria-selected={String(item.id) === selectedPoolId} key={item.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectResolverPool(String(item.id))}><span><strong>{item.code}</strong><small>{item.name}</small></span></button>) : poolsQuery.isError && periodsQuery.isError ? <div className="resolver-pool-no-suggestions"><strong>KPI Pool search unavailable</strong><span>Retry when the Pool or Monitoring service is available.</span></div> : <div className="resolver-pool-no-suggestions"><strong>No matching KPI Pools</strong><span>Try another Pool code or name.</span></div>}</div>}</div></label>
+              <label><span>Input Period</span><div className={`resolver-period-select ${!selectedPoolId ? "waiting-pool" : ""}`} onMouseDown={(event) => { if (!selectedPoolId) { event.preventDefault(); setResolverToast("Select a KPI Pool before choosing an Input Period."); } }}><select value={selectedPoolPeriodId} disabled={!selectedPoolId || poolPeriodsQuery.isLoading} onChange={(event) => selectResolverPeriod(event.target.value)}><option value="">Select Input Period</option>{poolPeriodOptions.map((item) => { const materialized = periodsQuery.data?.items.find((period) => period.poolId === selectedPoolId && period.periodStart === item.start); const value = item.poolPeriodId ?? materialized?.poolInputPeriodId ?? item.start; const periodLabel = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${item.start}T00:00:00Z`)); return <option value={value} key={item.start}>{periodLabel} · {materialized?.status ?? "Not Available"}</option>; })}</select><ChevronDown size={16}/></div></label>
+            </div>
+            {!selectedPoolId && !poolsQuery.isLoading && <div className="monitoring-period-unselected"><Search size={28}/><strong>No KPI Pool selected.</strong><p>Select a Pool and then choose its Input Period.</p></div>}
+            {selectedPoolId && !selectedPoolPeriodId && !poolPeriodsQuery.isLoading && <div className="monitoring-period-unselected"><ChevronDown size={28}/><strong>No Input Period selected.</strong><p>Choose an Input Period to resolve its Monitoring Period.</p></div>}
+            {selectedPoolPeriodId && !selectedMonitoringPeriod && !poolPeriodsQuery.isLoading && <div className="monitoring-period-unselected"><AlertTriangle size={28}/><strong>Monitoring Period not available.</strong><p>This Pool Input Period has not been materialized for Result Entry.</p></div>}
+            {selectedMonitoringPeriod && readinessSummary && <article className="monitoring-period-summary-card"><header><div><strong>{selectedMonitoringPeriod.code}</strong><span>{selectedMonitoringPeriod.status}</span></div><h3>{selectedMonitoringPeriod.poolCode} · {selectedMonitoringPeriod.poolName}</h3><p>{selectedMonitoringPeriod.periodLabel} · {selectedMonitoringPeriod.status} · {selectedMonitoringPeriod.frequency ?? "Frequency unavailable"}</p></header><dl><div><dt>Expected</dt><dd>{readinessSummary.expected}</dd></div><div><dt>Entered</dt><dd>{readinessSummary.entered}</dd></div><div><dt>Pending</dt><dd>{readinessSummary.pending}</dd></div></dl><div className="monitoring-period-progress"><i style={{ width: `${readinessPercent}%` }}/><span>{readinessPercent}%</span></div>{selectedMonitoringPeriod.status !== "DRAFT" && <p className="monitoring-period-readonly-note">{selectedMonitoringPeriod.status === "SUBMITTED" ? "Results are read-only while this Monitoring Period is under validation." : selectedMonitoringPeriod.status === "VALIDATED" ? "Results are validated and read-only." : "This historical Monitoring Period is read-only."}</p>}</article>}
+            <footer><button className="entry-primary" disabled={!selectedMonitoringPeriod} onClick={() => { if (!selectedMonitoringPeriod) return; setStep(selectedMonitoringPeriod.status === "DRAFT" ? 1 : selectedMonitoringPeriod.status === "SUBMITTED" ? 4 : selectedMonitoringPeriod.status === "VALIDATED" ? 4 : 5); setWizardStarted(true); }}>{selectedMonitoringPeriod?.status === "DRAFT" ? "Start / Continue Result Entry" : selectedMonitoringPeriod ? "View Results" : "Continue to Result Entry"}</button></footer>
+          </div>
+        )}
+
+        {false && step === 1 && (
+          <div className="monitoring-period-step">
+            <header><h2>Select Monitoring Period</h2><p>Select a Scorecard and one of its Pool Input Periods to see its real status and available action.</p></header>
+            <div className="period-resolver-controls">
+              <label><span>Scorecard</span><div className="resolver-pool-autocomplete" ref={resolverPoolRef}><Search size={17}/><input value={poolSearch} placeholder="Search Scorecard code or name..." role="combobox" autoComplete="off" aria-expanded={poolSuggestionsOpen} aria-controls="result-entry-pool-suggestions" onClick={() => setPoolSuggestionsOpen(true)} onFocus={() => setPoolSuggestionsOpen(true)} onChange={(event) => { setPoolSearch(event.target.value); setPoolSuggestionsOpen(true); if (selectedPoolId) { setSelectedPoolId(""); setSelectedPoolPeriodId(""); setSelectedMonitoringPeriodId(""); } }}/>{poolSearch && <button type="button" aria-label="Clear Scorecard" onClick={() => { setPoolSearch(""); setSelectedPoolId(""); setSelectedPoolPeriodId(""); setSelectedMonitoringPeriodId(""); setPoolSuggestionsOpen(true); }}><X size={15}/></button>}{poolSuggestionsOpen && <div className="resolver-pool-suggestions" id="result-entry-pool-suggestions" role="listbox">{scorecardsQuery.isLoading ? <div className="resolver-pool-no-suggestions">Loading Scorecards...</div> : scorecardsQuery.isError ? <div className="resolver-pool-no-suggestions"><strong>Scorecard search unavailable</strong></div> : matchingScorecards.length ? matchingScorecards.map((item) => <button type="button" role="option" aria-selected={false} key={item.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectResolverScorecard(item.id)}><span><strong>{item.code}</strong><small>{item.name}</small></span></button>) : <div className="resolver-pool-no-suggestions"><strong>No matching Scorecards</strong><span>Try another code or name. Periods are treated as separators.</span></div>}</div>}</div></label>
+              <label><span>Input Period</span><div className={`resolver-period-select ${!selectedPoolId ? "waiting-pool" : ""}`} onMouseDown={(event) => { if (!selectedPoolId) { event.preventDefault(); setResolverToast("Select a Scorecard before choosing an Input Period."); } }}><select value={selectedPoolPeriodId} disabled={!selectedPoolId || poolPeriodsQuery.isLoading} onChange={(event) => selectResolverPeriod(event.target.value)}><option value="">Select Input Period</option>{poolPeriodOptions.map((item) => { const materialized = periodsQuery.data?.items.find((period) => period.poolId === selectedPoolId && period.periodStart === item.start); const value = item.poolPeriodId ?? materialized?.poolInputPeriodId ?? item.start; const label = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${item.start}T00:00:00Z`)); return <option value={value} key={item.start}>{label} — {materialized?.status ?? "Not Available"}</option>; })}</select><ChevronDown size={16}/></div></label>
+            </div>
+            {(poolsQuery.isLoading || periodsQuery.isLoading || selectedPoolId && poolPeriodsQuery.isLoading) && <div className="resolver-feedback"><LoaderCircle className="spin" size={20}/><span>Loading Pool and Monitoring information...</span></div>}
+            {!selectedPoolId && !poolsQuery.isLoading && <div className="resolver-empty"><Search size={28}/><p>Select a KPI Pool and Input Period to continue.</p></div>}
+            {selectedPoolId && !selectedPoolPeriod && !poolPeriodsQuery.isLoading && <div className="resolver-empty"><ChevronDown size={28}/><p>Select an Input Period from this Pool.</p></div>}
+            {(selectedPoolRecord || resolvedReadiness) && resolvedPeriodStart && <article className={`period-readiness-card ${resolvedReadiness ? resolvedReadiness.status.toLowerCase() : "not-available"}`}>
+              <header><div><h3>{new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${resolvedPeriodStart}T00:00:00Z`))}</h3><p><strong>{resolvedReadiness?.status ?? "NOT AVAILABLE"}</strong></p></div></header>
+              {resolvedReadiness && readinessSummary ? <><p className="readiness-summary-line">{readinessSummary.expected} Expected · {readinessSummary.entered} Entered · {readinessSummary.pending} Pending</p><div className="readiness-progress"><i style={{ width: `${readinessPercent}%` }}/><span>{readinessPercent}%</span></div><div className="readiness-action"><p>{resolvedReadiness.status === "DRAFT" ? "Result entry is in progress." : resolvedReadiness.status === "SUBMITTED" ? "Results were submitted for validation. Result Entry is read-only." : resolvedReadiness.status === "VALIDATED" ? "Results have been validated. No further changes are allowed." : "Monitoring Period Closed."}</p><button className="entry-primary" onClick={() => setStep(resolvedReadiness.status === "DRAFT" ? 3 : 5)}>{resolvedReadiness.status === "DRAFT" ? "Continue Result Entry" : resolvedReadiness.status === "CLOSED" ? "View Historical Results" : "View Results"}</button></div></> : selectedPoolPeriod ? <div className="readiness-unavailable"><AlertTriangle size={20}/><div><h4>Monitoring results are not available for this Input Period yet.</h4><small>Reason</small><p>{selectedPoolPeriod.dependency.reasonCode === "PREVIOUS_INPUT_PERIOD_NOT_CLOSED" ? "Previous workflow requirements have not been completed." : selectedPoolPeriod.workflowStatus !== "FINALIZED" ? "The Pool composition for this Input Period is not finalized." : "Monitoring readiness has not been published for this Input Period."}</p></div><button className="entry-primary" disabled>Continue</button></div> : null}
+            </article>}
+            {periodsQuery.isLoading ? <div className="result-entry-live-state"><LoaderCircle className="spin"/><p>Loading Monitoring Periods…</p></div> : periodsQuery.isError ? <div className="result-entry-live-state"><AlertTriangle/><p>Monitoring Periods could not be loaded.</p><button className="entry-secondary" onClick={() => periodsQuery.refetch()}>Retry</button></div> : periodsQuery.data?.items.length ? <div className="result-entry-period-grid">{periodsQuery.data?.items.map((period) => <button type="button" key={period.id} className={selectedMonitoringPeriodId === period.id ? "monitoring-period-card selected" : "monitoring-period-card"} onClick={() => { setSelectedMonitoringPeriodId(period.id); navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${period.id}`, { replace: true }); }}><div><strong>{period.poolCode}</strong><span>{period.status}</span></div><h3>{period.poolName}</h3><p>{period.periodLabel}</p><dl><div><dt>Expected Results</dt><dd>{period.expected}</dd></div><div><dt>Input Period</dt><dd>{period.periodKey}</dd></div></dl><i>{selectedMonitoringPeriodId === period.id && <Check size={15}/>}</i></button>)}</div> : <div className="result-entry-live-state"><AlertTriangle/><h3>No Monitoring Periods available</h3><p>A READY Pool Input Period must be materialized before continuing.</p></div>}
+          </div>
+        )}
+
+        {false && step === 2 && (
           <div className="method-step">
             <header>
               <h2>Choose Input Method</h2>
@@ -853,12 +1090,14 @@ export function ResultEntry() {
           </div>
         )}
 
-        {step === 2 && (
+        {wizardStarted && step === 1 && (
           <div className="input-data-step">
+            <header className="result-entry-step-heading"><div><h2>Result Entry — {selectedMonitoringPeriod?.periodLabel}</h2><p>Expected {readinessSummary?.expected ?? 0} · Entered {readinessSummary?.entered ?? 0} · Pending {readinessSummary?.pending ?? 0}</p></div></header>
             <div className="capture-method-switch">
-              <span>Capture Method</span>
+              <span>Entry Tools</span>
               <div>
                 <button
+                  title="Manual Entry — Enter or correct results directly in the system."
                   disabled={readOnly}
                   className={method === "manual" ? "active" : ""}
                   onClick={() => requestMethod("manual")}
@@ -867,12 +1106,13 @@ export function ResultEntry() {
                   Manual Entry
                 </button>
                 <button
+                  title="Excel Template — Download, complete and upload the period template."
                   disabled={readOnly}
                   className={method === "excel" ? "active" : ""}
                   onClick={() => requestMethod("excel")}
                 >
                   <FileSpreadsheet size={15} />
-                  Excel Template
+                  Excel Import
                 </button>
               </div>
             </div>
@@ -891,7 +1131,7 @@ export function ResultEntry() {
                       <span className="pending"><i/>{manualStatusCounts.pending} Pending</span>
                     </div>
                   </div>
-                  <button type="button" className="manual-save-all" disabled={readOnly || !manualChangesPending} data-tooltip="To Save All use combination Ctrl + G or Ctrl + S" onClick={() => setShowSaveAllConfirm(true)}>
+                  <button type="button" className="manual-save-all" disabled={workflowBusy || readOnly || !manualChangesPending} data-tooltip="To Save All use combination Ctrl + G or Ctrl + S" onClick={() => setShowSaveAllConfirm(true)}>
                     Save All
                   </button>
                 </header>
@@ -964,7 +1204,7 @@ export function ResultEntry() {
                       Comment
                     </p>
                   </div>
-                  <button disabled={readOnly}>
+                  <button disabled={readOnly || excelBusy} onClick={downloadExcelTemplate}>
                     <Download size={15} />
                     Download Template
                   </button>
@@ -977,8 +1217,7 @@ export function ResultEntry() {
                     type="file"
                     accept=".xlsx,.xls"
                     onChange={(event) => {
-                      if (event.target.files?.length)
-                        setShowImportSummary(true);
+                      if (event.target.files?.[0]) previewExcelFile(event.target.files[0]);
                       event.target.value = "";
                     }}
                   />
@@ -1000,6 +1239,7 @@ export function ResultEntry() {
                       : "Choose an Excel file to review its import summary"}
                   </p>
                 </label>
+                {excelError && <p className="result-entry-live-error" role="alert">{excelError}</p>}
                 {uploaded && (
                   <div className="upload-meta">
                     <div>
@@ -1027,7 +1267,7 @@ export function ResultEntry() {
           </div>
         )}
 
-        {step === 3 && (
+        {wizardStarted && step === 2 && (
           <div className="validate-step">
             <header>
               <h2>Validation Details</h2>
@@ -1043,7 +1283,7 @@ export function ResultEntry() {
                   : "Preliminary validation required before submission"}
               </span>
               <button
-                disabled={!canValidate || entered === 0 || status !== "Draft"}
+                disabled={workflowBusy || !canValidate || entered === 0 || status !== "Draft"}
                 onClick={runValidation}
               >
                 <ShieldCheck size={16} />
@@ -1159,7 +1399,7 @@ export function ResultEntry() {
                     onClick={() => {
                       const code = criticalKpis[0]?.code ?? missingKpis[0]?.code;
                       if (code) selectKpi(code);
-                      setStep(2);
+                      setStep(1);
                     }}
                   >
                     Back to Input Data
@@ -1181,11 +1421,11 @@ export function ResultEntry() {
           </div>
         )}
 
-        {step === 4 && (
+        {wizardStarted && step === 3 && (
           <div className="preview-step">
             <header>
               <div>
-                <h2>Result Entry Preview</h2>
+                <h2>Review &amp; Submit</h2>
                 <p>
                   Review the captured results and validation findings before
                   submission.
@@ -1216,11 +1456,11 @@ export function ResultEntry() {
               </div>
               <div className="score-metric">
                 <small>Estimated Pool Score</small>
-                <strong>89.42%</strong>
+                <strong>{estimatedPoolScore === null ? "—" : `${estimatedPoolScore.toFixed(2)}%`}</strong>
               </div>
               <div className="impact-metric">
                 <small>ScoreCards Impacted</small>
-                <strong>{attachedScorecards.length}</strong>
+                <strong>{liveScorecards.length || attachedScorecards.length}</strong>
               </div>
             </div>
             {previewTab === "kpis" ? (
@@ -1236,7 +1476,7 @@ export function ResultEntry() {
                 </div>
                 <div className="manual-entry-toolbar preview-kpi-toolbar">
                   <label className="manual-entry-search"><Search size={17}/><input value={previewSearch} onChange={(event) => { setPreviewSearch(event.target.value); setPreviewPage(1); }} placeholder="Search KPI code, name, goal or data source..." /></label>
-                  <ManualMultiSelect label="All traffic lights" options={[...new Set(kpiResults.map((kpi) => kpi.trafficLight))].sort().map((value) => ({ value, label: value }))} selected={previewTrafficLights} onChange={(values) => { setPreviewTrafficLights(values); setPreviewPage(1); }} />
+                  <ManualMultiSelect label="All traffic lights" options={[...new Set(activeKpiResults.map((kpi) => kpi.trafficLight))].sort().map((value) => ({ value, label: value }))} selected={previewTrafficLights} onChange={(values) => { setPreviewTrafficLights(values); setPreviewPage(1); }} />
                   <ManualMultiSelect label="All statuses" options={["Entered", "Incorrect", "Pending"].map((value) => ({ value, label: value }))} selected={previewStatuses} onChange={(values) => { setPreviewStatuses(values); setPreviewPage(1); }} />
                   <ManualMultiSelect label="All measurement units" options={manualUnitOptions} selected={previewUnits} onChange={(values) => { setPreviewUnits(values); setPreviewPage(1); }} />
                   <ManualMultiSelect label="All data sources" options={manualSourceOptions} selected={previewSources} onChange={(values) => { setPreviewSources(values); setPreviewPage(1); }} />
@@ -1382,34 +1622,27 @@ export function ResultEntry() {
               <button
                 className="entry-secondary"
                 disabled={status !== "Draft"}
-                onClick={() => setStep(2)}
+                onClick={() => setStep(1)}
               >
                 Back to Input Data
               </button>
               {status === "Draft" && (
                 <button
                   className="entry-primary"
-                  disabled={!validationRun || hasBlockingErrors}
-                  onClick={submitResults}
+                  disabled={workflowBusy || !validationRun || hasBlockingErrors}
+                  onClick={() => setShowSubmitConfirmation(true)}
                 >
                   Submit Results
                 </button>
               )}
               {status === "Submitted" && (
                 <>
-                  <span>Submitted · Validation Status: Pending Validation</span>
+                  <span>Submitted · Results are now read-only.</span>
                   <button
-                    className="entry-primary validate-submitted"
-                    disabled={!canValidate || hasBlockingErrors}
-                    onClick={approveSubmittedResults}
+                    className="entry-primary"
+                    onClick={() => setStep(4)}
                   >
-                    Validate Submitted Results
-                  </button>
-                  <button
-                    className="entry-secondary"
-                    onClick={() => returnForCorrection()}
-                  >
-                    Return for Correction
+                    Continue to Validation
                   </button>
                 </>
               )}
@@ -1420,10 +1653,10 @@ export function ResultEntry() {
                     Results validated and ready for closure.
                   </span>
                   <button
-                    className="entry-secondary"
-                    onClick={() => returnForCorrection()}
+                    className="entry-primary"
+                    onClick={() => setStep(4)}
                   >
-                    Return for Correction
+                    View Validation
                   </button>
                 </>
               )}
@@ -1431,7 +1664,14 @@ export function ResultEntry() {
           </div>
         )}
 
-        {step === 5 && (
+        {wizardStarted && step === 4 && (
+          <div className="validation-workflow-step">
+            <header><span><CheckCircle2 size={23}/></span><div><h2>Validation</h2><p>Review the submitted Monitoring Period and decide whether it is ready for closure.</p></div></header>
+            {status === "Submitted" ? <div className="validation-decision-card"><span className="result-draft-state status-submitted">SUBMITTED</span><h3>Waiting for validation</h3><p>Results are read-only while this Monitoring Period is under validation.</p><label className="validation-return-reason"><span>Correction request</span><textarea value={returnReason} onChange={(event)=>setReturnReason(event.target.value)} placeholder="Describe the changes required before resubmission..."/></label><div><button className="entry-secondary" disabled={workflowBusy||returnReason.trim().length<10} onClick={() => returnForCorrection()}>Return for Correction</button><button className="entry-primary validate-submitted" disabled={workflowBusy||!canValidate || hasBlockingErrors} onClick={approveSubmittedResults}>Validate Results</button></div></div> : status === "Validated" ? <div className="validation-decision-card validated"><CheckCircle2 size={38}/><h3>Results validated</h3><p>This Monitoring Period is ready to be closed.</p><button className="entry-primary" onClick={() => setStep(5)}>Continue to Close Period</button></div> : status === "Closed" ? <div className="validation-decision-card validated"><LockKeyhole size={38}/><h3>Period closed</h3><p>Validation and results are historical and read-only.</p><button className="entry-primary" onClick={() => setStep(5)}>View Closure</button></div> : <div className="validation-decision-card"><AlertTriangle size={32}/><h3>Submission required</h3><p>Review and submit results before validation.</p><button className="entry-secondary" onClick={() => setStep(3)}>Back to Review &amp; Submit</button></div>}
+          </div>
+        )}
+
+        {wizardStarted && step === 5 && (
           <div className="close-step">
             <header>
               <span>
@@ -1480,7 +1720,7 @@ export function ResultEntry() {
                   <section className="closure-overview-section">
                     <header><h3>Results &amp; Validation</h3><span>Period snapshot</span></header>
                     <dl>
-                      <div><dt>Entered KPI Results</dt><dd>{entered}/{kpiResults.length}</dd></div>
+                      <div><dt>Entered KPI Results</dt><dd>{entered}/{activeKpiResults.length}</dd></div>
                       <div><dt>Missing Results</dt><dd>{missing}</dd></div>
                       <div className="full validation-status-fact"><dt>Validation Status</dt><dd><span>{validationLabel}</span></dd></div>
                     </dl>
@@ -1488,8 +1728,8 @@ export function ResultEntry() {
                   <section className="closure-overview-section">
                     <header><h3>Score &amp; Closure</h3><span>Closure context</span></header>
                     <dl>
-                      <div><dt>Estimated Pool Score</dt><dd>89.42%</dd></div>
-                      <div><dt>Attached ScoreCards</dt><dd>{attachedScorecards.length}</dd></div>
+                      <div><dt>Estimated Pool Score</dt><dd>{estimatedPoolScore === null ? "—" : `${estimatedPoolScore.toFixed(2)}%`}</dd></div>
+                      <div><dt>Attached ScoreCards</dt><dd>{liveScorecards.length || attachedScorecards.length}</dd></div>
                       <div className={`full closure-mode-fact ${missing ? "exception" : "normal"}`}><dt>Closure Mode</dt><dd><span>{missing ? "With Exceptions" : "Normal"}</span></dd></div>
                     </dl>
                   </section>
@@ -1505,11 +1745,11 @@ export function ResultEntry() {
                   </header>
                   <div className={closurePreview === "ALL" ? "closure-preview-content all" : "closure-preview-content"}>
                 {(closurePreview === "COMPLETION" || closurePreview === "ALL") && <section className="closure-completion" aria-labelledby="results-completion-title">
-                  <header><div><h3 id="results-completion-title">Results Completion</h3><p>{entered} entered · {missing} missing</p></div><strong>{entered}/{kpiResults.length} · {completionPercentage}%</strong></header>
+                  <header><div><h3 id="results-completion-title">Results Completion</h3><p>{entered} entered · {missing} missing</p></div><strong>{entered}/{activeKpiResults.length} · {completionPercentage}%</strong></header>
                   <div className="closure-completion-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={completionPercentage} aria-label={`${completionPercentage}% results completed`}><span style={{ width: `${completionPercentage}%` }}/></div>
                 </section>}
                 <div className="closure-visual-grid">
-                  {(closurePreview === "TRAFFIC_LIGHT" || closurePreview === "ALL") && <section className="closure-visual-card traffic"><header><h3>Traffic Light Summary</h3><span className="visual-count-badge">{kpiResults.length} KPIs</span></header><div className="closure-stacked-bar" aria-label={`${trafficLightCounts.green} green, ${trafficLightCounts.yellow} yellow, ${trafficLightCounts.red} red`}><i className="green" style={{ flex: trafficLightCounts.green }}/><i className="yellow" style={{ flex: trafficLightCounts.yellow }}/><i className="red" style={{ flex: trafficLightCounts.red }}/></div><dl><div><dt><i className="green"/>Green KPIs</dt><dd>{trafficLightCounts.green}</dd></div><div><dt><i className="yellow"/>Yellow KPIs</dt><dd>{trafficLightCounts.yellow}</dd></div><div><dt><i className="red"/>Red KPIs</dt><dd>{trafficLightCounts.red}</dd></div></dl></section>}
+                  {(closurePreview === "TRAFFIC_LIGHT" || closurePreview === "ALL") && <section className="closure-visual-card traffic"><header><h3>Traffic Light Summary</h3><span className="visual-count-badge">{activeKpiResults.length} KPIs</span></header><div className="closure-stacked-bar" aria-label={`${trafficLightCounts.green} green, ${trafficLightCounts.yellow} yellow, ${trafficLightCounts.red} red`}><i className="green" style={{ flex: trafficLightCounts.green }}/><i className="yellow" style={{ flex: trafficLightCounts.yellow }}/><i className="red" style={{ flex: trafficLightCounts.red }}/></div><dl><div><dt><i className="green"/>Green KPIs</dt><dd>{trafficLightCounts.green}</dd></div><div><dt><i className="yellow"/>Yellow KPIs</dt><dd>{trafficLightCounts.yellow}</dd></div><div><dt><i className="red"/>Red KPIs</dt><dd>{trafficLightCounts.red}</dd></div></dl></section>}
                   {(closurePreview === "VALIDATION" || closurePreview === "ALL") && <section className="closure-visual-card validation"><header><h3>Validation Summary</h3><span className={`visual-validation-badge ${hasBlockingErrors ? "critical" : validationWarningCount || missing ? "warning" : "valid"}`}>{validationLabel}</span></header><dl><div className="valid"><dt>Valid</dt><dd>{validationValidCount}</dd></div><div className="warnings"><dt>Warnings</dt><dd>{validationWarningCount}</dd></div><div className="missing"><dt>Missing</dt><dd>{missing}</dd></div><div className="critical"><dt>Critical Errors</dt><dd>{criticalKpis.length}</dd></div></dl></section>}
                 </div>
                   </div>
@@ -1520,25 +1760,27 @@ export function ResultEntry() {
         )}
       </section>
 
-      {status !== "Closed" && (
+      {resolverToast && <ActionToast message={resolverToast} tone="warning" onClose={() => setResolverToast("")} />}
+
+      {wizardStarted && status !== "Closed" && (
         <footer className="entry-footer">
           <button
             className="entry-secondary"
             onClick={() =>
               step === 1
-                ? navigate("/app/monitoring-results/overview")
+                ? setWizardStarted(false)
                 : setStep((current) => Math.max(1, current - 1))
             }
           >
-            {step === 1 ? "Go Back to Overview" : "Back"}
+            {step === 1 ? "Change Monitoring Period" : "Back"}
           </button>
-          {step < 4 && (
+          {step < 3 && (
             <button
               className="entry-primary"
               disabled={!stepAvailable(step + 1)}
               onClick={goNext}
             >
-              Next: {steps[step]}
+              Next: {step === 1 ? "Validate" : "Review & Submit"}
             </button>
           )}
           {step === 4 && status === "Validated" && (
@@ -1553,15 +1795,23 @@ export function ResultEntry() {
           {step === 5 && (
             <button
               className={missing ? "entry-close exception" : "entry-close"}
-              disabled={
-                !stepAvailable(5)
-              }
+              disabled={workflowBusy || !stepAvailable(5) || !canClose || (missing > 0 && !canCloseWithExceptions)}
               onClick={() => { setCloseDialogPosition({ x: 0, y: 0 }); setShowCloseConfirmation(true); }}
             >
               {missing ? "Close with Exceptions" : "Close Period"}
             </button>
           )}
         </footer>
+      )}
+
+      {showSubmitConfirmation && selectedMonitoringPeriod && (
+        <div className="entry-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowSubmitConfirmation(false); }}>
+          <section className="entry-dialog submit-results-dialog" role="dialog" aria-modal="true" aria-labelledby="submit-results-title" onKeyDown={(event) => { if (event.key === "Escape") setShowSubmitConfirmation(false); }}>
+            <button className="entry-dialog-close" aria-label="Cancel submission" onClick={() => setShowSubmitConfirmation(false)}><X size={17}/></button>
+            <CheckCircle2 size={32}/><h2 id="submit-results-title">Submit {selectedMonitoringPeriod.periodLabel} Results?</h2><p>After submission, results become read-only. They can only be modified again if the Monitoring Period is returned for correction.</p>
+            <footer><button className="entry-secondary" onClick={() => setShowSubmitConfirmation(false)}>Cancel</button><button className="entry-primary" onClick={submitResults}>Submit Results</button></footer>
+          </section>
+        </div>
       )}
 
       {showCloseConfirmation && (
@@ -1572,8 +1822,8 @@ export function ResultEntry() {
               {missing ? <AlertTriangle size={30}/> : <LockKeyhole size={30}/>}<h2 id="close-period-dialog-title">{missing ? "Close Period With Exceptions?" : "Close Period?"}</h2>
             </div>
             <div className="close-dialog-context"><strong>{pool.name}</strong><span>{inputPeriod}</span></div>
-            {missing ? <p className="close-dialog-alert"><AlertTriangle size={17}/>{missing} KPI result{missing === 1 ? " is" : "s are"} still missing.</p> : <p className="close-dialog-complete"><CheckCircle2 size={17}/>{entered} / {kpiResults.length} results entered</p>}
-            <dl className="close-dialog-summary"><div><dt>Results entered</dt><dd>{entered}/{kpiResults.length}</dd></div>{missing > 0 && <div><dt>Missing results</dt><dd>{missing}</dd></div>}<div><dt>Validation</dt><dd>{missing ? validationLabel : "Validated"}</dd></div><div><dt>Estimated score</dt><dd>89.42%</dd></div></dl>
+            {missing ? <p className="close-dialog-alert"><AlertTriangle size={17}/>{missing} KPI result{missing === 1 ? " is" : "s are"} still missing.</p> : <p className="close-dialog-complete"><CheckCircle2 size={17}/>{entered} / {activeKpiResults.length} results entered</p>}
+            <dl className="close-dialog-summary"><div><dt>Results entered</dt><dd>{entered}/{activeKpiResults.length}</dd></div>{missing > 0 && <div><dt>Missing results</dt><dd>{missing}</dd></div>}<div><dt>Validation</dt><dd>{missing ? validationLabel : "Validated"}</dd></div><div><dt>Estimated score</dt><dd>{estimatedPoolScore === null ? "—" : `${estimatedPoolScore.toFixed(2)}%`}</dd></div></dl>
             {missing ? <label className="close-dialog-justification"><span>Exception justification</span><textarea autoFocus value={closureComment} onChange={(event) => setClosureComment(event.target.value)} placeholder="Explain why this period can be closed with missing results..."/></label> : <p className="close-dialog-note">After closing, results will become read-only historical data.</p>}
             {missing > 0 && <p className="close-dialog-note">Closing with exceptions will preserve the missing results and justification in the historical record.</p>}
             <footer><button type="button" className="entry-secondary" onClick={() => setShowCloseConfirmation(false)}>Cancel</button><button type="button" className={missing ? "entry-close exception" : "entry-close"} disabled={missing > 0 && !closureComment.trim()} onClick={closePeriod}>{missing ? "Close With Exceptions" : "Close Period"}</button></footer>
@@ -1689,26 +1939,27 @@ export function ResultEntry() {
             <h2 id="import-title">Import Summary</h2>
             <div className="import-summary-counts">
               <span>
-                <strong>{importNewCount}</strong> new results
+                <strong>{excelPreview?.summary.newValues ?? 0}</strong> new results
               </span>
               <span>
-                <strong>{importUnchangedCount}</strong> unchanged
+                <strong>{excelPreview?.summary.existingSame ?? 0}</strong> unchanged
               </span>
               <span>
-                <strong>{importUpdateCount}</strong> existing result
-                {importUpdateCount === 1 ? "" : "s"} will be updated
+                <strong>{excelPreview?.summary.existingDifferent ?? 0}</strong> existing result
+                {excelPreview?.summary.existingDifferent === 1 ? "" : "s"} will be updated
               </span>
             </div>
             <div className="import-change-list">
-              {importChanges.map((item) => (
-                <div key={item.code}>
-                  <strong>{item.code}</strong>
-                  <span>Current: {item.current || "Empty"}</span>
-                  <span>Excel: {item.incoming}</span>
+              {excelPreview?.rows.filter((item) => item.classification === "NEW_VALUE" || item.classification === "DIFFERENT_VALUE").map((item) => (
+                <div key={item.configCode}>
+                  <strong>{item.configCode} · {item.kpiCode}</strong>
+                  <span>{item.classification === "NEW_VALUE" ? "New value" : "Existing value will change"}</span>
+                  <span>Excel: {item.resultValue}</span>
                 </div>
               ))}
             </div>
-            <p>Empty Excel rows do not delete existing Draft values.</p>
+            <p>{excelPreview?.summary.blankPending ?? 0} blank/pending · {excelPreview?.summary.invalidRows ?? 0} invalid. Empty Excel rows do not delete existing Draft values.</p>
+            {excelError && <p className="result-entry-live-error" role="alert">{excelError}</p>}
             <footer>
               <button
                 className="entry-secondary"
@@ -1716,8 +1967,8 @@ export function ResultEntry() {
               >
                 Cancel Import
               </button>
-              <button className="entry-primary" onClick={confirmImport}>
-                Import & Update
+              <button className="entry-primary" disabled={excelBusy || !excelPreview?.changes.length || Boolean(excelPreview?.summary.invalidRows)} onClick={confirmImport}>
+                {excelBusy ? "Importing…" : "Confirm Import"}
               </button>
             </footer>
           </section>

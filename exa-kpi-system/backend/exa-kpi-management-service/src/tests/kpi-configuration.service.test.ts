@@ -116,3 +116,27 @@ describe("kpiConfigurationService.batchLookup", () => {
     expect(result.notFoundIds).toEqual(["22"]);
   });
 });
+
+describe("kpiConfigurationService.effectiveSnapshots", () => {
+  const effectiveRecord = {
+    id: 10n, configCode: "KPC-050-01",
+    definition: { id: 50n, kpiCode: "KPI-050", kpiName: "Productivity", description: "Improve productivity" },
+    measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" },
+    primaryDataSource: { id: 2n, code: "EMS", name: "EMS" },
+    revisions: [{ id: 100n, revisionNumber: 1, targetValue: { toString: () => "100" }, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), effectiveTo: new Date("2026-08-31T00:00:00.000Z"), evaluationType: { id: 3n, code: "HIGHER_IS_BETTER", name: "Higher is better" }, thresholds: [{ id: 4n, rangeMinPercent: { toString: () => "80" }, rangeMaxPercent: { toString: () => "100" }, includesMin: true, includesMax: true, displayOrder: 1, trafficLightLevel: { id: 5n, code: "GREEN", name: "Green" } }] }],
+  };
+
+  it("returns the single revision covering the complete Input Period with snapshot catalogs", async () => {
+    db.kpiConfiguration.findMany.mockResolvedValue([effectiveRecord]);
+    const result = await kpiConfigurationService.effectiveSnapshots({ configurationIds: ["10"], periodStart: "2026-08-01", periodEnd: "2026-08-31" });
+    expect(db.kpiConfiguration.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: [10n] }, deletedAt: null } }));
+    expect(result.data[0]).toMatchObject({ kpiConfigurationId: "10", kpiConfigurationRevisionId: "100", revisionNumber: 1, goal: "100", evaluationType: { code: "HIGHER_IS_BETTER" }, measurementUnit: { code: "KMS" }, dataSource: { code: "EMS" } });
+  });
+
+  it("fails instead of choosing a revision when coverage is missing or ambiguous", async () => {
+    db.kpiConfiguration.findMany.mockResolvedValue([{ ...effectiveRecord, revisions: [] }]);
+    await expect(kpiConfigurationService.effectiveSnapshots({ configurationIds: ["10"], periodStart: "2026-08-01", periodEnd: "2026-08-31" })).rejects.toMatchObject({ code: "KPI_EFFECTIVE_REVISION_NOT_FOUND" });
+    db.kpiConfiguration.findMany.mockResolvedValue([{ ...effectiveRecord, revisions: [effectiveRecord.revisions[0], { ...effectiveRecord.revisions[0], id: 101n }] }]);
+    await expect(kpiConfigurationService.effectiveSnapshots({ configurationIds: ["10"], periodStart: "2026-08-01", periodEnd: "2026-08-31" })).rejects.toMatchObject({ code: "KPI_EFFECTIVE_REVISION_OVERLAP" });
+  });
+});

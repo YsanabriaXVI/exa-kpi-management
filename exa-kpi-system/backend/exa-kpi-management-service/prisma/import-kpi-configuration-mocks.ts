@@ -3,6 +3,7 @@ import { prisma } from "../src/config/database/prisma.js";
 import { initialKpiConfigurations } from "./kpi-configuration.initial-data.js";
 
 const codeOf = (value: string) => value === "%" ? "PERCENT" : value.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 50) || "UNSPECIFIED";
+export const INITIAL_KPI_REVISION_EFFECTIVE_FROM = new Date("2026-01-01T00:00:00.000Z");
 
 export async function importKpiConfigurationMocks(client: PrismaClient) {
   const units = [...new Set([...initialKpiConfigurations.map((item) => item.measurementUnit), "%", "km", "Incidents", "Units", "USD"])];
@@ -24,7 +25,7 @@ export async function importKpiConfigurationMocks(client: PrismaClient) {
     ]);
     const configuration = await client.kpiConfiguration.upsert({ where: { configCode: item.configCode }, update: { kpiDefinitionId: definition.id, measurementUnitId: unit.id, inputFrequencyId: frequency.id, primaryDataSourceId: source.id, kpiConfigurationStatusId: status.id }, create: { configCode: item.configCode, kpiDefinitionId: definition.id, measurementUnitId: unit.id, inputFrequencyId: frequency.id, primaryDataSourceId: source.id, kpiConfigurationStatusId: status.id } });
     if (item.status === "CONFIGURED") {
-      const revision = await client.kpiConfigurationRevision.upsert({ where: { kpiConfigurationId_revisionNumber: { kpiConfigurationId: configuration.id, revisionNumber: 1 } }, update: {}, create: { kpiConfigurationId: configuration.id, revisionNumber: 1, targetValue: item.goal, evaluationTypeId: evaluation.id, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), changeReason: "Imported from approved frontend development data" } });
+      const revision = await client.kpiConfigurationRevision.upsert({ where: { kpiConfigurationId_revisionNumber: { kpiConfigurationId: configuration.id, revisionNumber: 1 } }, update: { effectiveFrom: INITIAL_KPI_REVISION_EFFECTIVE_FROM }, create: { kpiConfigurationId: configuration.id, revisionNumber: 1, targetValue: item.goal, evaluationTypeId: evaluation.id, effectiveFrom: INITIAL_KPI_REVISION_EFFECTIVE_FROM, changeReason: "Imported from approved frontend development data" } });
       const levels = await client.trafficLightLevel.findMany({ where: { code: { in: ["RED", "YELLOW", "GREEN"] } } });
       const ranges = { RED: [item.ranges.redFrom, item.ranges.redTo], YELLOW: [item.ranges.yellowFrom, item.ranges.yellowTo], GREEN: [item.ranges.greenFrom, item.ranges.greenTo] } as const;
       for (const [order, code] of ["RED", "YELLOW", "GREEN"].entries()) { const level = levels.find((entry) => entry.code === code)!; const range = ranges[code as keyof typeof ranges]; const values = { rangeMinPercent: range[0], rangeMaxPercent: range[1], includesMin: true, includesMax: true, displayOrder: order + 1 }; await client.kpiConfigurationRevisionThreshold.upsert({ where: { kpiConfigurationRevisionId_trafficLightLevelId: { kpiConfigurationRevisionId: revision.id, trafficLightLevelId: level.id } }, update: values, create: { kpiConfigurationRevisionId: revision.id, trafficLightLevelId: level.id, ...values } }); }

@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { addPeriodKpisBodySchema, addPeriodLinkBodySchema, poolUsageBatchBodySchema, poolUsageQuerySchema, poolWorkflowQuerySchema, scorecardPeriodKpiParamsSchema, scorecardPeriodLinkParamsSchema, scorecardPeriodParamsSchema, updatePeriodWeightsBodySchema } from "../schemas/scorecard.schema.js";
+import { addPeriodKpisBodySchema, addPeriodLinkBodySchema, monitoringMaterializationQuerySchema, poolUsageBatchBodySchema, poolUsageQuerySchema, poolWorkflowQuerySchema, scorecardPeriodKpiParamsSchema, scorecardPeriodLinkParamsSchema, scorecardPeriodParamsSchema, updatePeriodWeightsBodySchema } from "../schemas/scorecard.schema.js";
 import { scorecardCompositionService } from "../services/scorecard-composition.service.js";
 
 type Handler = (request: Request, response: Response) => Promise<void>;
@@ -8,6 +8,7 @@ const handle = (handler: Handler) => (request: Request, response: Response, next
 export const poolWorkflow = handle(async (request, response) => { const query = poolWorkflowQuerySchema.parse(request.query); response.json(await scorecardCompositionService.poolWorkflow(BigInt(query.poolId), query.periodKey)); });
 export const poolUsageBatch = handle(async (request, response) => { const body = poolUsageBatchBodySchema.parse(request.body); response.json(await scorecardCompositionService.poolUsageBatch(body.targets)); });
 export const poolUsage = handle(async (request, response) => { const query = poolUsageQuerySchema.parse(request.query); response.json(await scorecardCompositionService.poolUsage(BigInt(query.poolId), query.periodKey)); });
+export const monitoringMaterialization = handle(async (request, response) => { const query = monitoringMaterializationQuerySchema.parse(request.query); response.json(await scorecardCompositionService.monitoringMaterialization(BigInt(query.poolId), query.poolInputPeriodId)); });
 export const listPeriods = handle(async (request, response) => { const { id } = scorecardPeriodParamsSchema.parse({ ...request.params, periodKey: "2000-01" }); response.json(await scorecardCompositionService.periods(BigInt(id))); });
 export const getComposition = handle(async (request, response) => { const p = scorecardPeriodParamsSchema.parse(request.params); response.json({ data: await scorecardCompositionService.get(BigInt(p.id), p.periodKey, request.identity.actorUserId) }); });
 export const availableKpis = handle(async (request, response) => { const p = scorecardPeriodParamsSchema.parse(request.params); response.json(await scorecardCompositionService.availableKpis(BigInt(p.id), p.periodKey)); });

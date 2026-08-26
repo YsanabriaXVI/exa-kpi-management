@@ -15,6 +15,7 @@ export type ScorecardRecord = {
   kpis: number;
   linkedScorecards: number;
   poolSource: string;
+  poolId?: number;
   company: string;
   status: ScorecardStatus;
   collaborators: number;

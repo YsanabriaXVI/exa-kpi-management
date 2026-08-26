@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { createScorecard, deactivateScorecard, eligiblePools, getScorecard, listScorecards, updateScorecard } from "../controllers/scorecard.controller.js";
-import { addKpis, addLink, availableKpis, availableLinks, finalizeComposition, getComposition, listPeriods, poolUsage, poolUsageBatch, poolWorkflow, removeKpi, removeLink, updateWeights } from "../controllers/scorecard-composition.controller.js";
+import { addKpis, addLink, availableKpis, availableLinks, finalizeComposition, getComposition, listPeriods, monitoringMaterialization, poolUsage, poolUsageBatch, poolWorkflow, removeKpi, removeLink, updateWeights } from "../controllers/scorecard-composition.controller.js";
 export const scorecardRouter = Router();
 scorecardRouter.get("/eligible-pools", eligiblePools);
 scorecardRouter.get("/pool-workflow", poolWorkflow);
 scorecardRouter.post("/pool-workflow/batch", poolUsageBatch);
 scorecardRouter.get("/pool-usage", poolUsage);
+scorecardRouter.get("/internal/monitoring-materialization", monitoringMaterialization);
 scorecardRouter.get("/", listScorecards);
 scorecardRouter.post("/", createScorecard);
 scorecardRouter.get("/:id/periods", listPeriods);
