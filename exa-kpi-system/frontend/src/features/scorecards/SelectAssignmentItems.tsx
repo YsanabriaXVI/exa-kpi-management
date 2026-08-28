@@ -171,7 +171,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
   const [availability, setAvailability] = useState<AvailabilityFilter>("ALL");
   const [kpiAvailabilitySelected, setKpiAvailabilitySelected] = useState<
     string[]
-  >([]);
+  >(["AVAILABLE"]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [dataSourceFilter, setDataSourceFilter] = useState<string[]>([]);
   const [measurementUnitFilter, setMeasurementUnitFilter] = useState<string[]>(
@@ -234,7 +234,8 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
     enabled: scorecardId > 0 && Boolean(periodKey),
   });
   const category = (row: Option): AvailabilityFilter => {
-    if (isKpi)
+    if (isKpi) {
+      if ("definitionCode" in row && row.status === "INACTIVE") return "NOT_AVAILABLE";
       return row.selectionStatus === "AVAILABLE_TO_SELECT"
         ? "AVAILABLE"
         : row.selectionStatus === "SELECTED_IN_SCORECARD"
@@ -242,6 +243,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
           : row.selectionStatus === "ASSIGNED_TO_ANOTHER_SCORECARD"
             ? "OCCUPIED"
             : "NOT_AVAILABLE";
+    }
     return row.selectionStatus === "AVAILABLE_TO_LINK"
       ? "AVAILABLE"
       : row.selectionStatus === "LINKED_THIS_PERIOD" ||
@@ -327,8 +329,9 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
     ? count("OCCUPIED") + count("NOT_AVAILABLE")
     : linkCount("NOT_AVAILABLE");
   const usedElsewhereCount = isKpi ? count("OCCUPIED") : 0;
+  const notAvailableCount = isKpi ? count("NOT_AVAILABLE") : 0;
   const kpiTotal = isKpi
-    ? includedCount + usedElsewhereCount + availableCount
+    ? includedCount + usedElsewhereCount + availableCount + notAvailableCount
     : 0;
   const kpiPercent = (value: number) =>
     kpiTotal ? Math.round((value / kpiTotal) * 100) : 0;
@@ -412,6 +415,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
         ["AVAILABLE", "Available"],
         ["SELECTED", "Selected by this Scorecard"],
         ["OCCUPIED", "Used by another Scorecard"],
+        ["NOT_AVAILABLE", "Not Available"],
       ]
     : [
         ["ALL", "All"],
@@ -614,6 +618,16 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
           <div className="assignment-kpi-summary-metrics">
             <button
               type="button"
+              className={kpiAvailabilitySelected.includes("AVAILABLE") ? "active" : ""}
+              aria-pressed={kpiAvailabilitySelected.includes("AVAILABLE")}
+              onClick={() => setKpiAvailabilitySelected((current) => current.includes("AVAILABLE") ? [] : ["AVAILABLE"])}
+            >
+              <span>KPIs Available</span>
+              <strong>{availableCount}</strong>
+              <small>{kpiPercent(availableCount)}%</small>
+            </button>
+            <button
+              type="button"
               className={
                 kpiAvailabilitySelected.includes("SELECTED") ? "active" : ""
               }
@@ -624,7 +638,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
                 )
               }
             >
-              <span>Selected Here</span>
+              <span>KPIs Selected Here</span>
               <strong>{includedCount}</strong>
               <small>{kpiPercent(includedCount)}%</small>
             </button>
@@ -640,25 +654,25 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
                 )
               }
             >
-              <span>Used by Other Scorecards</span>
+              <span>KPIs Used by Other Scorecards</span>
               <strong>{usedElsewhereCount}</strong>
               <small>{kpiPercent(usedElsewhereCount)}%</small>
             </button>
             <button
               type="button"
               className={
-                kpiAvailabilitySelected.includes("AVAILABLE") ? "active" : ""
+                kpiAvailabilitySelected.includes("NOT_AVAILABLE") ? "active" : ""
               }
-              aria-pressed={kpiAvailabilitySelected.includes("AVAILABLE")}
+              aria-pressed={kpiAvailabilitySelected.includes("NOT_AVAILABLE")}
               onClick={() =>
                 setKpiAvailabilitySelected((current) =>
-                  current.includes("AVAILABLE") ? [] : ["AVAILABLE"],
+                  current.includes("NOT_AVAILABLE") ? [] : ["NOT_AVAILABLE"],
                 )
               }
             >
-              <span>Available</span>
-              <strong>{availableCount}</strong>
-              <small>{kpiPercent(availableCount)}%</small>
+              <span>KPIs Not Available</span>
+              <strong>{notAvailableCount}</strong>
+              <small>{kpiPercent(notAvailableCount)}%</small>
             </button>
           </div>
           <section

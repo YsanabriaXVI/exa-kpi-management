@@ -5,7 +5,7 @@ const collaborator = z.object({ externalEmployeeId: externalId, departmentExtern
 export const createScorecardBodySchema = z.object({
   name: z.string().trim().min(1).max(200), description: z.string().trim().max(5000).nullable().optional(), kpiPoolExternalId: externalId,
   departments: z.array(department).min(1).superRefine((items, context) => { if (new Set(items.map((item) => item.externalDepartmentId)).size !== items.length) context.addIssue({ code: "custom", message: "Departments must be unique" }); }),
-  collaborators: z.array(collaborator).default([]).superRefine((items, context) => { if (new Set(items.map((item) => item.externalEmployeeId)).size !== items.length) context.addIssue({ code: "custom", message: "Collaborators must be unique" }); }),
+  collaborators: z.array(collaborator).min(1, "At least one Collaborator is required").superRefine((items, context) => { if (new Set(items.map((item) => item.externalEmployeeId)).size !== items.length) context.addIssue({ code: "custom", message: "Collaborators must be unique" }); }),
 });
 export const updateScorecardBodySchema = createScorecardBodySchema.pick({ name: true, description: true, departments: true, collaborators: true }).partial().refine((value) => Object.keys(value).length > 0, "At least one field is required");
 export const scorecardIdParamsSchema = z.object({ id: externalId });
@@ -15,6 +15,7 @@ export const scorecardPeriodLinkParamsSchema = scorecardPeriodParamsSchema.exten
 const weight = z.coerce.number().nonnegative().max(100).multipleOf(0.0001);
 export const addPeriodKpisBodySchema = z.object({ items: z.array(z.object({ poolMembershipExternalId: externalId, weight })).min(1) });
 export const updatePeriodWeightsBodySchema = z.object({ kpis: z.array(z.object({ kpiConfigurationExternalId: externalId, weight })), linkedScorecards: z.array(z.object({ linkedScorecardId: externalId, weight })) });
+export const updatePeriodScopeBodySchema = z.object({ departments: z.array(z.object({ id: externalId, companyId: externalId, code: z.string().trim().min(1).max(50), name: z.string().trim().min(1).max(150), collaborators: z.array(z.object({ id: externalId, code: z.string().trim().min(1).max(50), name: z.string().trim().min(1).max(220) })) })).min(1) });
 export const addPeriodLinkBodySchema = z.union([
   z.object({ linkedScorecardId: externalId, weight }),
   z.object({ items: z.array(z.object({ linkedScorecardId: externalId, weight })).min(1) }),

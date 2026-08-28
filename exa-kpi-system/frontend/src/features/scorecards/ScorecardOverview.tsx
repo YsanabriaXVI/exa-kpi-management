@@ -10,6 +10,7 @@ import {
   type SortDirection,
 } from "../../components/SortableTableHeader";
 import { ActionToast } from "../../components/ActionToast";
+import { OverviewDeleteConfirmation } from "../../components/OverviewDeleteConfirmation";
 import "./scorecards.css";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
@@ -28,7 +29,8 @@ export function ScorecardOverview() {
   const backendSort = sort.key === "code" ? "scorecardCode" : sort.key === "name" ? "scorecardName" : sort.key === "status" ? "statusCode" : "createdAt";
   const query = useQuery({ queryKey: ["scorecards", { page, pageSize, search, departments, frequencies, statuses, years, backendSort, direction: sort.direction }], queryFn: () => scorecardService.listPage({ page, pageSize, search, department: departments, frequency: frequencies, status: statuses, year: years, sortBy: backendSort, sortOrder: sort.direction }), placeholderData: (previous) => previous });
   const [actionMessage, setActionMessage] = useState("");
-  const remove = useMutation({ mutationFn: scorecardService.deactivate, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["scorecards"] }); setActionMessage("ScoreCard deactivated. Its historical records were preserved."); } });
+  const [scorecardToRemove, setScorecardToRemove] = useState<{ id: number; code: string } | null>(null);
+  const remove = useMutation({ mutationFn: scorecardService.deactivate, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["scorecards"] }); setScorecardToRemove(null); setActionMessage("ScoreCard deactivated. Its historical records were preserved."); }, onError: (cause) => setActionMessage(cause instanceof Error ? cause.message : "The ScoreCard could not be deactivated.") });
   const records = query.data?.data ?? [];
   const sortedRecords = useMemo(() => [...records].sort((left, right) => compareSortValues(scorecardSortValue(left, sort.key), scorecardSortValue(right, sort.key), sort.direction)), [records, sort]);
   const options = (values: string[]) => [...new Set(values)].sort().map((value) => ({ value, label: value }));
@@ -65,12 +67,13 @@ export function ScorecardOverview() {
       <th>Actions</th>
     </tr></thead><tbody>{query.isLoading ? <tr><td colSpan={10} className="table-message">Loading ScoreCards...</td></tr> : query.isError ? <tr><td colSpan={10} className="table-message">ScoreCards could not be loaded: {(query.error as Error).message}</td></tr> : sortedRecords.length ? sortedRecords.map((item) => <tr key={item.id}><td><span className="code-pill">{item.code}</span></td><td className="name-cell">{item.name}</td><td>{item.departments.join(", ")}</td><td>{item.poolSource}</td><td><PoolScheduleCell schedule={item.poolSchedule}/></td><td><CompositionCell composition={item.currentComposition}/></td><td className="scorecard-count">{item.currentComposition ? item.kpis : "—"}</td><td className="scorecard-count">{item.currentComposition ? item.linkedScorecards : "—"}</td><td><span className={`scorecard-status ${item.status.toLowerCase()}`}><i />{title(item.status)}</span></td><td><div className="table-actions">
       <button className="icon-button edit" title="Edit ScoreCard Info" onClick={() => navigate(`/app/scorecards/create-scorecard-info?scorecardId=${item.id}`)}><Pencil size={15} /></button>
-      <button className="icon-button delete" title="Deactivate ScoreCard (history is preserved)" disabled={remove.isPending || item.status === "INACTIVE"} onClick={() => { if (window.confirm(`Deactivate ${item.code}? Historical compositions will remain available.`)) remove.mutate(item.id); }}><Trash2 size={15} /></button>
+      <button className="icon-button delete" title="Deactivate ScoreCard (history is preserved)" disabled={remove.isPending || item.status === "INACTIVE"} onClick={() => setScorecardToRemove({ id: item.id, code: item.code })}><Trash2 size={15} /></button>
       <button className="icon-button configure" title="Open ScoreCard Assignment" onClick={() => navigate(`/app/scorecards/assignment?scorecardId=${item.id}&selector=1&source=overview`)}><Settings2 size={15} /></button>
       <button className="icon-button view" title="View Detail" onClick={() => navigate(`/app/scorecards/detail?scorecardId=${item.id}`)}><Eye size={15} /></button>
     </div></td></tr>) : <tr><td colSpan={10} className="table-message">No ScoreCards match the selected filters.</td></tr>}</tbody></table>
       <footer className="scorecard-results"><span>Showing <strong>{totalItems ? pageStart + 1 : 0}-{Math.min(pageStart + records.length, totalItems)}</strong> of <strong>{totalItems}</strong> ScoreCards</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="ScoreCard pagination" className="scorecard-pagination" /></footer>
     </div>
+    {scorecardToRemove && <OverviewDeleteConfirmation title="Remove ScoreCard from Overview?" message={`${scorecardToRemove.code} will be deactivated and removed from active operations. Its database history and finalized compositions will remain unchanged.`} acceptLabel="Deactivate" pending={remove.isPending} onAccept={() => remove.mutate(scorecardToRemove.id)} onCancel={() => setScorecardToRemove(null)} />}
   </main>;
 }
 

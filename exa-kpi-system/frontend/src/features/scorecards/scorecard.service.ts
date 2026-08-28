@@ -49,10 +49,13 @@ type ApiScorecard = {
     inputPeriods: number;
   } | null;
   currentComposition: ScorecardRecord["currentComposition"];
-  companies: Array<{ name: string }>;
+  companies: Array<{ id: string; code: string; name: string }>;
   departments: Array<{
+    id: string;
+    companyId: string;
+    code: string;
     name: string;
-    collaborators: Array<{ id: string; name: string }>;
+    collaborators: Array<{ id: string; code: string; name: string }>;
   }>;
   periodCompositionCount: number;
   createdAt: string;
@@ -133,9 +136,13 @@ const map = (value: ApiScorecard): ScorecardRecord => {
     name: value.name,
     departments: value.departments.map((row) => row.name),
     scopeDepartments: value.departments.map((row) => ({
+      id: row.id,
+      companyId: row.companyId,
+      code: row.code,
       name: row.name,
       employees: row.collaborators.map((employee) => ({
         id: employee.id,
+        code: employee.code,
         name: employee.name,
         company:
           value.companies.map((company) => company.name).join(", ") ||
@@ -156,6 +163,7 @@ const map = (value: ApiScorecard): ScorecardRecord => {
     poolSource: `${value.kpiPool.code} · ${value.kpiPool.name}`,
     poolId: Number(value.kpiPool.id),
     company: value.companies.map((row) => row.name).join(", "),
+    scopeCompanies: value.companies,
     status: value.status as ScorecardRecord["status"],
     collaborators: value.departments.reduce(
       (sum, row) => sum + row.collaborators.length,
@@ -235,6 +243,14 @@ export const scorecardService = {
       ).data,
     );
   },
+  async updateInfo(id: number, input: Pick<ScorecardCreateRequest, "name"> & Partial<Pick<ScorecardCreateRequest, "departments" | "collaborators">>) {
+    return map(
+      (await request<{ data: ApiScorecard }>(`/v1/scorecards/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      })).data,
+    );
+  },
   async deactivate(id: number) {
     await request(`/v1/scorecards/${id}/deactivate`, { method: "PATCH" });
   },
@@ -247,6 +263,26 @@ export const scorecardService = {
     return (
       await request<{ data: ScorecardComposition }>(
         `/v1/scorecards/${id}/periods/${periodKey}/composition`,
+      )
+    ).data;
+  },
+  async updatePeriodScope(
+    id: number,
+    periodKey: string,
+    input: {
+      departments: Array<{
+        id: string;
+        companyId: string;
+        code: string;
+        name: string;
+        collaborators: Array<{ id: string; code: string; name: string }>;
+      }>;
+    },
+  ) {
+    return (
+      await request<{ data: ScorecardComposition }>(
+        `/v1/scorecards/${id}/periods/${periodKey}/scope`,
+        { method: "PUT", body: JSON.stringify(input) },
       )
     ).data;
   },

@@ -6,8 +6,11 @@ export type ScorecardRecord = {
   name: string;
   departments: string[];
   scopeDepartments?: Array<{
+    id: string;
+    companyId: string;
+    code: string;
     name: string;
-    employees: Array<{ id: string; name: string; company: string }>;
+    employees: Array<{ id: string; code: string; name: string; company: string }>;
   }>;
   durationMonths: number[];
   year: number;
@@ -17,6 +20,7 @@ export type ScorecardRecord = {
   poolSource: string;
   poolId?: number;
   company: string;
+  scopeCompanies?: Array<{ id: string; code: string; name: string }>;
   status: ScorecardStatus;
   collaborators: number;
   poolSchedule: {
@@ -74,6 +78,16 @@ export type ScorecardComposition = {
   id: string;
   periodKey: string;
   status: "PREPARING" | "FINALIZED";
+  scopeCustomized: boolean;
+  scope: {
+    departments: Array<{
+      id: string;
+      code: string;
+      name: string;
+      companyId: string;
+      collaborators: Array<{ id: string; code: string; name: string }>;
+    }>;
+  };
   kpis: Array<{
     id: string;
     poolMembershipExternalId: string;

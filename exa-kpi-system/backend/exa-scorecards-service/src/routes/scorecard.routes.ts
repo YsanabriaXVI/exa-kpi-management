@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createScorecard, deactivateScorecard, eligiblePools, getScorecard, listScorecards, updateScorecard } from "../controllers/scorecard.controller.js";
-import { addKpis, addLink, availableKpis, availableLinks, finalizeComposition, getComposition, listPeriods, monitoringMaterialization, poolUsage, poolUsageBatch, poolWorkflow, removeKpi, removeLink, updateWeights } from "../controllers/scorecard-composition.controller.js";
+import { addKpis, addLink, availableKpis, availableLinks, finalizeComposition, getComposition, listPeriods, monitoringMaterialization, poolUsage, poolUsageBatch, poolWorkflow, removeKpi, removeLink, updateScope, updateWeights } from "../controllers/scorecard-composition.controller.js";
 export const scorecardRouter = Router();
 scorecardRouter.get("/eligible-pools", eligiblePools);
 scorecardRouter.get("/pool-workflow", poolWorkflow);
@@ -15,6 +15,7 @@ scorecardRouter.get("/:id/periods/:periodKey/available-kpis", availableKpis);
 scorecardRouter.post("/:id/periods/:periodKey/kpis", addKpis);
 scorecardRouter.delete("/:id/periods/:periodKey/kpis/:configurationId", removeKpi);
 scorecardRouter.patch("/:id/periods/:periodKey/weights", updateWeights);
+scorecardRouter.put("/:id/periods/:periodKey/scope", updateScope);
 scorecardRouter.get("/:id/periods/:periodKey/linked-scorecards", availableLinks);
 scorecardRouter.post("/:id/periods/:periodKey/linked-scorecards", addLink);
 scorecardRouter.delete("/:id/periods/:periodKey/linked-scorecards/:linkedScorecardId", removeLink);

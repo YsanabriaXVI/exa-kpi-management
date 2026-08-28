@@ -1826,3 +1826,45 @@ html[data-theme="dark"] .scorecard-summary-badges>b{color:#f0c985;background:#51
 .scorecard-detail-page>.scorecard-empty-state{min-height:220px;margin:28px auto 18px;padding:38px 28px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}.scorecard-detail-page>.scorecard-empty-state h2{margin:14px 0 8px;text-align:center}.scorecard-detail-page>.scorecard-empty-state p{max-width:560px;margin:0 auto;color:var(--ems-muted);font-size:15px;line-height:1.55;text-align:center}.scorecard-detail-page:has(>.scorecard-empty-state)>.scorecard-detail-back{width:max-content;margin:18px auto 28px;display:flex;justify-content:center}.scorecard-breakdown-columns .linked-performance>header.linked-performance-total{grid-template-columns:minmax(0,1fr) auto}.linked-performance-list>div>.linked-scorecard-color{width:11px;height:11px;border-radius:3px;flex:0 0 auto}.linked-performance-list>div>span{min-width:0;flex:1}.scorecard-donut-segment.linked{stroke:#13ae78}
 .scorecard-breakdown-columns>section>header strong{font-size:18px!important}.scorecard-breakdown-columns>section>header small{margin-top:5px!important;font-size:14px!important;line-height:1.45}.scorecard-breakdown-columns>section>header>b{font-size:19px!important}.linked-performance-list>div{padding:12px 0!important}.linked-performance-list span strong{font-size:16px!important}.linked-performance-list span small{margin-top:4px!important;font-size:14px!important;line-height:1.4}.linked-performance-list>div>b{font-size:16px!important}
 .scorecard-detail-table tfoot td{padding:14px 18px!important;border-top:2px solid var(--ems-border);text-align:left!important;background:var(--ems-surface-muted)}.scorecard-table-total-weight{display:inline;color:var(--ems-muted);font:700 16px Arial,sans-serif}.scorecard-table-total-weight strong,.scorecard-table-total-weight.linked strong{min-width:0;padding:0;border-radius:0;color:var(--ems-text);background:transparent;font:700 16px Arial,sans-serif;text-align:left}html[data-theme="dark"] .scorecard-table-total-weight strong,html[data-theme="dark"] .scorecard-table-total-weight.linked strong{color:var(--ems-text);background:transparent}
+.scorecard-create-scope-modal {
+  width: min(920px, calc(100vw - 32px));
+}
+
+.scorecard-create-scope-modal > header {
+  cursor: default;
+  touch-action: auto;
+}
+
+.scorecard-create-scope-modal .assignment-scope-browser {
+  min-height: 380px;
+}
+
+.scorecard-name-only-edit .scorecard-info-grid > :nth-child(2),
+.scorecard-name-only-edit .scorecard-info-grid > :nth-child(3),
+.scorecard-name-only-edit .scorecard-info-grid > :nth-child(5) {
+  pointer-events: none;
+}
+
+.scorecard-name-only-edit .scorecard-info-grid > :nth-child(2),
+.scorecard-name-only-edit .scorecard-info-grid > :nth-child(3) {
+  opacity: .72;
+}
+
+.scorecard-status-readonly {
+  display: flex;
+  align-items: center;
+}
+
+.scorecard-status-readonly .scorecard-status {
+  padding: 6px 11px;
+  font-size: 11px;
+}
+
+.scorecard-status.inactive {
+  color: #667085;
+  background: #e9edf2;
+}
+
+.scorecard-status.inactive i {
+  background: #7b8492;
+}

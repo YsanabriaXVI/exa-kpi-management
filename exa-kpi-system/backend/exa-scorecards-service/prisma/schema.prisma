@@ -182,6 +182,7 @@ model ScorecardPeriodComposition {
   poolCompositionExternalId BigInt?               @map("pool_composition_external_id")
   statusCode                String                @default("PREPARING") @map("status_code") @db.VarChar(30)
   finalizedAt               DateTime?             @map("finalized_at") @db.DateTime(3)
+  scopeCustomizedAt         DateTime?             @map("scope_customized_at") @db.DateTime(3)
   finalizedByUserId         BigInt?               @map("finalized_by_user_id")
   createdAt                 DateTime              @default(now()) @map("created_at") @db.DateTime(3)
   createdByUserId           BigInt?               @map("created_by_user_id")
@@ -190,12 +191,46 @@ model ScorecardPeriodComposition {
   scorecard                 Scorecard             @relation(fields: [scorecardId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_period_compositions_scorecard")
   kpis                      ScorecardPeriodKpi[]
   links                     ScorecardPeriodLink[]
+  scopeDepartments          ScorecardPeriodDepartmentScope[]
 
   @@unique([scorecardId, periodStart], map: "uq_scorecard_period_composition")
   @@index([scorecardId, statusCode, periodStart], map: "ix_scorecard_period_status")
   @@index([poolCompositionExternalId], map: "ix_scorecard_pool_composition_external")
   @@index([poolPeriodExternalId], map: "ix_scorecard_pool_period_external")
   @@map("scorecard_period_compositions")
+}
+
+model ScorecardPeriodDepartmentScope {
+  id                           BigInt                         @id @default(autoincrement()) @map("scorecard_period_department_scope_id")
+  scorecardPeriodCompositionId BigInt                         @map("scorecard_period_composition_id")
+  externalDepartmentId         BigInt                         @map("external_department_id")
+  externalCompanyId            BigInt                         @map("external_company_id")
+  departmentCodeSnapshot       String                         @map("department_code_snapshot") @db.VarChar(50)
+  departmentNameSnapshot       String                         @map("department_name_snapshot") @db.VarChar(150)
+  displayOrder                 Int                            @default(1) @map("display_order") @db.SmallInt
+  createdAt                    DateTime                       @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId              BigInt?                        @map("created_by_user_id")
+  composition                  ScorecardPeriodComposition     @relation(fields: [scorecardPeriodCompositionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_period_department_scope_composition")
+  employees                    ScorecardPeriodEmployeeScope[]
+
+  @@unique([scorecardPeriodCompositionId, externalDepartmentId], map: "uq_period_department_scope")
+  @@unique([scorecardPeriodCompositionId, displayOrder], map: "uq_period_department_scope_order")
+  @@map("scorecard_period_department_scopes")
+}
+
+model ScorecardPeriodEmployeeScope {
+  id                               BigInt                         @id @default(autoincrement()) @map("scorecard_period_employee_scope_id")
+  scorecardPeriodDepartmentScopeId BigInt                         @map("scorecard_period_department_scope_id")
+  externalEmployeeId               BigInt                         @map("external_employee_id")
+  employeeCodeSnapshot             String                         @map("employee_code_snapshot") @db.VarChar(50)
+  employeeNameSnapshot             String                         @map("employee_name_snapshot") @db.VarChar(220)
+  createdAt                        DateTime                       @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId                  BigInt?                        @map("created_by_user_id")
+  departmentScope                  ScorecardPeriodDepartmentScope @relation(fields: [scorecardPeriodDepartmentScopeId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_period_employee_scope_department")
+
+  @@unique([scorecardPeriodDepartmentScopeId, externalEmployeeId], map: "uq_period_department_employee")
+  @@index([externalEmployeeId], map: "ix_period_employee_external")
+  @@map("scorecard_period_employee_scopes")
 }
 
 model ScorecardPeriodKpi {

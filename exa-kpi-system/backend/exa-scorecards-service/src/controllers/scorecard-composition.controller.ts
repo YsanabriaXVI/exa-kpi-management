@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { addPeriodKpisBodySchema, addPeriodLinkBodySchema, monitoringMaterializationQuerySchema, poolUsageBatchBodySchema, poolUsageQuerySchema, poolWorkflowQuerySchema, scorecardPeriodKpiParamsSchema, scorecardPeriodLinkParamsSchema, scorecardPeriodParamsSchema, updatePeriodWeightsBodySchema } from "../schemas/scorecard.schema.js";
+import { addPeriodKpisBodySchema, addPeriodLinkBodySchema, monitoringMaterializationQuerySchema, poolUsageBatchBodySchema, poolUsageQuerySchema, poolWorkflowQuerySchema, scorecardPeriodKpiParamsSchema, scorecardPeriodLinkParamsSchema, scorecardPeriodParamsSchema, updatePeriodScopeBodySchema, updatePeriodWeightsBodySchema } from "../schemas/scorecard.schema.js";
 import { scorecardCompositionService } from "../services/scorecard-composition.service.js";
 
 type Handler = (request: Request, response: Response) => Promise<void>;
@@ -18,4 +18,5 @@ export const availableLinks = handle(async (request, response) => { const p = sc
 export const addLink = handle(async (request, response) => { const p = scorecardPeriodParamsSchema.parse(request.params); const items = addPeriodLinkBodySchema.parse(request.body); response.status(201).json({ data: await scorecardCompositionService.addLinks(BigInt(p.id), p.periodKey, items, request.identity.actorUserId) }); });
 export const removeLink = handle(async (request, response) => { const p = scorecardPeriodLinkParamsSchema.parse(request.params); await scorecardCompositionService.removeLink(BigInt(p.id), p.periodKey, BigInt(p.linkedScorecardId)); response.status(204).end(); });
 export const updateWeights = handle(async (request, response) => { const p = scorecardPeriodParamsSchema.parse(request.params); response.json({ data: await scorecardCompositionService.updateWeights(BigInt(p.id), p.periodKey, updatePeriodWeightsBodySchema.parse(request.body)) }); });
+export const updateScope = handle(async (request, response) => { const p = scorecardPeriodParamsSchema.parse(request.params); const body = updatePeriodScopeBodySchema.parse(request.body); response.json({ data: await scorecardCompositionService.updateScope(BigInt(p.id), p.periodKey, body.departments, request.identity.actorUserId) }); });
 export const finalizeComposition = handle(async (request, response) => { const p = scorecardPeriodParamsSchema.parse(request.params); response.json({ data: await scorecardCompositionService.finalize(BigInt(p.id), p.periodKey, request.identity.actorUserId) }); });

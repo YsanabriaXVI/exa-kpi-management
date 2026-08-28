@@ -7,6 +7,7 @@ import { AppError } from "../utils/app-error.js";
 const include = {
   kpis: { orderBy: { displayOrder: "asc" as const } },
   links: { include: { linkedScorecard: { include: { companies: { orderBy: { displayOrder: "asc" as const } }, departments: { orderBy: { displayOrder: "asc" as const } } } } }, orderBy: { displayOrder: "asc" as const } },
+  scopeDepartments: { include: { employees: true }, orderBy: { displayOrder: "asc" as const } },
 };
 type FullComposition = Prisma.ScorecardPeriodCompositionGetPayload<{ include: typeof include }>;
 
@@ -92,17 +93,18 @@ async function findComposition(scorecardId: bigint, periodKey: string) {
   return prisma.scorecardPeriodComposition.findFirst({ where: { scorecardId, periodKey }, include });
 }
 
-async function getOrCreate(owner: Awaited<ReturnType<typeof scorecard>>, period: Awaited<ReturnType<typeof finalizedPeriod>>, actor: bigint) {
-  return prisma.scorecardPeriodComposition.upsert({
-    where: { scorecardId_periodStart: { scorecardId: owner.id, periodStart: period.periodStart } },
-    update: {},
-    create: {
-      scorecardId: owner.id, kpiPoolExternalId: owner.kpiPoolExternalId,
-      poolPeriodExternalId: period.poolPeriodExternalId, poolCompositionExternalId: period.poolCompositionExternalId,
-      periodKey: period.periodKey, periodStart: period.periodStart, periodEnd: period.periodEnd,
-      createdByUserId: actor,
-    },
-    include,
+async function getOrCreate(owner: Awaited<ReturnType<typeof scorecard>>, period: { periodKey: string; periodStart: Date; periodEnd: Date; poolPeriodExternalId: bigint | null; poolCompositionExternalId: bigint | null }, actor: bigint) {
+  const existing = await findComposition(owner.id, period.periodKey);
+  if (existing && (existing.scopeCustomizedAt !== null || existing.statusCode === "FINALIZED")) return existing;
+  return prisma.$transaction(async (tx) => {
+    const previous = await tx.scorecardPeriodComposition.findFirst({ where: { scorecardId: owner.id, periodStart: { lt: period.periodStart }, scopeCustomizedAt: { not: null } }, orderBy: { periodStart: "desc" }, include: { scopeDepartments: { include: { employees: true }, orderBy: { displayOrder: "asc" } } } });
+    const base = previous?.scopeDepartments.length ? previous.scopeDepartments : await tx.scorecardDepartmentScope.findMany({ where: { scorecardId: owner.id }, include: { employees: true }, orderBy: { displayOrder: "asc" } });
+    if (existing) {
+      await tx.scorecardPeriodDepartmentScope.deleteMany({ where: { scorecardPeriodCompositionId: existing.id } });
+      for (const [index, department] of base.entries()) await tx.scorecardPeriodDepartmentScope.create({ data: { scorecardPeriodCompositionId: existing.id, externalDepartmentId: department.externalDepartmentId, externalCompanyId: department.externalCompanyId, departmentCodeSnapshot: department.departmentCodeSnapshot, departmentNameSnapshot: department.departmentNameSnapshot, displayOrder: index + 1, createdByUserId: actor, employees: { create: department.employees.map((employee) => ({ externalEmployeeId: employee.externalEmployeeId, employeeCodeSnapshot: employee.employeeCodeSnapshot, employeeNameSnapshot: employee.employeeNameSnapshot, createdByUserId: actor })) } } });
+      return (await tx.scorecardPeriodComposition.findUnique({ where: { id: existing.id }, include }))!;
+    }
+    return tx.scorecardPeriodComposition.create({ data: { scorecardId: owner.id, kpiPoolExternalId: owner.kpiPoolExternalId, poolPeriodExternalId: period.poolPeriodExternalId, poolCompositionExternalId: period.poolCompositionExternalId, periodKey: period.periodKey, periodStart: period.periodStart, periodEnd: period.periodEnd, createdByUserId: actor, scopeDepartments: { create: base.map((department, index) => ({ externalDepartmentId: department.externalDepartmentId, externalCompanyId: department.externalCompanyId, departmentCodeSnapshot: department.departmentCodeSnapshot, departmentNameSnapshot: department.departmentNameSnapshot, displayOrder: index + 1, createdByUserId: actor, employees: { create: department.employees.map((employee) => ({ externalEmployeeId: employee.externalEmployeeId, employeeCodeSnapshot: employee.employeeCodeSnapshot, employeeNameSnapshot: employee.employeeNameSnapshot, createdByUserId: actor })) } })) } }, include });
   });
 }
 
@@ -120,6 +122,8 @@ function dto(value: FullComposition) {
     periodStart: value.periodStart.toISOString().slice(0, 10), periodEnd: value.periodEnd.toISOString().slice(0, 10),
     poolPeriodExternalId: value.poolPeriodExternalId?.toString() ?? null,
     poolCompositionExternalId: value.poolCompositionExternalId?.toString() ?? null,
+    scopeCustomized: value.scopeCustomizedAt !== null,
+    scope: { departments: value.scopeDepartments.map((department) => ({ id: department.externalDepartmentId.toString(), code: department.departmentCodeSnapshot, name: department.departmentNameSnapshot, companyId: department.externalCompanyId.toString(), collaborators: department.employees.map((employee) => ({ id: employee.externalEmployeeId.toString(), code: employee.employeeCodeSnapshot, name: employee.employeeNameSnapshot })) })) },
     kpis: value.kpis.map((row) => ({
       id: row.id.toString(), poolMembershipExternalId: row.kpiPoolMembershipExternalId.toString(),
       kpiDefinitionExternalId: row.kpiDefinitionExternalId.toString(), kpiConfigurationExternalId: row.kpiConfigurationExternalId.toString(),
@@ -210,8 +214,9 @@ export const scorecardCompositionService = {
   },
 
   async get(scorecardId: bigint, periodKey: string, actor: bigint) {
-    const owner = await scorecard(scorecardId); const period = await finalizedPeriod(owner.kpiPoolExternalId, periodKey);
-    const existing = await findComposition(scorecardId, periodKey); if (existing) return dto(existing); canPrepare(owner);
+    const owner = await scorecard(scorecardId);
+    const existing = await findComposition(scorecardId, periodKey); if (existing && (existing.scopeCustomizedAt !== null || existing.statusCode === "FINALIZED")) return dto(existing); canPrepare(owner);
+    const period = await finalizedPeriod(owner.kpiPoolExternalId, periodKey);
     return dto(await getOrCreate(owner, period, actor));
   },
 
@@ -221,6 +226,37 @@ export const scorecardCompositionService = {
     const occupied = await prisma.scorecardPeriodKpi.findMany({ where: { kpiPoolExternalId: owner.kpiPoolExternalId, periodKey, composition: { scorecardId: { not: scorecardId } } }, select: { kpiConfigurationExternalId: true, composition: { select: { scorecard: { select: { id: true, code: true, name: true } } } } } });
     const occupiedByConfiguration = new Map(occupied.map((row) => [row.kpiConfigurationExternalId.toString(), row.composition.scorecard]));
     return { data: period.memberships.map((row) => { const assigned = occupiedByConfiguration.get(row.kpiConfigurationExternalId.toString()); return { poolMembershipExternalId: row.poolMembershipExternalId.toString(), kpiDefinitionExternalId: row.kpiDefinitionExternalId.toString(), kpiConfigurationExternalId: row.kpiConfigurationExternalId.toString(), definitionCode: row.definitionCode, definitionName: row.definitionName, configurationCode: row.configurationCode, categoryName: row.categoryName, goal: row.goalSnapshot, dataSource: row.dataSourceSnapshot, measurementUnit: row.measurementUnitSnapshot, displayOrder: row.displayOrder, selectionStatus: selected.has(row.poolMembershipExternalId.toString()) ? "SELECTED_IN_SCORECARD" : assigned ? "ASSIGNED_TO_ANOTHER_SCORECARD" : "AVAILABLE_TO_SELECT", assignedScorecard: assigned ? { id: assigned.id.toString(), code: assigned.code, name: assigned.name } : null }; }) };
+  },
+
+  async updateScope(scorecardId: bigint, periodKey: string, departments: Array<{ id: string; companyId: string; code: string; name: string; collaborators: Array<{ id: string; code: string; name: string }> }>, actor: bigint) {
+    const owner = await scorecard(scorecardId); canPrepare(owner);
+    let current = await findComposition(scorecardId, periodKey);
+    if (!current) {
+      const inputPeriod = (await kpiPoolClient.periods(owner.kpiPoolExternalId.toString())).find((period) => period.periodKey === periodKey);
+      if (!inputPeriod) throw new AppError(404, "POOL_INPUT_PERIOD_NOT_FOUND", "The Input Period does not exist in the selected KPI Pool");
+      current = await getOrCreate(owner, { periodKey: inputPeriod.periodKey, periodStart: new Date(`${inputPeriod.start}T00:00:00.000Z`), periodEnd: new Date(`${inputPeriod.end}T00:00:00.000Z`), poolPeriodExternalId: inputPeriod.poolPeriodId ? BigInt(inputPeriod.poolPeriodId) : null, poolCompositionExternalId: inputPeriod.poolCompositionId ? BigInt(inputPeriod.poolCompositionId) : null }, actor);
+    }
+    editable(owner, current);
+    const pool = await kpiPoolClient.getPool(owner.kpiPoolExternalId.toString());
+    const allowedCompanyIds = new Set(pool.companies.map((company) => company.id));
+    if (departments.some((department) => !allowedCompanyIds.has(department.companyId))) throw new AppError(422, "PERIOD_SCOPE_DEPARTMENT_OUTSIDE_POOL", "One or more Departments are outside the KPI Pool company scope");
+    if (new Set(departments.map((department) => department.id)).size !== departments.length) throw new AppError(422, "PERIOD_SCOPE_DEPARTMENT_DUPLICATE", "A Department cannot appear more than once in the period scope");
+    const collaboratorIds = departments.flatMap((department) => department.collaborators.map((collaborator) => collaborator.id));
+    if (new Set(collaboratorIds).size !== collaboratorIds.length) throw new AppError(422, "PERIOD_SCOPE_COLLABORATOR_DUPLICATE", "A Collaborator cannot appear in more than one selected Department");
+    await prisma.$transaction(async (tx) => {
+      await tx.scorecardPeriodDepartmentScope.deleteMany({ where: { scorecardPeriodCompositionId: current.id } });
+      for (const [index, department] of departments.entries()) await tx.scorecardPeriodDepartmentScope.create({ data: { scorecardPeriodCompositionId: current.id, externalDepartmentId: BigInt(department.id), externalCompanyId: BigInt(department.companyId), departmentCodeSnapshot: department.code, departmentNameSnapshot: department.name, displayOrder: index + 1, createdByUserId: actor, employees: { create: department.collaborators.map((employee) => ({ externalEmployeeId: BigInt(employee.id), employeeCodeSnapshot: employee.code, employeeNameSnapshot: employee.name, createdByUserId: actor })) } } });
+      await tx.scorecardPeriodComposition.update({ where: { id: current.id }, data: { scopeCustomizedAt: new Date(), updatedByUserId: actor } });
+      const inheritingFutureCompositions = await tx.scorecardPeriodComposition.findMany({
+        where: { scorecardId, periodStart: { gt: current.periodStart }, statusCode: "PREPARING", scopeCustomizedAt: null },
+        select: { id: true },
+      });
+      for (const future of inheritingFutureCompositions) {
+        await tx.scorecardPeriodDepartmentScope.deleteMany({ where: { scorecardPeriodCompositionId: future.id } });
+        for (const [index, department] of departments.entries()) await tx.scorecardPeriodDepartmentScope.create({ data: { scorecardPeriodCompositionId: future.id, externalDepartmentId: BigInt(department.id), externalCompanyId: BigInt(department.companyId), departmentCodeSnapshot: department.code, departmentNameSnapshot: department.name, displayOrder: index + 1, createdByUserId: actor, employees: { create: department.collaborators.map((employee) => ({ externalEmployeeId: BigInt(employee.id), employeeCodeSnapshot: employee.code, employeeNameSnapshot: employee.name, createdByUserId: actor })) } } });
+      }
+    });
+    return dto((await findComposition(scorecardId, periodKey))!);
   },
 
   async addKpis(scorecardId: bigint, periodKey: string, items: Array<{ poolMembershipExternalId: string; weight: number }>, actor: bigint) {
