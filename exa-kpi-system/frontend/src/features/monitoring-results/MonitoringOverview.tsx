@@ -15,16 +15,12 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMultiSelectVisibleCount } from "../../components/useMultiSelectVisibleCount";
-import {
-  monitoringPools,
-  type MonitoringPool,
-  type MonitoringStatus,
-} from "./monitoring-results.data";
+import { type MonitoringPool, type MonitoringStatus } from "./monitoring-results.types";
 import { isMonitoringPeriodClosed } from "./monitoring-period-state";
 import "./monitoring-results.css";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
-import { monitoringResultsService } from "./monitoring-results.service";
+import { monitoringReadService } from "./monitoring-results.service";
 
 const statusLabels: Record<MonitoringStatus, string> = {
   ACTIVE: "Active",
@@ -341,7 +337,6 @@ function primaryAction(pool: MonitoringPool) {
 export function MonitoringOverview() {
   const [pageSize, setPageSize] = useState(10);
   const navigate = useNavigate();
-  const periodsQuery = useQuery({ queryKey: ["monitoring-periods"], queryFn: monitoringResultsService.listPeriods, retry: false });
   const [navigationError, setNavigationError] = useState("");
   const [search, setSearch] = useState("");
   const [companiesSelected, setCompaniesSelected] = useState<string[]>([]);
@@ -356,56 +351,12 @@ export function MonitoringOverview() {
       ? "table"
       : "cards",
   );
-  const companies = [
-    ...new Set(monitoringPools.flatMap((pool) => pool.companies)),
-  ];
-  const filtered = useMemo(
-    () =>
-      monitoringPools.filter((pool) => {
-        const term = search.trim().toLowerCase();
-        const periodParts = pool.currentPeriod.split(" ");
-        const poolYear = Number(periodParts[periodParts.length - 1]);
-        const monthlyIndex = monitoringMonths.findIndex((month) =>
-          month.startsWith(periodParts[0]),
-        );
-        const quarterMatch = /^Q([1-4])$/.exec(periodParts[0]);
-        const quarterMonths = quarterMatch
-          ? [0, 1, 2].map(
-              (offset) => (Number(quarterMatch[1]) - 1) * 3 + offset,
-            )
-          : [];
-        const matchesPeriod =
-          !periodMonths.length ||
-          (poolYear === periodYear &&
-            (periodMonths.includes(monthlyIndex) ||
-              quarterMonths.some((month) => periodMonths.includes(month))));
-        return (
-          (!term || `${pool.code} ${pool.name}`.toLowerCase().includes(term)) &&
-          (!companiesSelected.length ||
-            companiesSelected.some((company) =>
-              pool.companies.includes(company),
-            )) &&
-          (!frequencies.length || frequencies.includes(pool.frequency)) &&
-          matchesPeriod &&
-          (!statuses.length || statuses.includes(pool.status))
-        );
-      }),
-    [
-      companiesSelected,
-      frequencies,
-      periodMonths,
-      periodYear,
-      search,
-      statuses,
-    ],
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const firstVisibleIndex = (currentPage - 1) * pageSize;
-  const paginatedPools = filtered.slice(
-    firstVisibleIndex,
-    firstVisibleIndex + pageSize,
-  );
+  const apiStatuses=statuses.flatMap((value)=>value==="ACTIVE"||value==="CONTINUE_ENTRY"?["DRAFT"]:value==="VALIDATED_WITH_WARNINGS"?["VALIDATED"]:[value]);
+  const overviewQuery=useQuery({queryKey:["monitoring-overview",page,pageSize,search,companiesSelected,frequencies,periodYear,periodMonths,apiStatuses],queryFn:()=>monitoringReadService.overview({page,pageSize,search:search.trim()||undefined,company:companiesSelected,frequency:frequencies,status:apiStatuses,year:periodYear,month:periodMonths.map((month)=>String(month+1)),sortBy:"periodStart",sortOrder:"desc"}),retry:false});
+  const companies=overviewQuery.data?.facets?.companies??[];
+  const paginatedPools:MonitoringPool[]=(overviewQuery.data?.items??[]).map((item)=>({id:Number(item.poolId),monitoringPeriodId:item.id,code:item.poolCode,name:item.poolName,companies:item.companies.map((company)=>company.name),duration:`${item.periodStart} - ${item.periodEnd}`,frequency:item.frequency??"Not available",currentPeriod:item.periodLabel,generatedInputs:1,closedInputs:item.status==="CLOSED"?1:0,kpiLines:item.expected,resultsEntered:item.entered,missing:item.pending,status:item.status==="DRAFT"?(item.entered?"CONTINUE_ENTRY":"ACTIVE"):item.status==="VALIDATED"&&item.validationStatus==="WITH_WARNINGS"?"VALIDATED_WITH_WARNINGS":item.status as MonitoringStatus} as MonitoringPool & {monitoringPeriodId:string}));
+  const filtered=paginatedPools;
+  const totalPages=Math.max(1,overviewQuery.data?.meta.totalPages??1);const currentPage=Math.min(page,totalPages);const firstVisibleIndex=(currentPage-1)*pageSize;
   useEffect(
     () => setPage(1),
     [
@@ -451,14 +402,10 @@ export function MonitoringOverview() {
       progress: Math.round((pool.closedInputs / pool.generatedInputs) * 100),
     };
   };
-  const openPrimaryAction = (pool: MonitoringPool) => {
-    const period = periodsQuery.data?.items.find((item) => item.poolId === String(pool.id));
-    if (!period) {
-      setNavigationError(`No materialized Monitoring Period exists for ${pool.code}.`);
-      return;
-    }
+  const openPrimaryAction = (pool: MonitoringPool & {monitoringPeriodId?:string}) => {
+    if (!pool.monitoringPeriodId) { setNavigationError(`No materialized Monitoring Period exists for ${pool.code}.`); return; }
     setNavigationError("");
-    navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${period.id}`);
+    navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${pool.monitoringPeriodId}`);
   };
 
   return (
@@ -660,7 +607,7 @@ export function MonitoringOverview() {
                 <button
                   className="monitor-action"
                   onClick={() =>
-                    navigate(`/app/monitoring-results/detail?poolId=${pool.id}`)
+                    navigate(`/app/monitoring-results/detail?monitoringPeriodId=${pool.monitoringPeriodId}`)
                   }
                 >
                   <Eye size={14} />
@@ -670,7 +617,7 @@ export function MonitoringOverview() {
                   className="monitor-action attached"
                   onClick={() =>
                     navigate(
-                      `/app/monitoring-results/attached-scorecards?poolId=${pool.id}&source=overview`,
+                      `/app/monitoring-results/attached-scorecards?monitoringPeriodId=${pool.monitoringPeriodId}&source=overview`,
                     )
                   }
                 >
@@ -729,8 +676,8 @@ export function MonitoringOverview() {
                     <td>
                       <div className="monitor-table-actions">
                         <button type="button" disabled={effectivePool.status === "CLOSED" || effectivePool.status === "LOCKED"} onClick={() => openPrimaryAction(pool)} title={action} aria-label={action}><ArrowRight size={15} /></button>
-                        <button type="button" onClick={() => navigate(`/app/monitoring-results/detail?poolId=${pool.id}`)} title="View Details" aria-label="View Details"><Eye size={15} /></button>
-                        <button type="button" onClick={() => navigate(`/app/monitoring-results/attached-scorecards?poolId=${pool.id}&source=overview`)} title="Attached ScoreCards" aria-label="Attached ScoreCards"><Link2 size={15} /></button>
+                        <button type="button" onClick={() => navigate(`/app/monitoring-results/detail?monitoringPeriodId=${pool.monitoringPeriodId}`)} title="View Details" aria-label="View Details"><Eye size={15} /></button>
+                        <button type="button" onClick={() => navigate(`/app/monitoring-results/attached-scorecards?monitoringPeriodId=${pool.monitoringPeriodId}&source=overview`)} title="Attached ScoreCards" aria-label="Attached ScoreCards"><Link2 size={15} /></button>
                         <button type="button" onClick={() => navigate(`/app/monitoring-results/pool-input-schedule?poolId=${pool.id}&source=overview`)} title="Input Schedule" aria-label="Input Schedule"><CalendarDays size={15} /></button>
                       </div>
                     </td>

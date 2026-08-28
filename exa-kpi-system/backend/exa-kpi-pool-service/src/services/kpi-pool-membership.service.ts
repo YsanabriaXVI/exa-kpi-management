@@ -126,10 +126,9 @@ export const kpiPoolMembershipService = {
   },
 
   async usage(configurationIds: string[]) {
-    const today = new Date();
-    const memberships = await prisma.kpiPoolKpi.findMany({ where: { kpiConfigurationExternalId: { in: configurationIds.map(BigInt) }, effectiveFrom: { lte: today }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: today } }], pool: { deletedAt: null } }, select: { kpiConfigurationExternalId: true, pool: { select: { id: true, poolCode: true, poolName: true, statusCode: true } } }, orderBy: [{ kpiConfigurationExternalId: "asc" }, { kpiPoolId: "asc" }] });
+    const memberships = await prisma.kpiPoolKpi.findMany({ where: { kpiConfigurationExternalId: { in: configurationIds.map(BigInt) }, pool: { deletedAt: null } }, select: { kpiConfigurationExternalId: true, pool: { select: { id: true, poolCode: true, poolName: true, statusCode: true } } }, orderBy: [{ kpiConfigurationExternalId: "asc" }, { kpiPoolId: "asc" }] });
     const grouped = new Map<string, Array<{ id: string; code: string; name: string; status: string }>>();
-    for (const item of memberships) { const key = item.kpiConfigurationExternalId.toString(); grouped.set(key, [...(grouped.get(key) ?? []), { id: item.pool.id.toString(), code: item.pool.poolCode, name: item.pool.poolName, status: item.pool.statusCode }]); }
+    for (const item of memberships) { const key = item.kpiConfigurationExternalId.toString(); const pools = grouped.get(key) ?? []; if (!pools.some((pool) => pool.id === item.pool.id.toString())) pools.push({ id: item.pool.id.toString(), code: item.pool.poolCode, name: item.pool.poolName, status: item.pool.statusCode }); grouped.set(key, pools); }
     return { data: configurationIds.map((configurationId) => ({ configurationId, usedIn: grouped.get(configurationId)?.length ?? 0, pools: grouped.get(configurationId) ?? [] })) };
   },
 

@@ -12,8 +12,12 @@ export const openApiDocument = {
       },
     },
     "/api/v1/monitoring-periods": {
-      get: { summary: "List materialized Monitoring Period identities for navigation", responses: { "200": { description: "Stable Monitoring Period IDs with Pool and Input Period identity" } } },
+      get: { summary: "Paginated Monitoring Overview with server-side filters and sorting", responses: { "200": { description: "Monitoring Period page, facets and totals" } } },
     },
+    "/api/v1/monitoring-periods/resolve": { get: { summary: "Resolve Monitoring availability and action for an exact Pool Input Period", responses: { "200": { description: "Available, ready to materialize, or unavailable with reason" } } } },
+    "/api/v1/monitoring-periods/{id}/detail": { get: { summary: "Paginated, filterable and sortable Monitoring KPI detail", responses: { "200": { description: "Monitoring detail projection" } } } },
+    "/api/v1/monitoring-periods/{id}/attached-scorecards": { get: { summary: "Paginated Scorecard snapshots and selected KPI results", responses: { "200": { description: "Attached Scorecards projection" } } } },
+    "/api/v1/monitoring-periods/pools/{poolId}/input-schedule": { get: { summary: "Paginated Pool Input Period schedule joined with Monitoring state", responses: { "200": { description: "Pool schedule projection including non-materialized periods" } } } },
     "/api/v1/monitoring-periods/{id}/result-entry": {
       get: {
         summary: "Get the materialized Result Entry projection and Expected/Entered/Pending summary",

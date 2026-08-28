@@ -24,6 +24,8 @@ import { kpiConfigurationService } from "../services/kpi-configuration.service.j
 const input = {
   definitionId: "4", goal: 4200, measurementUnit: "kms", dataSource: "Integrator - EMS", isActive: true,
   ranges: { redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100 },
+  resultSemantics: null, evaluationTypeCode: null, scoringMethod: null, scoringRuleConfig: null,
+  scoringRuleConfigVersion: null, negativeResultPolicy: null, scoringApprovalStatus: "BLOCKED" as const,
 };
 
 beforeEach(() => {
@@ -52,7 +54,7 @@ describe("kpiConfigurationService.create", () => {
     const created = await kpiConfigurationService.create(input, 99n);
     expect(db.$transaction).toHaveBeenCalledTimes(1);
     expect(tx.kpiConfiguration.create).toHaveBeenCalledWith({ data: expect.objectContaining({ kpiDefinitionId: 4n, configCode: "KPC-050-04" }) });
-    expect(tx.kpiConfigurationRevision.create).toHaveBeenCalledWith({ data: expect.objectContaining({ kpiConfigurationId: 20n, revisionNumber: 1, targetValue: 4200 }) });
+    expect(tx.kpiConfigurationRevision.create).toHaveBeenCalledWith({ data: expect.objectContaining({ kpiConfigurationId: 20n, revisionNumber: 1, targetValue: 4200, measurementUnitId: 1n, dataSourceId: 2n }) });
     expect(tx.kpiConfigurationRevisionThreshold.createMany.mock.calls[0]?.[0].data).toHaveLength(3);
     expect(created).toMatchObject({ code: "KPC-050-04", definitionId: 4 });
   });
@@ -123,14 +125,15 @@ describe("kpiConfigurationService.effectiveSnapshots", () => {
     definition: { id: 50n, kpiCode: "KPI-050", kpiName: "Productivity", description: "Improve productivity" },
     measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" },
     primaryDataSource: { id: 2n, code: "EMS", name: "EMS" },
-    revisions: [{ id: 100n, revisionNumber: 1, targetValue: { toString: () => "100" }, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), effectiveTo: new Date("2026-08-31T00:00:00.000Z"), evaluationType: { id: 3n, code: "HIGHER_IS_BETTER", name: "Higher is better" }, thresholds: [{ id: 4n, rangeMinPercent: { toString: () => "80" }, rangeMaxPercent: { toString: () => "100" }, includesMin: true, includesMax: true, displayOrder: 1, trafficLightLevel: { id: 5n, code: "GREEN", name: "Green" } }] }],
+    revisions: [{ id: 100n, revisionNumber: 1, targetValue: { toString: () => "100" }, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), effectiveTo: new Date("2026-08-31T00:00:00.000Z"), evaluationType: { id: 3n, code: "HIGHER_IS_BETTER", name: "Higher is better" }, measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" }, dataSource: { id: 2n, code: "EMS", name: "EMS" }, resultSemantics:"ABSOLUTE_VALUE",scoringMethod:"PROPORTIONAL",scoringRuleConfig:{floorPercent:0,capPercent:100},scoringRuleConfigVersion:1,negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", thresholds: [{ id: 4n, rangeMinPercent: { toString: () => "80" }, rangeMaxPercent: { toString: () => "100" }, includesMin: true, includesMax: true, displayOrder: 1, trafficLightLevel: { id: 5n, code: "GREEN", name: "Green" } }] }],
   };
 
   it("returns the single revision covering the complete Input Period with snapshot catalogs", async () => {
     db.kpiConfiguration.findMany.mockResolvedValue([effectiveRecord]);
     const result = await kpiConfigurationService.effectiveSnapshots({ configurationIds: ["10"], periodStart: "2026-08-01", periodEnd: "2026-08-31" });
     expect(db.kpiConfiguration.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: [10n] }, deletedAt: null } }));
-    expect(result.data[0]).toMatchObject({ kpiConfigurationId: "10", kpiConfigurationRevisionId: "100", revisionNumber: 1, goal: "100", evaluationType: { code: "HIGHER_IS_BETTER" }, measurementUnit: { code: "KMS" }, dataSource: { code: "EMS" } });
+    expect(db.kpiConfiguration.findMany).toHaveBeenCalledWith(expect.objectContaining({ select: expect.objectContaining({ revisions: expect.objectContaining({ where: { effectiveFrom: { lte: new Date("2026-08-01T00:00:00.000Z") }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date("2026-08-31T00:00:00.000Z") } }] } }) }) }));
+    expect(result.data[0]).toMatchObject({ kpiConfigurationId: "10", kpiConfigurationRevisionId: "100", revisionNumber: 1, goal: "100", evaluationType: { code: "HIGHER_IS_BETTER" }, resultSemantics:"ABSOLUTE_VALUE",scoringMethod:"PROPORTIONAL",scoringRuleConfig:{floorPercent:0,capPercent:100},scoringRuleConfigVersion:1,negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", measurementUnit: { code: "KMS" }, dataSource: { code: "EMS" } });
   });
 
   it("fails instead of choosing a revision when coverage is missing or ambiguous", async () => {

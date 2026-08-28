@@ -1,5 +1,6 @@
 import type { InputPeriod } from "../domain/input-period.js";
 import { formatDateOnly } from "../domain/input-period.js";
+import { prisma } from "../config/prisma.js";
 
 export type MonitoringClosureStatus = "NOT_REQUIRED" | "UNKNOWN" | "OPEN" | "PENDING" | "CLOSED" | "CLOSED_WITH_APPROVED_EXCEPTION";
 
@@ -16,12 +17,12 @@ export interface MonitoringPeriodStatusProvider {
 
 // Safe foundation until Monitoring exposes an authoritative REST contract or projection.
 // It deliberately never assumes that an unknown period is closed.
-const unavailableMonitoringProvider: MonitoringPeriodStatusProvider = {
-  async getStatus() { return "UNKNOWN"; },
+const persistedMonitoringProvider: MonitoringPeriodStatusProvider = {
+  async getStatus(poolId, period) { const closure=await prisma.monitoringPeriodClosureReference.findFirst({where:{kpiPoolId:poolId,periodKey:formatDateOnly(period.start).slice(0,7)}}); return closure ? closure.closureType==="WITH_EXCEPTIONS" ? "CLOSED_WITH_APPROVED_EXCEPTION" : "CLOSED" : "OPEN"; },
 };
 
 export const periodFinalizationGateway = {
-  async evaluate(poolId: bigint, periods: InputPeriod[], periodIndex: number, provider: MonitoringPeriodStatusProvider = unavailableMonitoringProvider): Promise<PeriodFinalizationDecision> {
+  async evaluate(poolId: bigint, periods: InputPeriod[], periodIndex: number, provider: MonitoringPeriodStatusProvider = persistedMonitoringProvider): Promise<PeriodFinalizationDecision> {
     if (periodIndex === 0) return { canFinalize: true, previousPeriodStart: null, previousMonitoringStatus: "NOT_REQUIRED", reasonCode: null };
     const previous = periods[periodIndex - 1];
     if (!previous) return { canFinalize: false, previousPeriodStart: null, previousMonitoringStatus: "UNKNOWN", reasonCode: "MONITORING_INTEGRATION_PENDING" };

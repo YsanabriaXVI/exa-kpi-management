@@ -34,6 +34,8 @@ export async function recalculatePeriodScores(tx: Transaction, monitoringPeriodI
         displayOrder: threshold.displayOrder,
       })),
       weight: input.weightPercentSnapshot,
+      negativeResultPolicy: input.negativeResultPolicySnapshot,
+      scoringApprovalStatus: input.scoringApprovalStatusSnapshot,
     });
     contributionByInput.set(input.id.toString(), calculated.weightedScore);
     await tx.kpiResult.update({

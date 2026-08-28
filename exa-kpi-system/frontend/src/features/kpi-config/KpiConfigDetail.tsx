@@ -17,14 +17,20 @@ export function KpiConfigDetail() {
   const requestedCode = params.get("kpiConfigCode");
   const requestedPoolId = Number(params.get("poolId")) || 1;
   const openedFromPoolDetail = params.get("from") === "pool-detail";
-  const openedFromPool = Boolean(requestedCode);
+  const openedFromPool = openedFromPoolDetail || params.get("from") === "pool-manage";
   const configId = requestedId;
   const detailQuery = useQuery({
     queryKey: ["kpi-config-detail", requestedCode ?? configId],
-    queryFn: () => openedFromPool
+    queryFn: () => requestedCode && !(Number.isFinite(configId) && configId > 0)
       ? kpiPoolService.getConfigurationDetailByCode(requestedCode as string)
       : kpiConfigService.getDetail(configId as number),
-    enabled: openedFromPool || (Number.isFinite(configId) && configId > 0),
+    enabled: Boolean(requestedCode) || (Number.isFinite(configId) && configId > 0),
+  });
+  const resolvedConfigurationId = detailQuery.data?.id;
+  const usageQuery = useQuery({
+    queryKey: ["kpi-pool-configuration-usage", "detail", resolvedConfigurationId],
+    queryFn: () => kpiPoolService.getConfigurationUsage([String(resolvedConfigurationId)]).then((items) => items[0]),
+    enabled: Boolean(resolvedConfigurationId),
   });
 
   if (!requestedCode && !(Number.isFinite(requestedId) && requestedId > 0)) {
@@ -43,6 +49,9 @@ export function KpiConfigDetail() {
   }
 
   const config = detailQuery.data;
+  const poolUsage = usageQuery.data;
+  const poolNames = poolUsage?.pools.map((pool) => pool.name) ?? config?.poolNames ?? [];
+  const usedIn = poolUsage?.usedIn ?? config?.usedIn ?? 0;
   const isUnconfigured = config?.status === "INCOMPLETE";
   const rangeRows = config ? [
     { label: "Red", color: "red", from: config.ranges.redFrom, to: config.ranges.redTo, meaning: "Critical" },
@@ -130,10 +139,10 @@ export function KpiConfigDetail() {
           </div>
         </section>
         <section className="config-detail-card usage-detail-card">
-          <Heading icon={<Database size={16} />} title="Usage Information" note={config.usedIn ? `${config.usedIn} ${config.usedIn === 1 ? "Pool" : "Pools"}` : "No Data"} />
-          <div className="usage-total"><span>Used in</span><strong>{config.usedIn} {config.usedIn === 1 ? "Pool" : "Pools"}</strong></div>
+          <Heading icon={<Database size={16} />} title="Usage Information" note={usageQuery.isLoading ? "Loading Pools..." : `${usedIn} ${usedIn === 1 ? "Pool" : "Pools"}`} />
+          <div className="usage-total"><span>Used in</span><strong>{usedIn} {usedIn === 1 ? "Pool" : "Pools"}</strong></div>
           <div className="pool-usage-list">
-            {config.poolNames.length ? config.poolNames.map((pool) => <div key={pool}><span>{pool}</span><strong><i />Active</strong></div>) : <p>Not currently assigned to any KPI Pool.</p>}
+            {usageQuery.isLoading ? <p>Loading assigned KPI Pools...</p> : poolNames.length ? poolNames.map((pool) => <div key={pool}><span>{pool}</span><strong><i />Assigned</strong></div>) : <p>Not assigned to any KPI Pool.</p>}
           </div>
         </section>
       </div>

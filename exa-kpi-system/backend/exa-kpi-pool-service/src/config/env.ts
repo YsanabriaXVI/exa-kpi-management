@@ -20,6 +20,7 @@ const environmentSchema = z.object({
   NATS_NAME: z.string().min(1).default("exa-kpi-pool-service"),
   NATS_STREAM: z.string().min(1).default("EXA_KPI_POOL_EVENTS"),
   NATS_SUBJECTS: z.string().min(1).default("kpi.pool.>"),
+  NATS_MONITORING_STREAM:z.string().min(1).default("MONITORING_EVENTS"),NATS_MONITORING_CONSUMER:z.string().min(1).default("exa-kpi-pool-monitoring-closures-v1"),
   OUTBOX_PROCESSOR_ENABLED: booleanFromEnvironment,
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2_000),
   OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().max(100).default(20),

@@ -36,6 +36,7 @@ model MeasurementUnit {
   updatedAt       DateTime?          @map("updated_at") @db.DateTime(3)
   updatedByUserId BigInt?            @map("updated_by_user_id")
   configurations  KpiConfiguration[]
+  configurationRevisions KpiConfigurationRevision[] @relation("RevisionMeasurementUnit")
 
   @@map("measurement_units")
 }
@@ -88,6 +89,7 @@ model DataSource {
   updatedAt          DateTime?          @map("updated_at") @db.DateTime(3)
   updatedByUserId    BigInt?            @map("updated_by_user_id")
   configurations     KpiConfiguration[]
+  configurationRevisions KpiConfigurationRevision[] @relation("RevisionDataSource")
 
   @@index([sourceType], map: "ix_data_sources_source_type")
   @@map("data_sources")
@@ -179,6 +181,14 @@ model KpiConfigurationRevision {
   revisionNumber     Int                                 @map("revision_number") @db.UnsignedInt
   targetValue        Decimal?                            @map("target_value") @db.Decimal(20, 6)
   evaluationTypeId   BigInt                              @map("evaluation_type_id")
+  measurementUnitId  BigInt                              @map("measurement_unit_id")
+  dataSourceId        BigInt                              @map("data_source_id")
+  resultSemantics    String?                             @map("result_semantics") @db.VarChar(40)
+  scoringMethod      String?                             @map("scoring_method") @db.VarChar(40)
+  scoringRuleConfig  Json?                               @map("scoring_rule_config")
+  scoringRuleConfigVersion Int?                          @map("scoring_rule_config_version") @db.UnsignedInt
+  negativeResultPolicy String?                           @map("negative_result_policy") @db.VarChar(20)
+  scoringApprovalStatus String                            @default("BLOCKED") @map("scoring_approval_status") @db.VarChar(30)
   effectiveFrom      DateTime                            @map("effective_from") @db.Date
   effectiveTo        DateTime?                           @map("effective_to") @db.Date
   changeReason       String?                             @map("change_reason") @db.VarChar(500)
@@ -188,11 +198,15 @@ model KpiConfigurationRevision {
   updatedByUserId    BigInt?                             @map("updated_by_user_id")
   configuration      KpiConfiguration                    @relation(fields: [kpiConfigurationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_configuration")
   evaluationType     EvaluationType                      @relation(fields: [evaluationTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_evaluation_type")
+  measurementUnit    MeasurementUnit                     @relation("RevisionMeasurementUnit", fields: [measurementUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_measurement_unit")
+  dataSource          DataSource                         @relation("RevisionDataSource", fields: [dataSourceId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_data_source")
   thresholds         KpiConfigurationRevisionThreshold[]
 
   @@unique([kpiConfigurationId, revisionNumber], map: "uq_kpi_configuration_revision_number")
   @@index([kpiConfigurationId, effectiveFrom, effectiveTo], map: "ix_kpi_configuration_revisions_effective_lookup")
   @@index([evaluationTypeId], map: "ix_kpi_configuration_revisions_evaluation_type")
+  @@index([measurementUnitId], map: "ix_kpi_configuration_revisions_measurement_unit")
+  @@index([dataSourceId], map: "ix_kpi_configuration_revisions_data_source")
   @@map("kpi_configuration_revisions")
 }
 

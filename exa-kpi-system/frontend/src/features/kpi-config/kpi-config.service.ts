@@ -1,5 +1,4 @@
 import type { KpiConfigInput, KpiConfigRecord } from "./kpi-config.types";
-import { kpiResults } from "../monitoring-results/monitoring-results.data";
 import { apiRequest } from "../../api/http-client";
 
 let configurations: KpiConfigRecord[] = [
@@ -60,35 +59,6 @@ let configurations: KpiConfigRecord[] = [
     updatedBy: "Carlos Gomez",
     poolNames: ["Pool Seguridad y Transporte 2026"],
   },
-];
-
-configurations = [
-  ...kpiResults.map((kpi): KpiConfigRecord => {
-    const definitionId = Number(kpi.code.replace(/\D/g, ""));
-    const numericGoal = Number(kpi.goal.replace(/[^0-9.-]/g, "")) || 0;
-    const lowerIsBetter = /(reduce|damage|cost|time|claim|emission|error|variance)/i.test(kpi.name);
-    return {
-      id: 1000 + definitionId,
-      code: `KPC-${String(definitionId).padStart(3, "0")}-01`,
-      definitionId,
-      definitionCode: kpi.code,
-      definitionName: kpi.name,
-      goal: numericGoal,
-      measurementUnit: kpi.unit,
-      evaluationType: lowerIsBetter ? "Lower is better" : "Higher is better",
-      dataSource: kpi.dataSource,
-      ranges: lowerIsBetter
-        ? { redFrom: 0, redTo: 30, yellowFrom: 31, yellowTo: 65, greenFrom: 66, greenTo: 100 }
-        : { redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100 },
-      usedIn: 1 + (definitionId % 3),
-      status: "CONFIGURED",
-      createdAt: "2026-01-15T09:00:00",
-      createdBy: "Carlos Gomez",
-      updatedAt: "2026-08-01T12:00:00",
-      updatedBy: "Carlos Gomez",
-      poolNames: ["KPI Pool Operations EXA"],
-    };
-  }),
 ];
 
 const wait = () => new Promise((resolve) => window.setTimeout(resolve, 220));

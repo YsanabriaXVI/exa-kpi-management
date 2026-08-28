@@ -1,0 +1,2 @@
+export type MonitoringStatus = "ACTIVE" | "CONTINUE_ENTRY" | "SUBMITTED" | "VALIDATED" | "VALIDATED_WITH_WARNINGS" | "CLOSED" | "LOCKED";
+export type MonitoringPool = { id:number; monitoringPeriodId?:string; code:string; name:string; companies:string[]; duration:string; frequency:string; currentPeriod:string; generatedInputs:number; closedInputs:number; kpiLines:number; resultsEntered:number; missing:number; status:MonitoringStatus };

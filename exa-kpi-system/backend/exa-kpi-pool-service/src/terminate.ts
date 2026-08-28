@@ -3,6 +3,7 @@ import { logger } from "./config/logger.js";
 import { natsManager } from "./config/nats.js";
 import { prisma } from "./config/prisma.js";
 import { outboxProcessor } from "./outbox/outbox.processor.js";
+import { monitoringEventsConsumer } from "./consumers/monitoring-events.consumer.js";
 
 let terminating = false;
 
@@ -13,7 +14,7 @@ export function registerTerminationHandlers(server: Server): void {
     logger.info({ signal }, "Graceful shutdown started");
     outboxProcessor.stop();
     server.close(async () => {
-      await Promise.allSettled([natsManager.stop(), prisma.$disconnect()]);
+      await Promise.allSettled([monitoringEventsConsumer.stop(),natsManager.stop(), prisma.$disconnect()]);
       logger.info("Graceful shutdown completed");
       process.exit(0);
     });

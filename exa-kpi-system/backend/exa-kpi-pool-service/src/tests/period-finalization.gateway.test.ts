@@ -10,7 +10,8 @@ describe("period finalization dependency", () => {
   });
 
   it("does not infer closure when Monitoring is unavailable", async () => {
-    await expect(periodFinalizationGateway.evaluate(1n, periods, 1)).resolves.toMatchObject({ canFinalize: false, previousPeriodStart: "2026-08-01", reasonCode: "MONITORING_INTEGRATION_PENDING" });
+    const unavailableProvider: MonitoringPeriodStatusProvider = { async getStatus() { return "UNKNOWN"; } };
+    await expect(periodFinalizationGateway.evaluate(1n, periods, 1, unavailableProvider)).resolves.toMatchObject({ canFinalize: false, previousPeriodStart: "2026-08-01", reasonCode: "MONITORING_INTEGRATION_PENDING" });
   });
 
   it.each(["CLOSED", "CLOSED_WITH_APPROVED_EXCEPTION"] as const)("allows the next period when Monitoring reports %s", async (status) => {

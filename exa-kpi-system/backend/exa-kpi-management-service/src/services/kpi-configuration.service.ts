@@ -4,13 +4,13 @@ import type { BatchLookupKpiConfigurationsBody, EffectiveKpiConfigurationSnapsho
 import { AppError } from "../utils/app-error.js";
 import { toKpiConfigurationDto } from "../utils/kpi-configuration.dto.js";
 
-const include = { definition: true, measurementUnit: true, primaryDataSource: true, status: true, inputFrequency: true, revisions: { orderBy: { revisionNumber: "desc" as const }, take: 1, include: { evaluationType: true, thresholds: { include: { trafficLightLevel: true } } } } };
+const include = { definition: true, measurementUnit: true, primaryDataSource: true, status: true, inputFrequency: true, revisions: { orderBy: { revisionNumber: "desc" as const }, take: 1, include: { evaluationType: true, measurementUnit: true, dataSource: true, thresholds: { include: { trafficLightLevel: true } } } } };
 const lower = (name: string) => /(reduce|damage|cost|time|claim|emission|error|variance|daño|costo|tiempo)/i.test(name);
 async function catalogs(tx: Prisma.TransactionClient, input: KpiConfigurationBody, definitionName: string) {
   const [unit, source, frequency, status, evaluation, levels] = await Promise.all([
     tx.measurementUnit.findFirst({ where: { symbol: input.measurementUnit, isActive: true } }), tx.dataSource.findFirst({ where: { name: input.dataSource, isActive: true } }),
     tx.inputFrequency.findUnique({ where: { code: "MONTHLY" } }), tx.kpiConfigurationStatus.findUnique({ where: { code: input.isActive ? "CONFIGURED" : "INACTIVE" } }),
-    tx.evaluationType.findUnique({ where: { code: lower(definitionName) ? "LOWER_IS_BETTER" : "HIGHER_IS_BETTER" } }), tx.trafficLightLevel.findMany({ where: { code: { in: ["RED", "YELLOW", "GREEN"] } } }),
+    tx.evaluationType.findUnique({ where: { code: input.evaluationTypeCode ?? (lower(definitionName) ? "LOWER_IS_BETTER" : "HIGHER_IS_BETTER") } }), tx.trafficLightLevel.findMany({ where: { code: { in: ["RED", "YELLOW", "GREEN"] } } }),
   ]);
   if (!unit || !source || !frequency || !status || !evaluation || levels.length !== 3) throw new AppError("KPI Configuration catalogs are unavailable", 422, "KPI_CONFIGURATION_CATALOG_UNAVAILABLE");
   return { unit, source, frequency, status, evaluation, levels };
@@ -20,8 +20,8 @@ async function writeThresholds(tx: Prisma.TransactionClient, revisionId: bigint,
   const values: Record<string, [number, number]> = { RED: [input.ranges.redFrom, input.ranges.redTo], YELLOW: [input.ranges.yellowFrom, input.ranges.yellowTo], GREEN: [input.ranges.greenFrom, input.ranges.greenTo] };
   await tx.kpiConfigurationRevisionThreshold.createMany({ data: ["RED", "YELLOW", "GREEN"].map((code, index) => { const range = values[code]!; return { kpiConfigurationRevisionId: revisionId, trafficLightLevelId: levels.find((level) => level.code === code)!.id, rangeMinPercent: range[0], rangeMaxPercent: range[1], includesMin: true, includesMax: true, displayOrder: index + 1 }; }) });
 }
-async function writeRevision(tx: Prisma.TransactionClient, configurationId: bigint, revisionNumber: number, input: KpiConfigurationBody, evaluationId: bigint, levels: { id: bigint; code: string }[], effectiveFrom = new Date()) {
-  const revision = await tx.kpiConfigurationRevision.create({ data: { kpiConfigurationId: configurationId, revisionNumber, targetValue: input.goal, evaluationTypeId: evaluationId, effectiveFrom, changeReason: revisionNumber === 1 ? "Initial configuration" : "Configuration updated for next Input Period" } });
+async function writeRevision(tx: Prisma.TransactionClient, configurationId: bigint, revisionNumber: number, input: KpiConfigurationBody, evaluationId: bigint, measurementUnitId: bigint, dataSourceId: bigint, levels: { id: bigint; code: string }[], effectiveFrom = new Date()) {
+  const revision = await tx.kpiConfigurationRevision.create({ data: { kpiConfigurationId: configurationId, revisionNumber, targetValue: input.goal, evaluationTypeId: evaluationId, measurementUnitId, dataSourceId, resultSemantics: input.resultSemantics, scoringMethod: input.scoringMethod, scoringRuleConfig: input.scoringRuleConfig === null ? Prisma.JsonNull : input.scoringRuleConfig as Prisma.InputJsonValue, scoringRuleConfigVersion: input.scoringRuleConfigVersion, negativeResultPolicy: input.negativeResultPolicy, scoringApprovalStatus: input.scoringApprovalStatus, effectiveFrom, changeReason: revisionNumber === 1 ? "Initial configuration" : "Configuration updated for next Input Period" } });
   await writeThresholds(tx, revision.id, input, levels);
 }
 function nextPeriodStart(today: Date, monthsPerPeriod: number) {
@@ -46,9 +46,7 @@ export const kpiConfigurationService = {
       select: {
         id: true, configCode: true,
         definition: { select: { id: true, kpiCode: true, kpiName: true, description: true } },
-        measurementUnit: { select: { id: true, code: true, name: true, symbol: true } },
-        primaryDataSource: { select: { id: true, code: true, name: true } },
-        revisions: { where: { effectiveFrom: { lte: periodStart }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodEnd } }] }, orderBy: { revisionNumber: "asc" }, include: { evaluationType: true, thresholds: { orderBy: { displayOrder: "asc" }, include: { trafficLightLevel: true } } } },
+        revisions: { where: { effectiveFrom: { lte: periodStart }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodEnd } }] }, orderBy: { revisionNumber: "asc" }, include: { evaluationType: true, measurementUnit: true, dataSource: true, thresholds: { orderBy: { displayOrder: "asc" }, include: { trafficLightLevel: true } } } },
       },
     });
     const byId = new Map(records.map((record) => [record.id.toString(), record]));
@@ -66,8 +64,10 @@ export const kpiConfigurationService = {
         configCode: record.configCode, kpiDefinitionId: record.definition.id.toString(), kpiCode: record.definition.kpiCode, kpiName: record.definition.kpiName, objective: record.definition.description,
         goal: revision.targetValue?.toString() ?? null,
         evaluationType: { id: revision.evaluationType.id.toString(), code: revision.evaluationType.code, name: revision.evaluationType.name },
-        measurementUnit: { id: record.measurementUnit.id.toString(), code: record.measurementUnit.code, name: record.measurementUnit.name, symbol: record.measurementUnit.symbol },
-        dataSource: { id: record.primaryDataSource.id.toString(), code: record.primaryDataSource.code, name: record.primaryDataSource.name },
+        resultSemantics: revision.resultSemantics, scoringMethod: revision.scoringMethod, scoringRuleConfig: revision.scoringRuleConfig,
+        scoringRuleConfigVersion: revision.scoringRuleConfigVersion, negativeResultPolicy: revision.negativeResultPolicy, scoringApprovalStatus: revision.scoringApprovalStatus,
+        measurementUnit: { id: revision.measurementUnit.id.toString(), code: revision.measurementUnit.code, name: revision.measurementUnit.name, symbol: revision.measurementUnit.symbol },
+        dataSource: { id: revision.dataSource.id.toString(), code: revision.dataSource.code, name: revision.dataSource.name },
         thresholds: revision.thresholds.map((threshold) => ({ id: threshold.id.toString(), trafficLightLevelId: threshold.trafficLightLevel.id.toString(), code: threshold.trafficLightLevel.code, name: threshold.trafficLightLevel.name, rangeMinPercent: threshold.rangeMinPercent.toString(), rangeMaxPercent: threshold.rangeMaxPercent.toString(), includesMin: threshold.includesMin, includesMax: threshold.includesMax, displayOrder: threshold.displayOrder })),
       };
     }) };
@@ -94,7 +94,7 @@ export const kpiConfigurationService = {
           inputFrequency: { select: { code: true, name: true, isActive: true } },
           measurementUnit: { select: { symbol: true, name: true } },
           primaryDataSource: { select: { name: true } },
-          revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true } },
+          revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true, scoringApprovalStatus: true, measurementUnit: { select: { symbol: true, name: true } }, dataSource: { select: { name: true } } } },
         },
       }),
       prisma.kpiConfiguration.count({ where }),
@@ -107,9 +107,9 @@ export const kpiConfigurationService = {
         categoryName: record.definition.category.name,
         inputFrequencyId: record.inputFrequencyId.toString(), inputFrequencyCode: record.inputFrequency.code,
         inputFrequencyName: record.inputFrequency.name, inputFrequencyIsActive: record.inputFrequency.isActive,
-        measurementUnit: record.measurementUnit.symbol || record.measurementUnit.name,
-        dataSource: record.primaryDataSource.name,
-        goal: record.revisions[0]?.targetValue?.toString() ?? null,
+        measurementUnit: record.revisions[0]?.measurementUnit.symbol || record.revisions[0]?.measurementUnit.name || record.measurementUnit.symbol || record.measurementUnit.name,
+        dataSource: record.revisions[0]?.dataSource.name ?? record.primaryDataSource.name,
+        goal: record.revisions[0]?.targetValue?.toString() ?? null, scoringApprovalStatus: record.revisions[0]?.scoringApprovalStatus ?? "BLOCKED",
         status: record.status.code, isActive: record.status.code === "CONFIGURED",
       })),
       meta: { page: query.page, pageSize: query.pageSize, totalItems, totalPages: Math.ceil(totalItems / query.pageSize) },
@@ -129,7 +129,7 @@ export const kpiConfigurationService = {
         inputFrequency: { select: { code: true, name: true, isActive: true } },
         measurementUnit: { select: { symbol: true, name: true } },
         primaryDataSource: { select: { name: true } },
-        revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true } },
+        revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true, measurementUnit: { select: { symbol: true, name: true } }, dataSource: { select: { name: true } } } },
       },
     });
     const byId = new Map(records.map((record) => [record.id.toString(), record]));
@@ -148,8 +148,8 @@ export const kpiConfigurationService = {
           inputFrequencyCode: record.inputFrequency.code,
           inputFrequencyName: record.inputFrequency.name,
           inputFrequencyIsActive: record.inputFrequency.isActive,
-          measurementUnit: record.measurementUnit?.symbol || record.measurementUnit?.name || "Not specified",
-          dataSource: record.primaryDataSource?.name ?? "Not specified",
+          measurementUnit: record.revisions?.[0]?.measurementUnit?.symbol || record.revisions?.[0]?.measurementUnit?.name || record.measurementUnit?.symbol || record.measurementUnit?.name || "Not specified",
+          dataSource: record.revisions?.[0]?.dataSource?.name ?? record.primaryDataSource?.name ?? "Not specified",
           goal: record.revisions?.[0]?.targetValue?.toString() ?? null,
           status: record.status.code,
           isActive: record.status.code === "CONFIGURED",
@@ -209,7 +209,7 @@ export const kpiConfigurationService = {
           const c = await catalogs(tx,input,definition.kpiName);
           const configCode = await nextConfigCode(tx, definition.id, definition.kpiCode);
           const created = await tx.kpiConfiguration.create({data:{kpiDefinitionId:definition.id,configCode,measurementUnitId:c.unit.id,inputFrequencyId:c.frequency.id,primaryDataSourceId:c.source.id,kpiConfigurationStatusId:c.status.id,createdByUserId:actor}});
-          await writeRevision(tx,created.id,1,input,c.evaluation.id,c.levels);
+          await writeRevision(tx,created.id,1,input,c.evaluation.id,c.unit.id,c.source.id,c.levels);
           return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({where:{id:created.id},include}));
         });
       } catch (error) {
@@ -226,15 +226,15 @@ export const kpiConfigurationService = {
       if (!definition) throw new AppError("KPI Definition not found", 422, "KPI_DEFINITION_NOT_AVAILABLE");
       const c = await catalogs(tx, input, definition.kpiName);
       const latest = await tx.kpiConfigurationRevision.findFirst({ where: { kpiConfigurationId: id }, orderBy: { revisionNumber: "desc" } });
-      await tx.kpiConfiguration.update({ where: { id }, data: { measurementUnitId: c.unit.id, primaryDataSourceId: c.source.id, kpiConfigurationStatusId: c.status.id, updatedAt: new Date(), updatedByUserId: actor } });
+      await tx.kpiConfiguration.update({ where: { id }, data: { kpiConfigurationStatusId: c.status.id, updatedAt: new Date(), updatedByUserId: actor } });
       const effectiveFrom = nextPeriodStart(new Date(), c.frequency.monthsPerPeriod);
       if (latest?.effectiveFrom.getTime() === effectiveFrom.getTime()) {
-        await tx.kpiConfigurationRevision.update({ where: { id: latest.id }, data: { targetValue: input.goal, evaluationTypeId: c.evaluation.id, changeReason: "Scheduled revision updated before becoming effective", updatedAt: new Date(), updatedByUserId: actor } });
+        await tx.kpiConfigurationRevision.update({ where: { id: latest.id }, data: { targetValue: input.goal, evaluationTypeId: c.evaluation.id, measurementUnitId: c.unit.id, dataSourceId: c.source.id, resultSemantics: input.resultSemantics, scoringMethod: input.scoringMethod, scoringRuleConfig: input.scoringRuleConfig === null ? Prisma.JsonNull : input.scoringRuleConfig as Prisma.InputJsonValue, scoringRuleConfigVersion: input.scoringRuleConfigVersion, negativeResultPolicy: input.negativeResultPolicy, scoringApprovalStatus: input.scoringApprovalStatus, changeReason: "Scheduled revision updated before becoming effective", updatedAt: new Date(), updatedByUserId: actor } });
         await tx.kpiConfigurationRevisionThreshold.deleteMany({ where: { kpiConfigurationRevisionId: latest.id } });
         await writeThresholds(tx, latest.id, input, c.levels);
       } else {
         if (latest && !latest.effectiveTo) await tx.kpiConfigurationRevision.update({ where: { id: latest.id }, data: { effectiveTo: new Date(effectiveFrom.getTime() - 86_400_000) } });
-        await writeRevision(tx, id, (latest?.revisionNumber ?? 0) + 1, input, c.evaluation.id, c.levels, effectiveFrom);
+        await writeRevision(tx, id, (latest?.revisionNumber ?? 0) + 1, input, c.evaluation.id, c.unit.id, c.source.id, c.levels, effectiveFrom);
       }
       return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({ where: { id }, include }));
     });

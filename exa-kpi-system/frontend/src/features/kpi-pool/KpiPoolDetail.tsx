@@ -307,9 +307,11 @@ export function KpiPoolDetail() {
                         <button
                           className="icon-button view"
                           title="View KPI Configuration detail"
+                          aria-label={`View details for ${kpi.configCode}`}
+                          disabled={!kpi.configurationId}
                           onClick={() =>
                             navigate(
-                              `/app/kpi-management/config/detail-record?kpiConfigCode=${encodeURIComponent(kpi.configCode)}&poolId=${pool.id}&from=pool-detail`,
+                              `/app/kpi-management/config/detail-record?kpiConfigId=${encodeURIComponent(kpi.configurationId!)}&poolId=${pool.id}&from=pool-detail`,
                             )
                           }
                         >

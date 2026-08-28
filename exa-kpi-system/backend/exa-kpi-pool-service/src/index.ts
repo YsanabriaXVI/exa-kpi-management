@@ -4,10 +4,11 @@ import { logger } from "./config/logger.js";
 import { natsManager } from "./config/nats.js";
 import { outboxProcessor } from "./outbox/outbox.processor.js";
 import { registerTerminationHandlers } from "./terminate.js";
+import { monitoringEventsConsumer } from "./consumers/monitoring-events.consumer.js";
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT }, "EXA KPI Pool Service listening");
 });
 
 registerTerminationHandlers(server);
-void natsManager.start().then(() => outboxProcessor.start());
+void natsManager.start().then(async()=>{outboxProcessor.start();try{await monitoringEventsConsumer.start();}catch(error){logger.error({error},"Monitoring events consumer could not start");}});

@@ -6,6 +6,7 @@ async function main() {
   await prisma.monitoringPeriodStatus.upsert({ where: { code: "VALIDATED" }, update: { allowsClose: true }, create: { code: "VALIDATED", name: "Validated", description: "Results were validated and may be closed.", displayOrder: 3, allowsClose: true } });
   await prisma.monitoringPeriodStatus.upsert({ where: { code: "CLOSED" }, update: { isTerminal: true }, create: { code: "CLOSED", name: "Closed", description: "Historical read-only Monitoring Period.", displayOrder: 4, isTerminal: true } });
   await prisma.monitoringInputMethod.upsert({ where: { code: "MANUAL" }, update: {}, create: { code: "MANUAL", name: "Manual Entry" } });
+  await prisma.monitoringInputMethod.upsert({ where: { code: "EXCEL" }, update: {}, create: { code: "EXCEL", name: "Excel Import" } });
   await prisma.resultEntryBatchStatus.upsert({ where: { code: "IMPORTED" }, update: {}, create: { code: "IMPORTED", name: "Imported" } });
   await prisma.resultEntryRowStatus.upsert({ where: { code: "VALID" }, update: {}, create: { code: "VALID", name: "Valid" } });
   await prisma.kpiResultStatus.upsert({ where: { code: "PENDING" }, update: {}, create: { code: "PENDING", name: "Pending" } });

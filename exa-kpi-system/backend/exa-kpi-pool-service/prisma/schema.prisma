@@ -221,3 +221,30 @@ model OutboxEvent {
   @@index([aggregateType, aggregateId, aggregateVersion], map: "ix_outbox_events_aggregate")
   @@map("outbox_events")
 }
+
+model MonitoringPeriodClosureReference {
+  id BigInt @id @default(autoincrement()) @map("monitoring_period_closure_reference_id")
+  monitoringPeriodExternalId BigInt @unique(map:"uq_mpcr_monitoring_period") @map("monitoring_period_id")
+  kpiPoolId BigInt @map("kpi_pool_id")
+  poolInputPeriodExternalId BigInt @map("pool_input_period_id")
+  periodKey String @map("period_key") @db.VarChar(30)
+  closureType String @map("closure_type") @db.VarChar(40)
+  closedAt DateTime @map("closed_at") @db.DateTime(3)
+  sourceVersion Int @map("source_version") @db.UnsignedInt
+  sourceEventId String @unique(map:"uq_mpcr_source_event") @map("source_event_id") @db.Char(36)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  @@unique([kpiPoolId,poolInputPeriodExternalId],map:"uq_mpcr_pool_period")
+  @@index([kpiPoolId,periodKey],map:"ix_mpcr_pool_period_key")
+  @@map("monitoring_period_closure_references")
+}
+
+model ProcessedEvent {
+  eventId String @id @map("event_id") @db.Char(36)
+  eventType String @map("event_type") @db.VarChar(120)
+  subject String @db.VarChar(200)
+  aggregateId String? @map("aggregate_id") @db.VarChar(100)
+  sourceService String? @map("source_service") @db.VarChar(100)
+  processedAt DateTime @default(now()) @map("processed_at") @db.DateTime(3)
+  @@index([eventType,processedAt],map:"ix_processed_events_type")
+  @@map("processed_events")
+}

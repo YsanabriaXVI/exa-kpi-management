@@ -24,6 +24,8 @@
   text-align: center;
 }
 
+.config-revision-notice{margin-bottom:12px;padding:12px 14px;border:1px solid #c8ddef;border-radius:9px;display:flex;align-items:flex-start;gap:10px;color:#245b78;background:#eef7fc}.config-revision-notice>svg{flex:0 0 auto;margin-top:1px}.config-revision-notice strong,.config-revision-notice span{display:block}.config-revision-notice strong{font-size:13px}.config-revision-notice span{margin-top:3px;font-size:12px;line-height:1.45}html[data-theme="dark"] .config-revision-notice{color:#bfe4f6;border-color:#405f74;background:#203746}
+
 /* Set KPI Config readability and stable range slider geometry. */
 .set-kpi-config-page .config-page-header p {
   font-size: 14px;

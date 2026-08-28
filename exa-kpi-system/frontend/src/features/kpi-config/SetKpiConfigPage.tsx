@@ -14,6 +14,9 @@ const defaultRanges: TrafficLightRanges = {
   redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100,
 };
 
+const measurementUnitOptions = ["%", "USD", "km", "Incidents", "Units"];
+const dataSourceOptions = ["EMS", "SAP", "GPS", "Excel Import", "Manual Entry", "API"];
+
 export function SetKpiConfigPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -243,6 +246,8 @@ export function SetKpiConfigPage() {
         </div>
       </header>
 
+      {isEditing && <div className="config-revision-notice" role="note"><ShieldAlert size={18}/><div><strong>Period-safe revision</strong><span>Goal, Measurement Unit, Data Source and scoring rules will apply from the next Input Period. Finalized Pool, Scorecard and Monitoring snapshots remain unchanged.</span></div></div>}
+
       <form className="config-form" onSubmit={submit}>
         <section className="config-card">
           <div className="config-section-heading">
@@ -323,8 +328,8 @@ export function SetKpiConfigPage() {
           </div>
           <div className="config-fields-grid">
             <label><span>Goal</span><input type="number" inputMode="decimal" value={goal} onKeyDown={(event) => { if (event.key === "e" || event.key === "E") event.preventDefault(); }} onChange={(e) => setGoal(e.target.value)} placeholder="Enter a numeric goal, e.g. 3700" /></label>
-            <label><span>Measurement Unit</span><select value={measurementUnit} onChange={(e) => setMeasurementUnit(e.target.value)}><option value="">Select unit</option><option value="%">Percentage (%)</option><option value="USD">US Dollars (USD)</option><option value="km">Kilometers (km)</option><option value="Incidents">Incidents</option><option value="Units">Units</option></select></label>
-            <label><span>Data Source</span><select value={dataSource} onChange={(e) => setDataSource(e.target.value)}><option value="">Select source</option><option>EMS</option><option>SAP</option><option>GPS</option><option>Excel Import</option><option>Manual Entry</option><option>API</option></select></label>
+            <label><span>Measurement Unit</span><select value={measurementUnit} onChange={(e) => setMeasurementUnit(e.target.value)}><option value="">Select unit</option>{measurementUnit && !measurementUnitOptions.includes(measurementUnit) && <option value={measurementUnit}>{measurementUnit}</option>}<option value="%">Percentage (%)</option><option value="USD">US Dollars (USD)</option><option value="km">Kilometers (km)</option><option value="Incidents">Incidents</option><option value="Units">Units</option></select></label>
+            <label><span>Data Source</span><select value={dataSource} onChange={(e) => setDataSource(e.target.value)}><option value="">Select source</option>{dataSource && !dataSourceOptions.includes(dataSource) && <option value={dataSource}>{dataSource}</option>}{dataSourceOptions.map((source) => <option value={source} key={source}>{source}</option>)}</select></label>
           </div>
         </section>
 

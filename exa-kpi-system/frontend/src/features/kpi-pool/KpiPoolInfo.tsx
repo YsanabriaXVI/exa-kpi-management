@@ -224,7 +224,7 @@ function formatPoolStatus(status: "DRAFT" | "ACTIVE" | "INACTIVE") {
 
 function formatInputFrequencyOption(code: string) {
   const labels: Record<string, string> = {
-    MONTHLY: "Monthly",
+    MONTHLY: "Mensual",
     QUARTERLY: "Trimestral",
     FOUR_MONTHLY: "Cuatrimestral",
     FOUR_MONTH: "Cuatrimestral",

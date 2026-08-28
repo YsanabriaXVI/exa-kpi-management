@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { ArrowLeft, CalendarClock, CheckCircle2, FileCog, Settings2, UserRound } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { ArrowLeft, ArrowUpDown, CalendarClock, CheckCircle2, ChevronDown, ChevronUp, FileCog, Settings2, UserRound } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { kpiDefinitionKeys, kpiDefinitionService } from "./kpi-definition.service";
 import "./kpi-definition.css";
@@ -11,8 +11,11 @@ const formatDate = (value: string | null) => value ?
     timeStyle: "short",
   }).format(new Date(value)) : "Not updated";
 
+type ConfigurationSortKey = "configCode" | "goal" | "measurementUnit" | "dataSource" | "status";
+
 export function KpiDefinitionDetail() {
   const navigate = useNavigate();
+  const [configurationSort, setConfigurationSort] = useState<{ key: ConfigurationSortKey; order: "asc" | "desc" }>({ key: "configCode", order: "asc" });
   const { definitionId } = useParams();
   const id = definitionId ?? "";
   const detailQuery = useQuery({
@@ -25,6 +28,18 @@ export function KpiDefinitionDetail() {
     queryFn: () => kpiDefinitionService.listConfigurations(id),
     enabled: /^\d+$/.test(id),
   });
+  const sortedConfigurations = useMemo(() => [...(configurationsQuery.data?.data ?? [])].sort((left, right) => {
+    const leftValue = left[configurationSort.key];
+    const rightValue = right[configurationSort.key];
+    const result = typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : String(leftValue ?? "").localeCompare(String(rightValue ?? ""), undefined, { numeric: true, sensitivity: "base" });
+    return configurationSort.order === "asc" ? result : -result;
+  }), [configurationsQuery.data?.data, configurationSort]);
+  const changeConfigurationSort = (key: ConfigurationSortKey) => setConfigurationSort((current) => ({
+    key,
+    order: current.key === key && current.order === "asc" ? "desc" : "asc",
+  }));
   if (!id) return <main className="kpi-definition-page kpi-definition-detail-page detail-empty-state"><h1>No KPI Definition selected</h1><p>Open a KPI Definition from the Overview to view its details.</p><Link className="button primary" to="/app/kpi-management/definition/overview">Return to Overview</Link></main>;
 
   if (detailQuery.isLoading) {
@@ -123,19 +138,28 @@ export function KpiDefinitionDetail() {
         <div className="kpi-table-wrap detail-table-wrap">
           <table className="kpi-table detail-usage-table">
             <thead>
-              <tr><th>Config Code</th><th>Goal</th><th>Unit</th><th>Data Source</th><th>Status</th></tr>
+              <tr>{([
+                ["configCode", "Config Code"],
+                ["goal", "Goal"],
+                ["measurementUnit", "Unit"],
+                ["dataSource", "Data Source"],
+                ["status", "Status"],
+              ] as const).map(([key, label]) => {
+                const active = configurationSort.key === key;
+                return <th key={key} aria-sort={active ? (configurationSort.order === "asc" ? "ascending" : "descending") : "none"}><button type="button" className={active ? "active" : ""} onClick={() => changeConfigurationSort(key)}><span>{label}</span>{active ? configurationSort.order === "asc" ? <ChevronUp size={16}/> : <ChevronDown size={16}/> : <ArrowUpDown size={15}/>}</button></th>;
+              })}</tr>
             </thead>
             <tbody>{configurationsQuery.isLoading ? (
               <tr><td className="table-message" colSpan={5}>Loading KPI Configurations...</td></tr>
             ) : configurationsQuery.isError ? (
               <tr><td className="table-message" colSpan={5}>KPI Configurations could not be loaded.</td></tr>
-            ) : configurationsQuery.data?.data.length ? configurationsQuery.data.data.map((configuration) => (
+            ) : sortedConfigurations.length ? sortedConfigurations.map((configuration) => (
               <tr key={configuration.id}>
                 <td><button type="button" className="detail-config-link" onClick={() => navigate(`/app/kpi-management/config/detail-record?kpiConfigId=${configuration.id}`)}>{configuration.configCode}</button></td>
                 <td>{configuration.goal ?? "Pending"}</td>
                 <td>{configuration.measurementUnit ?? "Pending"}</td>
                 <td>{configuration.dataSource ?? "Pending"}</td>
-                <td><span className={`mini-state ${configuration.status.toLowerCase()}`}>{configuration.status.charAt(0) + configuration.status.slice(1).toLowerCase()}</span></td>
+                <td><span className={`config-status ${configuration.status.toLowerCase()}`}><i aria-hidden="true" />{configuration.status.charAt(0) + configuration.status.slice(1).toLowerCase()}</span></td>
               </tr>
             )) : (
               <tr><td className="table-message" colSpan={5}>No KPI Configurations use this definition yet.</td></tr>

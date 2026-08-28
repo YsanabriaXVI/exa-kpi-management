@@ -2,12 +2,17 @@ export type DerivedInputPeriod = { start: string; end: string; label: string };
 
 const frequencyMonthsByCode: Record<string, number> = {
   MONTHLY: 1,
+  MENSUAL: 1,
   QUARTERLY: 3,
+  TRIMESTRAL: 3,
   FOUR_MONTHLY: 4,
   FOUR_MONTH: 4,
+  CUATRIMESTRAL: 4,
   SEMIANNUAL: 6,
   SEMI_ANNUAL: 6,
+  SEMESTRAL: 6,
   ANNUAL: 12,
+  ANUAL: 12,
 };
 
 export function frequencyMonths(value?: string) {
@@ -20,13 +25,18 @@ export function formatScheduleFrequency(value?: string) {
   if (!value) return "Select a frequency";
   const normalized = value.trim().toUpperCase().replace(/[ -]+/g, "_");
   return ({
-    MONTHLY: "Monthly",
+    MONTHLY: "Mensual",
+    MENSUAL: "Mensual",
     QUARTERLY: "Trimestral",
+    TRIMESTRAL: "Trimestral",
     FOUR_MONTHLY: "Cuatrimestral",
     FOUR_MONTH: "Cuatrimestral",
+    CUATRIMESTRAL: "Cuatrimestral",
     SEMIANNUAL: "Semestral",
     SEMI_ANNUAL: "Semestral",
+    SEMESTRAL: "Semestral",
     ANNUAL: "Anual",
+    ANUAL: "Anual",
   } as Record<string, string>)[normalized] ?? value;
 }
 

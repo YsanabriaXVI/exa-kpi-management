@@ -69,12 +69,51 @@ model MonitoringPeriod {
   inputs                          MonitoringPeriodInput[]
   batches                         ResultEntryBatch[]
   workflowEvents                  MonitoringPeriodWorkflowEvent[]
+  closure                         MonitoringPeriodClosure?
+  validationRuns                 MonitoringValidationRun[]
 
   @@unique([kpiPoolExternalId, poolInputPeriodExternalId], map: "uq_mp_pool_input_period")
   @@unique([kpiPoolExternalId, periodKey], map: "uq_mp_pool_period_key")
   @@unique([kpiPoolExternalId, sequenceNo], map: "uq_mp_pool_sequence")
   @@index([poolPeriodCompositionExternalId], map: "ix_mp_pool_composition")
   @@map("monitoring_periods")
+}
+
+model MonitoringPeriodClosure {
+  id                 BigInt           @id @default(autoincrement()) @map("monitoring_period_closure_id")
+  monitoringPeriodId BigInt           @unique(map: "uq_mpc_period") @map("monitoring_period_id")
+  closureType        String           @map("closure_type") @db.VarChar(40)
+  missingResultCount Int              @default(0) @map("missing_result_count")
+  justification      String?          @db.Text
+  closedAt           DateTime         @map("closed_at") @db.DateTime(3)
+  closedByUserId     BigInt?          @map("closed_by_user_id")
+  period             MonitoringPeriod @relation(fields: [monitoringPeriodId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_mpc_period")
+  @@map("monitoring_period_closures")
+}
+
+model OutboxEvent {
+  id BigInt @id @default(autoincrement()) @map("outbox_event_id")
+  eventId String @unique(map:"uq_outbox_events_event_id") @map("event_id") @db.Char(36)
+  eventType String @map("event_type") @db.VarChar(120)
+  aggregateType String @map("aggregate_type") @db.VarChar(80)
+  aggregateId String @map("aggregate_id") @db.VarChar(100)
+  aggregateVersion Int @map("aggregate_version") @db.UnsignedInt
+  subject String @db.VarChar(200)
+  payload Json
+  occurredAt DateTime @map("occurred_at") @db.DateTime(3)
+  status String @default("PENDING") @db.VarChar(20)
+  attemptCount Int @default(0) @map("attempt_count") @db.UnsignedInt
+  nextAttemptAt DateTime? @map("next_attempt_at") @db.DateTime(3)
+  lastError String? @map("last_error") @db.Text
+  publishedAt DateTime? @map("published_at") @db.DateTime(3)
+  lockedAt DateTime? @map("locked_at") @db.DateTime(3)
+  lockedBy String? @map("locked_by") @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime? @map("updated_at") @db.DateTime(3)
+  @@index([status,nextAttemptAt,occurredAt],map:"ix_outbox_events_pending")
+  @@index([status,lockedAt],map:"ix_outbox_events_claim")
+  @@index([aggregateType,aggregateId,aggregateVersion],map:"ix_outbox_events_aggregate")
+  @@map("outbox_events")
 }
 
 model MonitoringPeriodWorkflowEvent {
@@ -138,8 +177,12 @@ model MonitoringPeriodInput {
   goalValueSnapshot                  Decimal?                         @map("goal_value_snapshot") @db.Decimal(20, 6)
   evaluationTypeExternalId           BigInt?                          @map("evaluation_type_id")
   evaluationTypeCodeSnapshot         String                           @map("evaluation_type_code_snapshot") @db.VarChar(40)
+  resultSemanticsSnapshot            String?                          @map("result_semantics_snapshot") @db.VarChar(40)
   scoringMethodCodeSnapshot          String?                          @map("scoring_method_code_snapshot") @db.VarChar(40)
   scoringRuleConfigSnapshot          Json?                            @map("scoring_rule_config_snapshot")
+  scoringRuleConfigVersionSnapshot   Int?                             @map("scoring_rule_config_version_snapshot") @db.UnsignedInt
+  negativeResultPolicySnapshot       String?                          @map("negative_result_policy_snapshot") @db.VarChar(20)
+  scoringApprovalStatusSnapshot      String                           @default("BLOCKED") @map("scoring_approval_status_snapshot") @db.VarChar(30)
   calculationRuleVersionSnapshot     String?                          @map("calculation_rule_version_snapshot") @db.VarChar(30)
   measurementUnitExternalId          BigInt?                          @map("measurement_unit_id")
   measurementUnitCodeSnapshot        String?                          @map("measurement_unit_code_snapshot") @db.VarChar(40)
@@ -157,11 +200,54 @@ model MonitoringPeriodInput {
   thresholds                         MonitoringPeriodInputThreshold[]
   batchRows                          ResultEntryBatchRow[]
   result                             KpiResult?
+  validationIssues                   MonitoringValidationIssue[]
 
   @@unique([monitoringPeriodId, kpiConfigurationExternalId], map: "uq_mpi_period_configuration")
   @@unique([monitoringPeriodId, displayOrder], map: "uq_mpi_period_order")
   @@unique([monitoringPeriodId, scorecardKpiAssignmentExternalId], map: "uq_mpi_scorecard_assignment")
   @@map("monitoring_period_inputs")
+}
+
+model MonitoringValidationRun {
+  id                      BigInt                      @id @default(autoincrement()) @map("monitoring_validation_run_id")
+  monitoringPeriodId      BigInt                      @map("monitoring_period_id")
+  runNo                   Int                         @map("run_no")
+  resultsVersion          Int                         @map("results_version")
+  status                  String                      @db.VarChar(30)
+  calculationVersion      String                      @map("calculation_version") @db.VarChar(30)
+  summary                 Json
+  createdAt               DateTime                    @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId         BigInt?                     @map("created_by_user_id")
+  invalidatedAt           DateTime?                   @map("invalidated_at") @db.DateTime(3)
+  invalidatedByBatchId    BigInt?                     @map("invalidated_by_batch_id")
+  period                  MonitoringPeriod            @relation(fields: [monitoringPeriodId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mvr_period")
+  issues                  MonitoringValidationIssue[]
+
+  @@unique([monitoringPeriodId, runNo], map: "uq_mvr_period_run")
+  @@index([monitoringPeriodId, status, createdAt], map: "ix_mvr_period_status")
+  @@map("monitoring_validation_runs")
+}
+
+model MonitoringValidationIssue {
+  id                          BigInt                    @id @default(autoincrement()) @map("monitoring_validation_issue_id")
+  validationRunId             BigInt                    @map("monitoring_validation_run_id")
+  monitoringPeriodId          BigInt                    @map("monitoring_period_id")
+  monitoringPeriodInputId     BigInt?                   @map("monitoring_period_input_id")
+  kpiConfigurationExternalId  BigInt?                   @map("kpi_configuration_id")
+  findingCode                 String                    @map("finding_code") @db.VarChar(100)
+  severity                    String                    @db.VarChar(20)
+  message                     String                    @db.VarChar(500)
+  details                     Json?
+  blocksSubmit                Boolean                   @default(false) @map("blocks_submit")
+  blocksApproval              Boolean                   @default(false) @map("blocks_approval")
+  exceptionAllowed            Boolean                   @default(false) @map("exception_allowed")
+  createdAt                   DateTime                  @default(now()) @map("created_at") @db.DateTime(3)
+  run                         MonitoringValidationRun   @relation(fields: [validationRunId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mvi_run")
+  input                       MonitoringPeriodInput?    @relation(fields: [monitoringPeriodInputId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_mvi_input")
+
+  @@index([monitoringPeriodId, severity], map: "ix_mvi_period_severity")
+  @@index([monitoringPeriodInputId], map: "ix_mvi_input")
+  @@map("monitoring_validation_issues")
 }
 
 model MonitoringPeriodInputThreshold {

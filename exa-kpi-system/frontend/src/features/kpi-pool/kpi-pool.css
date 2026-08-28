@@ -98,6 +98,13 @@ html[data-theme="dark"] .pool-period-context,html[data-theme="dark"] .manage-per
   font-size: 13px;
 }
 
+.pool-overview-page .pool-toolbar {
+  grid-template-columns: minmax(260px, 1.25fr) repeat(4, minmax(190px, 1fr));
+}
+
+@media(max-width:1100px){.pool-overview-page .pool-toolbar{grid-template-columns:1fr 1fr}.pool-overview-page .pool-toolbar .pool-search{grid-column:1/-1}}
+@media(max-width:700px){.pool-overview-page .pool-toolbar{grid-template-columns:1fr}.pool-overview-page .pool-toolbar .pool-search{grid-column:auto}}
+
 .pool-overview-page .pool-results {
   font-size: 13px;
 }

@@ -33,11 +33,21 @@ export const excelImportService = {
     if (meta.get("templateVersion") !== TEMPLATE_VERSION || meta.get("monitoringPeriodId") !== periodId || meta.get("poolInputPeriodId") !== entry.monitoringPeriod.poolInputPeriodId || meta.get("periodKey") !== entry.monitoringPeriod.periodKey) throw new AppError(422, "TEMPLATE_CONTEXT_MISMATCH", "The workbook belongs to another Monitoring Period or template version");
     const inputs = entry.inputs as Array<{id:string;configCode:string;kpiCode:string;resultValue:string|null;comment:string|null;version:number|null}>;
     const byConfig = new Map(inputs.map((input) => [input.configCode, input])); const rows: any[] = []; const invalidRows: any[] = [];
+    const occurrences = new Map<string, number>();
+    for (let number = 2; number <= sheet.rowCount; number++) {
+      const configCode = text(sheet.getRow(number).getCell(1).value);
+      if (configCode) occurrences.set(configCode, (occurrences.get(configCode) ?? 0) + 1);
+    }
     for (let number = 2; number <= sheet.rowCount; number++) {
       const row = sheet.getRow(number), configCode = text(row.getCell(1).value), resultValue = text(row.getCell(7).value), comment = text(row.getCell(8).value) || null, input = byConfig.get(configCode);
-      if (!input) { invalidRows.push({ row: number, configCode, error: "Unknown Config Code" }); continue; }
-      if (resultValue && !/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(resultValue.replace(/,/g, ""))) { invalidRows.push({ row: number, configCode, error: "Result must be numeric" }); continue; }
+      if ((occurrences.get(configCode) ?? 0) > 1) { invalidRows.push({ row: number, configCode, code: "EXCEL_DUPLICATE_KPI", error: "Config Code appears more than once in the workbook" }); continue; }
+      if (!input) { invalidRows.push({ row: number, configCode, code: "EXCEL_UNKNOWN_KPI", error: "Unknown Config Code" }); continue; }
+      if (resultValue && !/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(resultValue.replace(/,/g, ""))) { invalidRows.push({ row: number, configCode, code: "RESULT_NOT_NUMERIC", error: "Result must be numeric" }); continue; }
       const normalized = resultValue ? resultValue.replace(/,/g, "") : null;
+      if (normalized) {
+        const unsigned = normalized.replace(/^[+-]/, ""), [integer = "", fraction = ""] = unsigned.split(".");
+        if (integer.replace(/^0+(?=\d)/, "").length > 14 || fraction.length > 6) { invalidRows.push({ row: number, configCode, code: "RESULT_PRECISION_EXCEEDED", error: "Result exceeds DECIMAL(20,6) precision" }); continue; }
+      }
       const classification = !normalized ? "BLANK_PENDING" : input.resultValue === normalized && (input.comment ?? null) === comment ? "SAME_VALUE" : input.resultValue === null ? "NEW_VALUE" : "DIFFERENT_VALUE";
       rows.push({ row: number, configCode, kpiCode: input.kpiCode, resultValue: normalized, comment, classification, monitoringPeriodInputId: input.id, version: input.version });
     }

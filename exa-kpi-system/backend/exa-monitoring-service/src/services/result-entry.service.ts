@@ -6,6 +6,7 @@ import { recalculatePeriodScores } from "./scoring.service.js";
 
 const resultEntryInclude = {
   status: true,
+  validationRuns: { orderBy: { runNo: "desc" as const }, take: 1, include: { issues: { orderBy: { id: "asc" as const }, include: { input: { select: { kpiCodeSnapshot: true, kpiNameSnapshot: true } } } } } },
   scorecards: { orderBy: { scorecardCodeSnapshot: "asc" as const } },
   inputs: {
     orderBy: { displayOrder: "asc" as const },
@@ -14,6 +15,7 @@ const resultEntryInclude = {
 };
 
 function serialize(row: any) {
+  const latestValidationRun = row.validationRuns?.[0] ?? null;
   const inputs = row.inputs.map((input: any) => ({
     id: input.id.toString(),
     scorecardId: input.scorecard.scorecardExternalId.toString(),
@@ -58,11 +60,28 @@ function serialize(row: any) {
       validationStatus: row.validationStatus,
       validationSummary: row.validationSummary,
       validationRunAt: row.validationRunAt?.toISOString() ?? null,
+      validationRun: latestValidationRun ? {
+        id: latestValidationRun.id.toString(),
+        runNo: latestValidationRun.runNo,
+        resultsVersion: latestValidationRun.resultsVersion,
+        status: latestValidationRun.status,
+        calculationVersion: latestValidationRun.calculationVersion,
+        createdAt: latestValidationRun.createdAt.toISOString(),
+        invalidatedAt: latestValidationRun.invalidatedAt?.toISOString() ?? null,
+        summary: latestValidationRun.summary,
+        findings: latestValidationRun.issues.map((issue: any) => ({
+          id: issue.id.toString(), monitoringPeriodInputId: issue.monitoringPeriodInputId?.toString() ?? null,
+          kpiConfigurationId: issue.kpiConfigurationExternalId?.toString() ?? null,
+          kpiCode: issue.input?.kpiCodeSnapshot ?? null, kpiName: issue.input?.kpiNameSnapshot ?? null,
+          code: issue.findingCode, severity: issue.severity, message: issue.message, details: issue.details,
+          blocksSubmit: issue.blocksSubmit, blocksApproval: issue.blocksApproval, exceptionAllowed: issue.exceptionAllowed,
+        })),
+      } : null,
       returnReason: row.returnReason,
       closedWithExceptions: row.closedWithExceptions,
       closeExceptionJustification: row.closeExceptionJustification,
     },
-    scorecards: row.scorecards.map((item: any) => ({ id: item.id.toString(), code: item.scorecardCodeSnapshot, name: item.scorecardNameSnapshot, directScorePercent: item.directScorePercent?.toString() ?? null, linkedScorePercent: item.linkedScorePercent?.toString() ?? null, previewScorePercent: item.previewScorePercent?.toString() ?? null, finalScorePercent: item.finalScorePercent?.toString() ?? null, calculationVersion: item.calculationVersion })),
+    scorecards: row.scorecards.map((item: any) => ({ id: item.id.toString(), code: item.scorecardCodeSnapshot, name: item.scorecardNameSnapshot, departments:item.departmentsSnapshot??[], directScorePercent: item.directScorePercent?.toString() ?? null, linkedScorePercent: item.linkedScorePercent?.toString() ?? null, previewScorePercent: item.previewScorePercent?.toString() ?? null, finalScorePercent: item.finalScorePercent?.toString() ?? null, calculationVersion: item.calculationVersion })),
     inputs,
     summary: { expected: inputs.length, entered, pending: inputs.length - entered },
   };
@@ -145,7 +164,8 @@ export const resultEntryService = {
       }
       await tx.resultEntryBatch.update({ where: { id: batch.id }, data: { finishedAt: new Date() } });
       await recalculatePeriodScores(tx, periodId, period.status.code);
-      await tx.monitoringPeriod.update({ where: { id: periodId }, data: { validationStatus: null, validationSummary: Prisma.JsonNull, validationRunAt: null, validationRunByUserId: null, version: { increment: 1 } } });
+      const invalidated = await tx.monitoringValidationRun.updateMany({ where: { monitoringPeriodId: periodId, status: "CURRENT" }, data: { status: "STALE", invalidatedAt: new Date(), invalidatedByBatchId: batch.id } });
+      await tx.monitoringPeriod.update({ where: { id: periodId }, data: { validationStatus: invalidated.count ? "STALE" : null, validationSummary: Prisma.JsonNull, validationRunByUserId: null, version: { increment: 1 } } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     const saved = await findPeriod(periodId);

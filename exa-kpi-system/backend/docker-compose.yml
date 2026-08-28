@@ -58,7 +58,7 @@ services:
       TEMPORARY_ACTOR_USER_ID: ${TEMPORARY_ACTOR_USER_ID:-}
     ports:
       - "${KPI_MANAGEMENT_PORT:-4001}:4001"
-    command: ["sh", "-c", "npm run prisma:migrate:deploy && npm run prisma:seed && npm run dev"]
+    command: ["sh", "-c", "npm run prisma:generate && npm run prisma:migrate:deploy && npm run prisma:seed && npm run dev"]
     volumes:
       - ./exa-kpi-management-service:/app
       - kpi_management_node_modules:/app/node_modules
@@ -92,7 +92,7 @@ services:
       OUTBOX_BATCH_SIZE: 20
     ports:
       - "${KPI_POOL_PORT:-4002}:4002"
-    command: ["sh", "-c", "npm run prisma:migrate:deploy && npm run dev"]
+    command: ["sh", "-c", "npm run prisma:generate && npm run prisma:migrate:deploy && npm run dev"]
     volumes:
       - ./exa-kpi-pool-service:/app
       - kpi_pool_node_modules:/app/node_modules

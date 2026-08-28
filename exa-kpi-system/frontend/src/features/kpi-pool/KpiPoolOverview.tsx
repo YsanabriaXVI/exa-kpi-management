@@ -73,7 +73,7 @@ export function KpiPoolOverview() {
         <label className="pool-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search Pool code or name..." /></label>
         <PoolOverviewMultiSelect label="All companies" options={(lookupsQuery.data?.companies ?? []).map((item) => ({ value: item.id, label: item.name }))} selected={companiesSelected} onChange={setCompaniesSelected} />
         <PoolOverviewMultiSelect label="All statuses" options={[{ value: "DRAFT", label: "Draft" }, { value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }]} selected={statuses} onChange={setStatuses} />
-        <PoolOverviewMultiSelect label="All frequencies" options={(lookupsQuery.data?.inputFrequencies ?? []).map((item) => ({ value: item.id, label: item.name }))} selected={frequenciesSelected} onChange={setFrequenciesSelected} />
+        <PoolOverviewMultiSelect label="All frequencies" options={(lookupsQuery.data?.inputFrequencies ?? []).map((item) => ({ value: item.id, label: formatFrequencyFilter(item.code, item.name) }))} selected={frequenciesSelected} onChange={setFrequenciesSelected} />
         <PoolOverviewMultiSelect label="All years" options={years.map((item) => ({ value: item, label: item }))} selected={yearsSelected} onChange={setYearsSelected} />
       </section>
 
@@ -135,3 +135,6 @@ function formatDate(value: string) {
 function formatMonth(value: string) { return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(value)); }
 function formatMonthShort(value: string) { return new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(new Date(value)); }
 function titlePeriod(value: string) { return value === "FINALIZED" ? "Finalized" : "Preparing"; }
+function formatFrequencyFilter(code: string, fallback: string) {
+  return ({ MONTHLY: "Mensual", QUARTERLY: "Trimestral", FOUR_MONTHLY: "Cuatrimestral", FOUR_MONTH: "Cuatrimestral", SEMIANNUAL: "Semestral", SEMI_ANNUAL: "Semestral", ANNUAL: "Anual" } as Record<string, string>)[code.toUpperCase()] ?? fallback;
+}

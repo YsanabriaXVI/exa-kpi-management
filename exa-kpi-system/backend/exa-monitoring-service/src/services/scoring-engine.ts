@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 
-export const CALCULATION_VERSION = "1";
+export const CALCULATION_VERSION = "SCORING_V1";
 const ZERO = new Prisma.Decimal(0);
 const HUNDRED = new Prisma.Decimal(100);
 
@@ -11,6 +11,8 @@ export type ScoringRuleConfig = {
   tolerance?: DecimalInput;
   rangeMin?: DecimalInput;
   rangeMax?: DecimalInput;
+  floorPercent?: DecimalInput;
+  capPercent?: DecimalInput;
 };
 export type TrafficThreshold = {
   code: string;
@@ -28,9 +30,11 @@ export type KpiScoringInput = {
   scoringRuleConfig?: ScoringRuleConfig | null;
   thresholds: TrafficThreshold[];
   weight: DecimalInput;
+  negativeResultPolicy?: string | null;
+  scoringApprovalStatus?: string | null;
 };
 export type KpiScoringResult = {
-  status: "PENDING" | "CALCULATED" | "NOT_CALCULABLE";
+  status: "MISSING" | "CALCULATED" | "NOT_CALCULABLE";
   errorCode: string | null;
   scoringMethod: string | null;
   rawAchievement: Prisma.Decimal | null;
@@ -41,25 +45,15 @@ export type KpiScoringResult = {
 };
 
 const decimal = (value: DecimalInput) => value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
-const clampCompliance = (value: Prisma.Decimal) => Prisma.Decimal.min(HUNDRED, Prisma.Decimal.max(ZERO, value));
 const normalizeEvaluation = (value: string) => value === "HIGHER_IS_BETTER" ? "GREATER_IS_BETTER" : value;
 
-function resolveMethod(evaluation: string, goal: Prisma.Decimal | null, explicit?: string | null) {
-  if (explicit) return explicit;
-  if (evaluation === "GREATER_IS_BETTER") return "PROPORTIONAL";
-  if (evaluation === "LOWER_IS_BETTER") return goal?.isZero() ? "ZERO_TARGET" : "PROPORTIONAL";
-  if (evaluation === "EQUAL_IS_BETTER") return "TOLERANCE_BASED";
-  if (evaluation === "RANGE") return "RANGE_BASED";
-  return null;
-}
-
 function bandComplianceByResult(result: Prisma.Decimal, bands: Band[] | undefined) {
-  const match = bands?.find((band) => {
+  const matches = bands?.filter((band) => {
     const aboveMin = band.minResult === undefined || result.greaterThanOrEqualTo(decimal(band.minResult));
     const belowMax = band.maxResult === undefined || result.lessThanOrEqualTo(decimal(band.maxResult));
     return aboveMin && belowMax;
   });
-  return match ? decimal(match.compliance) : null;
+  return matches?.length === 1 ? decimal(matches[0]!.compliance) : null;
 }
 
 function bandComplianceByDistance(distance: Prisma.Decimal, bands: Band[] | undefined) {
@@ -85,28 +79,32 @@ function notCalculable(errorCode: string, method: string | null): KpiScoringResu
 }
 
 export function calculateKpiScore(input: KpiScoringInput): KpiScoringResult {
-  if (input.result === null) return { status: "PENDING", errorCode: null, scoringMethod: null, rawAchievement: null, compliance: null, trafficLight: null, weightedScore: null, calculationVersion: CALCULATION_VERSION };
+  if (input.result === null) return { status: "MISSING", errorCode: null, scoringMethod: input.scoringMethod ?? null, rawAchievement: null, compliance: null, trafficLight: null, weightedScore: null, calculationVersion: CALCULATION_VERSION };
   const goal = input.goal === null ? null : decimal(input.goal);
   const result = decimal(input.result);
   const evaluation = normalizeEvaluation(input.evaluationType);
-  const method = resolveMethod(evaluation, goal, input.scoringMethod);
+  const method = input.scoringMethod ?? null;
   let raw: Prisma.Decimal | null = null;
 
-  if (!method) return notCalculable("UNSUPPORTED_EVALUATION_TYPE", null);
+  if (input.scoringApprovalStatus !== "APPROVED") return notCalculable("SCORING_CONFIGURATION_NOT_APPROVED", method);
+  if (!method) return notCalculable("SCORING_METHOD_NOT_CONFIGURED", null);
+  if (result.lessThan(ZERO) && !input.negativeResultPolicy) return notCalculable("NEGATIVE_RESULT_POLICY_NOT_CONFIGURED", method);
+  if (result.lessThan(ZERO) && input.negativeResultPolicy === "DISALLOW") return notCalculable("NEGATIVE_RESULT_NOT_ALLOWED", method);
+  if (result.lessThan(ZERO) && input.negativeResultPolicy === "REVIEW") return notCalculable("NEGATIVE_RESULT_REQUIRES_REVIEW", method);
   if (method === "PROPORTIONAL") {
     if (goal === null) return notCalculable("GOAL_REQUIRED", method);
     if (evaluation === "GREATER_IS_BETTER") {
-      if (goal.isZero()) return notCalculable("PROPORTIONAL_GOAL_ZERO", method);
+      if (goal.lessThanOrEqualTo(ZERO)) return notCalculable("PROPORTIONAL_GOAL_NOT_POSITIVE", method);
       raw = result.div(goal).mul(HUNDRED);
     } else if (evaluation === "LOWER_IS_BETTER") {
       if (goal.lessThanOrEqualTo(ZERO)) return notCalculable("LOWER_PROPORTIONAL_GOAL_NOT_POSITIVE", method);
       raw = result.isZero() ? HUNDRED : goal.div(result).mul(HUNDRED);
     } else return notCalculable("PROPORTIONAL_EVALUATION_MISMATCH", method);
-  } else if (method === "ZERO_TARGET" || method === "THRESHOLD_BASED") {
+  } else if (method === "ZERO_TARGET" || method === "ZERO_TARGET_BANDS") {
     if (goal === null || !goal.isZero()) return notCalculable("ZERO_TARGET_REQUIRES_ZERO_GOAL", method);
     raw = result.isZero() ? HUNDRED : bandComplianceByResult(result, input.scoringRuleConfig?.bands);
     if (raw === null) return notCalculable("SCORING_RULE_NOT_CONFIGURED", method);
-  } else if (method === "TOLERANCE_BASED") {
+  } else if (method === "TOLERANCE_BASED" || method === "TOLERANCE") {
     if (goal === null) return notCalculable("GOAL_REQUIRED", method);
     const tolerance = input.scoringRuleConfig?.tolerance === undefined ? null : decimal(input.scoringRuleConfig.tolerance);
     if (tolerance === null || tolerance.lessThan(ZERO)) return notCalculable("TOLERANCE_NOT_CONFIGURED", method);
@@ -122,14 +120,18 @@ export function calculateKpiScore(input: KpiScoringInput): KpiScoringResult {
     if (raw === null) return notCalculable("SCORING_RULE_NOT_CONFIGURED", method);
   } else return notCalculable("UNSUPPORTED_SCORING_METHOD", method);
 
-  const compliance = clampCompliance(raw);
+  const floor = input.scoringRuleConfig?.floorPercent === undefined ? ZERO : decimal(input.scoringRuleConfig.floorPercent);
+  const cap = input.scoringRuleConfig?.capPercent === undefined ? HUNDRED : decimal(input.scoringRuleConfig.capPercent);
+  const compliance = Prisma.Decimal.min(cap, Prisma.Decimal.max(floor, raw));
+  const resolvedTrafficLight = trafficLight(compliance, input.thresholds);
+  if (!resolvedTrafficLight) return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_NOT_CONFIGURED", method);
   return {
     status: "CALCULATED",
     errorCode: null,
     scoringMethod: method,
     rawAchievement: raw,
     compliance,
-    trafficLight: trafficLight(compliance, input.thresholds),
+    trafficLight: resolvedTrafficLight,
     weightedScore: compliance.div(HUNDRED).mul(decimal(input.weight)),
     calculationVersion: CALCULATION_VERSION,
   };

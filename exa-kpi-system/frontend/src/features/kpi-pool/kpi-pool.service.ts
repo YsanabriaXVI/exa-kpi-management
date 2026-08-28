@@ -102,9 +102,12 @@ export const kpiPoolService = {
     const response = await poolApiRequest<PoolListResponse>(`/v1/kpi-pools?${query}`);
     return { ...response, data: response.data.map((value) => clone(cachePool(fromApi(value)))) };
   },
-  async get(id: number) {
+  async getBasic(id: number) {
     const response = await poolApiRequest<{ data: PoolApiRecord }>(`/v1/kpi-pools/${id}`);
-    const pool = fromApi(response.data);
+    return clone(cachePool(fromApi(response.data)));
+  },
+  async get(id: number) {
+    const pool = await this.getBasic(id);
     const periods = await this.getInputPeriods(id);
     const manageable = periods.meta.defaultPeriodStart ? await this.getManageableKpis(id, periods.meta.defaultPeriodStart) : [];
     pool.kpis = manageable.filter((item) => item.availability === "IN_POOL").map(({ availability: _availability, reasonCode: _reasonCode, ...item }) => item);
