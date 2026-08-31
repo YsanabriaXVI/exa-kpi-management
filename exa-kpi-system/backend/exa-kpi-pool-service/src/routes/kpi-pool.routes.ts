@@ -1,11 +1,12 @@
 import { Router } from "express";
-import { activateKpiPool, addPoolKpiConfigurations, createKpiPool, deactivateKpiPool, extendKpiPoolValidity, finalizeKpiPoolPeriodComposition, getActivationReadiness, getKpiConfigurationUsage, getKpiPool, getKpiPoolLookups, listAvailableKpiConfigurations, listKpiPoolPeriods, listKpiPools, listPoolKpiConfigurations, removePoolKpiConfiguration, replacePoolKpiConfiguration, retirePoolKpiConfiguration, updateKpiPool } from "../controllers/kpi-pool.controller.js";
+import { activateKpiPool, addPoolKpiConfigurations, createKpiPool, deactivateKpiPool, extendKpiPoolValidity, finalizeKpiPoolPeriodComposition, getActivationReadiness, getKpiConfigurationUsage, getKpiPool, getKpiPoolLookups, getPoolAssignmentEligibility, listAvailableKpiConfigurations, listKpiPoolPeriods, listKpiPools, listPoolKpiConfigurations, removePoolKpiConfiguration, replacePoolKpiConfiguration, retirePoolKpiConfiguration, updateKpiPool } from "../controllers/kpi-pool.controller.js";
 
 export const kpiPoolRouter = Router();
 kpiPoolRouter.get("/lookups", getKpiPoolLookups);
 kpiPoolRouter.get("/", listKpiPools);
 kpiPoolRouter.post("/", createKpiPool);
 kpiPoolRouter.post("/kpi-configuration-usage", getKpiConfigurationUsage);
+kpiPoolRouter.post("/assignment-eligibility", getPoolAssignmentEligibility);
 kpiPoolRouter.get("/:id/kpi-configurations", listPoolKpiConfigurations);
 kpiPoolRouter.post("/:id/kpi-configurations", addPoolKpiConfigurations);
 kpiPoolRouter.post("/:id/kpi-configurations/replace", replacePoolKpiConfiguration);

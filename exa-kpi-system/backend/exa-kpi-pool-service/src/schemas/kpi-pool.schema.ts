@@ -32,6 +32,8 @@ export const replaceKpiPoolConfigurationBodySchema = z.object({ oldConfiguration
   .refine((value) => value.oldConfigurationId !== value.newConfigurationId, "Replacement Configuration must be different");
 export const kpiConfigurationUsageBodySchema = z.object({ configurationIds: z.array(positiveId).min(1).max(100) }).strict()
   .transform(({ configurationIds }) => ({ configurationIds: [...new Set(configurationIds)] }));
+export const poolAssignmentEligibilityBodySchema = z.object({ configurationIds: z.array(positiveId).min(1).max(50) }).strict()
+  .transform(({ configurationIds }) => ({ configurationIds: [...new Set(configurationIds)] }));
 export const availableKpiConfigurationsQuerySchema = paginationSchema.extend({ search: z.string().trim().max(200).optional(), periodStart: dateString.optional() }).strict();
 export const createKpiPoolBodySchema = z.object(poolInfoFields).strict().refine((value) => value.validTo >= value.validFrom, {
   message: "validTo must be on or after validFrom",

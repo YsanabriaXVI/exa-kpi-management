@@ -95,6 +95,85 @@ async function lookupAndValidate(ids: string[], pool: KpiPool) {
 }
 
 export const kpiPoolMembershipService = {
+  async assignmentEligibility(configurationIds: string[]) {
+    const lookup = await kpiManagementClient.batchLookup(configurationIds);
+    if (lookup.notFoundIds.length) throw new AppError(422, "KPI_CONFIGURATION_NOT_FOUND", "One or more KPI Configurations were not found", { ids: lookup.notFoundIds });
+    const duplicateDefinitions = new Set<string>();
+    const seenDefinitions = new Set<string>();
+    for (const configuration of lookup.data) {
+      if (seenDefinitions.has(configuration.definitionId)) duplicateDefinitions.add(configuration.definitionId);
+      seenDefinitions.add(configuration.definitionId);
+    }
+
+    const pools = await prisma.kpiPool.findMany({
+      where: { deletedAt: null },
+      include: { companies: { orderBy: { displayOrder: "asc" } } },
+      orderBy: [{ statusCode: "asc" }, { poolName: "asc" }],
+    });
+    const frequencies = await prisma.inputFrequencyReference.findMany({
+      where: { externalInputFrequencyId: { in: [...new Set(pools.map((pool) => pool.inputFrequencyExternalId))] } },
+    });
+    const frequencyById = new Map(frequencies.map((frequency) => [frequency.externalInputFrequencyId.toString(), frequency]));
+
+    const data = await Promise.all(pools.map(async (pool) => {
+      const issues: Array<{ configurationId: string | null; code: string; message: string; conflictingConfigurationCode?: string | null }> = [];
+      const availableConfigurationIds: string[] = [];
+      const alreadyIncludedConfigurationIds: string[] = [];
+      const frequency = frequencyById.get(pool.inputFrequencyExternalId.toString());
+      let period: InputPeriod | null = null;
+
+      if (!frequency?.isActive) {
+        issues.push({ configurationId: null, code: "INPUT_FREQUENCY_INACTIVE", message: "The Pool Input Frequency is inactive." });
+      } else {
+        try {
+          period = targetPeriod(Object.assign(pool, { frequency }));
+          const finalized = await prisma.kpiPoolPeriodComposition.findUnique({ where: { kpiPoolId_periodStart: { kpiPoolId: pool.id, periodStart: period.start } } });
+          if (finalized) issues.push({ configurationId: null, code: "POOL_PERIOD_LOCKED", message: "The target Pool period is already finalized." });
+        } catch (error) {
+          const appError = error instanceof AppError ? error : null;
+          issues.push({ configurationId: null, code: appError?.code ?? "POOL_NOT_EDITABLE", message: appError?.message ?? "The Pool has no editable period." });
+        }
+      }
+
+      const conflicts = period ? await prisma.kpiPoolKpi.findMany({
+        where: { ...effectiveWhere(pool.id, { start: period.start, end: pool.validTo }), kpiDefinitionExternalId: { in: lookup.data.map((item) => BigInt(item.definitionId)) } },
+      }) : [];
+
+      for (const configuration of lookup.data) {
+        if (duplicateDefinitions.has(configuration.definitionId)) {
+          issues.push({ configurationId: configuration.id, code: "BATCH_DEFINITION_DUPLICATE", message: `${configuration.definitionCode} appears more than once in the selection.` });
+          continue;
+        }
+        const reason = eligibilityReason(configuration, pool.inputFrequencyExternalId);
+        if (reason) {
+          const messages: Record<string, string> = {
+            KPI_CONFIGURATION_INACTIVE: `${configuration.configCode} is inactive.`,
+            KPI_DEFINITION_INACTIVE: `${configuration.definitionCode} is inactive.`,
+            INPUT_FREQUENCY_INACTIVE: `${configuration.configCode} has an inactive Input Frequency.`,
+            FREQUENCY_MISMATCH: `${configuration.configCode} does not match the Pool frequency.`,
+          };
+          issues.push({ configurationId: configuration.id, code: reason, message: messages[reason] ?? `${configuration.configCode} is not eligible.` });
+          continue;
+        }
+        const conflict = conflicts.find((item) => item.kpiDefinitionExternalId === BigInt(configuration.definitionId));
+        if (conflict?.kpiConfigurationExternalId === BigInt(configuration.id)) alreadyIncludedConfigurationIds.push(configuration.id);
+        else if (conflict) issues.push({ configurationId: configuration.id, code: "KPI_DEFINITION_ALREADY_EFFECTIVE", message: `${configuration.definitionCode} already has ${conflict.configurationCodeSnapshot} in this Pool.`, conflictingConfigurationCode: conflict.configurationCodeSnapshot });
+        else availableConfigurationIds.push(configuration.id);
+      }
+
+      const eligibility = issues.length ? "NOT_ELIGIBLE"
+        : availableConfigurationIds.length && alreadyIncludedConfigurationIds.length ? "PARTIAL"
+          : availableConfigurationIds.length ? "ELIGIBLE" : "ALREADY_INCLUDED";
+      return {
+        poolId: pool.id.toString(), poolCode: pool.poolCode, poolName: pool.poolName, poolStatus: pool.statusCode,
+        companies: pool.companies.map((company) => company.companyNameSnapshot), inputFrequencyCode: pool.inputFrequencyCode,
+        targetPeriod: period ? periodDto(period) : null, eligibility,
+        availableConfigurationIds, alreadyIncludedConfigurationIds, issues,
+      };
+    }));
+    return { data };
+  },
+
   async periods(poolId: bigint) {
     const pool = await requirePool(poolId);
     const periods = poolPeriods(pool.validFrom, pool.validTo, pool.frequency.monthsPerPeriod);

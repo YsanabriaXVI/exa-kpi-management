@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  kpiPool: { findFirst: vi.fn(), update: vi.fn() },
-  inputFrequencyReference: { findUnique: vi.fn() },
+  kpiPool: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  inputFrequencyReference: { findUnique: vi.fn(), findMany: vi.fn() },
   kpiPoolPeriodComposition: { findUnique: vi.fn(), create: vi.fn() },
   kpiPoolInputPeriod: { findUnique: vi.fn() },
   kpiPoolKpi: { findMany: vi.fn() },
@@ -73,5 +73,26 @@ describe("KPI Pool membership validation", () => {
     management.batchLookup.mockResolvedValue({ data: [configuration, { ...configuration, id: "11", configCode: "KPC-050-02" }], notFoundIds: [] });
     await expect(kpiPoolMembershipService.add(2n, { configurationIds: ["10", "11"] }, 1n)).rejects.toMatchObject({ code: "KPI_DEFINITION_ALREADY_EFFECTIVE" });
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("lists an editable Pool as eligible for a matching active Configuration", async () => {
+    management.batchLookup.mockResolvedValue({ data: [configuration], notFoundIds: [] });
+    db.kpiPool.findMany.mockResolvedValue([{ ...pool, poolCode: "POOL-001", poolName: "Operations", inputFrequencyCode: "MONTHLY", companies: [{ displayOrder: 1, companyNameSnapshot: "EXA" }] }]);
+    db.inputFrequencyReference.findMany.mockResolvedValue([{ externalInputFrequencyId: 1n, monthsPerPeriod: 1, isActive: true }]);
+    db.kpiPoolKpi.findMany.mockResolvedValue([]);
+
+    await expect(kpiPoolMembershipService.assignmentEligibility(["10"])).resolves.toEqual({ data: [expect.objectContaining({
+      poolId: "2", eligibility: "ELIGIBLE", availableConfigurationIds: ["10"], alreadyIncludedConfigurationIds: [], issues: [],
+    })] });
+  });
+
+  it("blocks a Pool when the KPI Definition already has another effective Configuration", async () => {
+    management.batchLookup.mockResolvedValue({ data: [configuration], notFoundIds: [] });
+    db.kpiPool.findMany.mockResolvedValue([{ ...pool, poolCode: "POOL-001", poolName: "Operations", inputFrequencyCode: "MONTHLY", companies: [] }]);
+    db.inputFrequencyReference.findMany.mockResolvedValue([{ externalInputFrequencyId: 1n, monthsPerPeriod: 1, isActive: true }]);
+    db.kpiPoolKpi.findMany.mockResolvedValue([{ kpiDefinitionExternalId: 50n, kpiConfigurationExternalId: 11n, configurationCodeSnapshot: "KPC-050-02" }]);
+
+    const result = await kpiPoolMembershipService.assignmentEligibility(["10"]);
+    expect(result.data[0]).toMatchObject({ eligibility: "NOT_ELIGIBLE", issues: [expect.objectContaining({ code: "KPI_DEFINITION_ALREADY_EFFECTIVE", conflictingConfigurationCode: "KPC-050-02" })] });
   });
 });

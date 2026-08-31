@@ -39,7 +39,6 @@ export function KpiConfigOverview() {
     direction: "asc",
   });
   const configsQuery = useQuery({ queryKey: ["kpi-configurations"], queryFn: kpiConfigService.list });
-  const poolsQuery = useQuery({ queryKey: ["kpi-pools"], queryFn: kpiPoolService.list });
   const usageIds = (configsQuery.data ?? []).filter((configuration) => configuration.id > 0 && configuration.status !== "INCOMPLETE").map((configuration) => String(configuration.id));
   const usageQuery = useQuery({ queryKey: ["kpi-pool-configuration-usage", usageIds.join(",")], queryFn: () => kpiPoolService.getConfigurationUsage(usageIds), enabled: usageIds.length > 0 });
   const deleteMutation = useMutation({
@@ -196,7 +195,7 @@ export function KpiConfigOverview() {
           <PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="KPI Config pagination" className="config-pagination" />
         </footer>
       </div>
-      {sendModalOpen && <SendToPoolModal configurations={selectedConfigurations} pools={poolsQuery.data ?? []} onClose={() => setSendModalOpen(false)} onAssigned={() => setSelectedConfigIds([])} />}
+      {sendModalOpen && <SendToPoolModal configurations={selectedConfigurations} onClose={() => setSendModalOpen(false)} onAssigned={() => setSelectedConfigIds([])} />}
       {configToDelete && <OverviewDeleteConfirmation title="Remove KPI Configuration?" message={`${configToDelete.code} will disappear from the active Overview. Its historical data will remain preserved.`} pending={deleteMutation.isPending} onAccept={() => deleteMutation.mutate(configToDelete.id)} onCancel={() => setConfigToDelete(null)} />}
     </main>
   );

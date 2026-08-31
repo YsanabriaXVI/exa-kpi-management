@@ -36,7 +36,7 @@ export function AppHeader({
       </button>
 
       <nav className="ems-header-actions" aria-label="Application controls">
-        <button type="button" className="ems-header-icon" aria-label="Language">
+        <button type="button" className="ems-header-icon" aria-label="Language" disabled title="Language selection is temporarily unavailable">
           <Languages size={18} />
           <span className="ems-header-language">EN</span>
         </button>
