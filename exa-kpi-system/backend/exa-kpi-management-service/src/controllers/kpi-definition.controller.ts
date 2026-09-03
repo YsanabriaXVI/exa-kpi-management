@@ -1,17 +1,34 @@
 import type { NextFunction, Request, Response } from "express";
 import {
+  analyzeKpiDefinitionBodySchema,
   createKpiDefinitionBodySchema,
   kpiDefinitionIdParamsSchema,
+  kpiDefinitionSuggestionsQuerySchema,
   listKpiDefinitionsQuerySchema,
   updateKpiDefinitionBodySchema,
 } from "../schemas/kpi-definition.schema.js";
 import { paginationSchema } from "../schemas/pagination.schema.js";
 import { kpiDefinitionService } from "../services/kpi-definition.service.js";
+import { analyzeKpiDefinition } from "../definition-assist/index.js";
 
 export async function listKpiDefinitions(request: Request, response: Response, next: NextFunction) {
   try {
     const query = listKpiDefinitionsQuerySchema.parse(request.query);
     response.json(await kpiDefinitionService.list(query));
+  } catch (error) { next(error); }
+}
+
+export async function suggestKpiDefinitions(request: Request, response: Response, next: NextFunction) {
+  try {
+    const query = kpiDefinitionSuggestionsQuerySchema.parse(request.query);
+    response.json({ data: await kpiDefinitionService.suggestions(query) });
+  } catch (error) { next(error); }
+}
+
+export async function analyzeKpiDefinitionName(request: Request, response: Response, next: NextFunction) {
+  try {
+    const { name } = analyzeKpiDefinitionBodySchema.parse(request.body);
+    response.json({ data: analyzeKpiDefinition(name) });
   } catch (error) { next(error); }
 }
 

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "../utils/app-error.js";
 
 const mocks = vi.hoisted(() => ({
-  list: vi.fn(), getById: vi.fn(), listConfigurations: vi.fn(), create: vi.fn(), update: vi.fn(), setActive: vi.fn(), softDelete: vi.fn(),
+  list: vi.fn(), suggestions: vi.fn(), getById: vi.fn(), listConfigurations: vi.fn(), create: vi.fn(), update: vi.fn(), setActive: vi.fn(), softDelete: vi.fn(),
 }));
 
 vi.mock("../services/kpi-definition.service.js", () => ({ kpiDefinitionService: mocks }));
@@ -25,6 +25,42 @@ beforeEach(() => {
 });
 
 describe("KPI Definition API", () => {
+  it("analyzes a KPI name without calling the database-backed Definition service", async () => {
+    const response = await request(app).post("/api/v1/kpi-definitions/analyze").send({ name: "Reducir gasto administrativo 10%" });
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      analysisStatus: "NEEDS_CONFIRMATION", configurationReadiness: "INCOMPLETE", originalName: "Reducir gasto administrativo 10%",
+      behavior: { value: null, confidence: "LOW" }, comparison: { intent: "POSSIBLE", mode: null },
+    });
+    expect(mocks.list).not.toHaveBeenCalled();
+    expect(mocks.suggestions).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it.each([{}, { name: "" }, { name: "a" }, { name: "Valid KPI", behavior: "GREATER_IS_BETTER" }])("rejects invalid analyzer input %#", async (body) => {
+    expect((await request(app).post("/api/v1/kpi-definitions/analyze").send(body)).status).toBe(400);
+  });
+
+  it("returns ranked KPI Definition suggestions from the static route", async () => {
+    mocks.suggestions.mockResolvedValue({ query: "costo por km", normalizedQuery: "costo por km", suggestions: [{ id: "1", code: "KPI-001", name: "Costo por km", normalizedName: "costo por km", similarityScore: 100, matchType: "EXACT_OR_NEAR_DUPLICATE" }] });
+    const response = await request(app).get("/api/v1/kpi-definitions/suggestions?q=costo%20por%20km&limit=6");
+    expect(response.status).toBe(200);
+    expect(response.body.data.suggestions[0].matchType).toBe("EXACT_OR_NEAR_DUPLICATE");
+    expect(mocks.suggestions).toHaveBeenCalledWith({ q: "costo por km", limit: 6 });
+    expect(mocks.getById).not.toHaveBeenCalled();
+  });
+
+  it.each(["", "a"])("rejects an empty or short suggestion query: %s", async (q) => {
+    const response = await request(app).get(`/api/v1/kpi-definitions/suggestions?q=${q}`);
+    expect(response.status).toBe(400);
+    expect(mocks.suggestions).not.toHaveBeenCalled();
+  });
+
+  it.each(["0", "9", "not-a-number"])("rejects an invalid suggestion limit: %s", async (limit) => {
+    expect((await request(app).get(`/api/v1/kpi-definitions/suggestions?q=costo&limit=${limit}`)).status).toBe(400);
+  });
+
   it("lists related KPI Configurations through the nested endpoint", async () => {
     mocks.listConfigurations.mockResolvedValue({ data: [{ id: "11", configCode: "KPC-001-01" }], meta: { page: 1, pageSize: 20, totalItems: 1, configuredItems: 1, totalPages: 1 } });
     const response = await request(app).get("/api/v1/kpi-definitions/1/configurations");

@@ -35,6 +35,15 @@ export const openApiDocument = {
         properties: { id: { type: "string" }, code: { type: "string" }, name: { type: "string" }, description: { type: ["string", "null"] } },
       },
       KpiDefinition: kpiDefinition,
+      KpiDefinitionSuggestion: {
+        type: "object",
+        required: ["id", "code", "name", "normalizedName", "similarityScore", "matchType"],
+        properties: {
+          id: { type: "string" }, code: { type: "string" }, name: { type: "string" }, normalizedName: { type: "string" },
+          similarityScore: { type: "number", minimum: 0, maximum: 100 },
+          matchType: { type: "string", enum: ["EXACT_OR_NEAR_DUPLICATE", "STRONG_SIMILARITY", "RELATED"] },
+        },
+      },
       KpiDefinitionInput: {
         type: "object",
         required: ["kpiName", "description", "kpiCategoryId"],
@@ -83,6 +92,25 @@ export const openApiDocument = {
         tags: ["KPI Definitions"], summary: "Create KPI definition",
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/KpiDefinitionInput" } } } },
         responses: { "201": { description: "Created" }, "400": { description: "Invalid payload" }, "409": { description: "Duplicate code" }, "422": { description: "Category unavailable" } },
+      },
+    },
+    "/api/v1/kpi-definitions/suggestions": {
+      get: {
+        tags: ["KPI Definitions"], summary: "Suggest similar active KPI Definitions",
+        description: "Read-only deterministic Autosuggest. Suggestions never replace the user-authored KPI name or block creation.",
+        parameters: [
+          { name: "q", in: "query", required: true, schema: { type: "string", minLength: 2, maxLength: 200 } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 8, default: 6 } },
+        ],
+        responses: { "200": { description: "Ranked suggestion result" }, "400": { description: "Invalid or short query" } },
+      },
+    },
+    "/api/v1/kpi-definitions/analyze": {
+      post: {
+        tags: ["KPI Definitions"], summary: "Analyze a user-authored KPI name",
+        description: "Returns deterministic ephemeral proposals, analysisStatus, Configuration readiness, target hint, ambiguities and business questions. It performs no persistence, scoring, baseline lookup or Autosuggest query.",
+        requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: false, required: ["name"], properties: { name: { type: "string", minLength: 2, maxLength: 200 } } } } } },
+        responses: { "200": { description: "Ephemeral Definition analysis" }, "400": { description: "Invalid KPI name" } },
       },
     },
     "/api/v1/kpi-definitions/{id}": {

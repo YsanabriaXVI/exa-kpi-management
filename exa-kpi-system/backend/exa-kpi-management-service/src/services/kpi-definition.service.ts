@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../config/database/prisma.js";
 import type {
   CreateKpiDefinitionBody,
+  KpiDefinitionSuggestionsQuery,
   ListKpiDefinitionsQuery,
   UpdateKpiDefinitionBody,
 } from "../schemas/kpi-definition.schema.js";
@@ -9,6 +10,7 @@ import type { PaginatedResponse } from "../types/api.types.js";
 import type { PaginationQuery } from "../schemas/pagination.schema.js";
 import { AppError } from "../utils/app-error.js";
 import { toKpiDefinitionDto, type KpiDefinitionDto } from "../utils/kpi-definition.dto.js";
+import { normalizeDefinitionText, rankAutosuggestCandidates } from "../definition-assist/index.js";
 
 const categoryInclude = { category: true } as const;
 
@@ -61,19 +63,16 @@ async function findExisting(id: bigint) {
 
 export const kpiDefinitionService = {
   async list(query: ListKpiDefinitionsQuery): Promise<PaginatedResponse<KpiDefinitionDto>> {
+    const terms = query.search ? normalizeDefinitionText(query.search).split(/[\s/+-]+/).filter(Boolean) : [];
     const where: Prisma.KpiDefinitionWhereInput = {
       deletedAt: null,
       ...(query.categoryId?.length ? { kpiCategoryId: { in: query.categoryId.map(BigInt) } } : {}),
       ...(query.status?.length ? { statusCode: { in: query.status } } : {}),
-      ...(query.search ? {
-        OR: [
-          { kpiCode: { contains: query.search } },
-          { kpiName: { contains: query.search } },
-          { description: { contains: query.search } },
-          { category: { is: { name: { contains: query.search } } } },
-          { statusCode: { contains: query.search } },
-        ],
-      } : {}),
+      ...(terms.length ? { AND: terms.map((term) => ({ OR: [
+        { kpiCode: { contains: term } }, { kpiName: { contains: term } },
+        { description: { contains: term } }, { category: { is: { name: { contains: term } } } },
+        { statusCode: { contains: term } },
+      ] })) } : {}),
     };
     const skip = (query.page - 1) * query.pageSize;
     const orderBy = buildOrderBy(query.sortBy, query.sortOrder);
@@ -91,6 +90,22 @@ export const kpiDefinitionService = {
         totalItems,
         totalPages: Math.ceil(totalItems / query.pageSize),
       },
+    };
+  },
+
+  async suggestions(query: KpiDefinitionSuggestionsQuery) {
+    const candidates = await prisma.kpiDefinition.findMany({
+      where: { deletedAt: null, isActive: true, statusCode: "ACTIVE" },
+      select: { id: true, kpiCode: true, kpiName: true, description: true },
+      orderBy: [{ kpiCode: "asc" }, { id: "asc" }],
+      take: 500,
+    });
+    return {
+      query: query.q,
+      normalizedQuery: normalizeDefinitionText(query.q),
+      suggestions: rankAutosuggestCandidates(query.q, candidates.map((candidate) => ({
+        id: candidate.id.toString(), code: candidate.kpiCode, name: candidate.kpiName, description: candidate.description,
+      })), query.limit),
     };
   },
 

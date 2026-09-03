@@ -24,6 +24,25 @@ const definition = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("kpiDefinitionService", () => {
+  it("autosuggests from active non-deleted Definitions without mutating data", async () => {
+    const records = [
+      { id: 1n, kpiCode: "KPI-001", kpiName: "Costo por km de cabezales", description: "Costo operativo" },
+      { id: 2n, kpiCode: "KPI-002", kpiName: "Venta de contenedores", description: "Ventas" },
+    ];
+    db.kpiDefinition.findMany.mockResolvedValue(records);
+    const result = await kpiDefinitionService.suggestions({ q: "costo por km cabezales", limit: 6 });
+    expect(db.kpiDefinition.findMany).toHaveBeenCalledWith({
+      where: { deletedAt: null, isActive: true, statusCode: "ACTIVE" },
+      select: { id: true, kpiCode: true, kpiName: true, description: true },
+      orderBy: [{ kpiCode: "asc" }, { id: "asc" }],
+      take: 500,
+    });
+    expect(result).toMatchObject({ query: "costo por km cabezales", normalizedQuery: "costo por km cabezales" });
+    expect(result.suggestions[0]).toMatchObject({ id: "1", code: "KPI-001", matchType: "EXACT_OR_NEAR_DUPLICATE" });
+    expect(db.kpiDefinition.create).not.toHaveBeenCalled();
+    expect(db.kpiDefinition.update).not.toHaveBeenCalled();
+  });
+
   it("uses MySQL pagination, filters, safe order and excludes soft-deleted rows", async () => {
     db.kpiDefinition.findMany.mockResolvedValue([definition]);
     db.kpiDefinition.count.mockResolvedValue(21);

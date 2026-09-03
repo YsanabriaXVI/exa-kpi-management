@@ -10,6 +10,15 @@ const repeatedQueryParam = <T extends z.ZodTypeAny>(schema: T) => z.preprocess(
 
 export const kpiDefinitionIdParamsSchema = z.object({ id: positiveBigIntString }).strict();
 
+export const kpiDefinitionSuggestionsQuerySchema = z.object({
+  q: z.string().trim().min(2).max(200),
+  limit: z.coerce.number().int().min(1).max(8).default(6),
+}).strict();
+
+export const analyzeKpiDefinitionBodySchema = z.object({
+  name: z.string().trim().min(2).max(200),
+}).strict();
+
 export const listKpiDefinitionsQuerySchema = paginationSchema.extend({
   search: z.string().trim().min(1).max(200).optional(),
   categoryId: repeatedQueryParam(positiveBigIntString),
@@ -35,5 +44,7 @@ export const updateKpiDefinitionBodySchema = z.object({
 });
 
 export type ListKpiDefinitionsQuery = z.infer<typeof listKpiDefinitionsQuerySchema>;
+export type KpiDefinitionSuggestionsQuery = z.infer<typeof kpiDefinitionSuggestionsQuerySchema>;
+export type AnalyzeKpiDefinitionBody = z.infer<typeof analyzeKpiDefinitionBodySchema>;
 export type CreateKpiDefinitionBody = z.infer<typeof createKpiDefinitionBodySchema>;
 export type UpdateKpiDefinitionBody = z.infer<typeof updateKpiDefinitionBodySchema>;
