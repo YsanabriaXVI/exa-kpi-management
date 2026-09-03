@@ -4,6 +4,7 @@ const db = vi.hoisted(() => ({
   kpiPool: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   inputFrequencyReference: { findUnique: vi.fn(), findMany: vi.fn() },
   kpiPoolPeriodComposition: { findUnique: vi.fn(), create: vi.fn() },
+  kpiPoolPeriodCompositionItem: { createMany: vi.fn() },
   kpiPoolInputPeriod: { findUnique: vi.fn() },
   kpiPoolKpi: { findMany: vi.fn() },
   outboxEvent: { create: vi.fn() },

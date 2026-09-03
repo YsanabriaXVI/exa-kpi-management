@@ -232,7 +232,7 @@ function formatStatus(status: string) {
 }
 
 function normalizeConfigSearch(value: string) {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[–—]/g, "-").replace(/_/g, " ").replace(/\s*-\s*/g, "-").replace(/\s+/g, " ").trim();
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[.·–—_-]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function configurationSearchText(config: KpiConfigRecord) {

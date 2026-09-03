@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
-import { kpiManagementClient } from "../clients/kpi-management.client.js";
 import { kpiPoolClient } from "../clients/kpi-pool.client.js";
 import { scorecardsClient } from "../clients/scorecards.client.js";
 import type { MaterializeMonitoringPeriodBody } from "../schemas/monitoring-period.schema.js";
@@ -134,20 +133,8 @@ export const monitoringPeriodService = {
         "NO_EXPECTED_RESULTS",
         "Finalized Scorecards do not contain direct KPI assignments",
       );
-    const snapshots = await kpiManagementClient.effectiveSnapshots(
-      ids,
-      period.start,
-      period.end,
-    );
-    const byConfiguration = new Map(
-      snapshots.map((snapshot) => [snapshot.kpiConfigurationId, snapshot]),
-    );
-    if (byConfiguration.size !== ids.length)
-      throw new AppError(
-        502,
-        "KPI_SNAPSHOT_CONTRACT_INCOMPLETE",
-        "KPI Management did not return every requested Configuration snapshot",
-      );
+    const byConfiguration = new Map(assignments.map(({ assignment }) => [assignment.kpiConfigurationId, assignment.effectiveSettings]));
+    if (assignments.some(({ assignment }) => !assignment.kpiConfigurationRevisionId || !assignment.effectiveSettings)) throw new AppError(409, "FROZEN_SCORECARD_SETTINGS_MISSING", "A FINALIZED Scorecard is missing its frozen effective KPI settings");
     try {
       const created = await prisma.$transaction(
         async (tx) => {
@@ -237,9 +224,7 @@ export const monitoringPeriodService = {
           }
           let displayOrder = 0;
           for (const { scorecard, assignment } of assignments) {
-            const snapshot = byConfiguration.get(
-              assignment.kpiConfigurationId,
-            )!;
+            const snapshot = byConfiguration.get(assignment.kpiConfigurationId)! as any;
             await tx.monitoringPeriodInput.create({
               data: {
                 monitoringPeriodId: periodRow.id,
@@ -248,9 +233,7 @@ export const monitoringPeriodService = {
                 )!,
                 kpiDefinitionExternalId: BigInt(snapshot.kpiDefinitionId),
                 kpiConfigurationExternalId: BigInt(snapshot.kpiConfigurationId),
-                kpiConfigurationRevisionExternalId: BigInt(
-                  snapshot.kpiConfigurationRevisionId,
-                ),
+                kpiConfigurationRevisionExternalId: BigInt(assignment.kpiConfigurationRevisionId!),
                 poolCompositionItemExternalId: BigInt(
                   assignment.poolMembershipExternalId,
                 ),
@@ -289,7 +272,7 @@ export const monitoringPeriodService = {
                 displayOrder: ++displayOrder,
                 generatedAt: new Date(),
                 thresholds: {
-                  create: snapshot.thresholds.map((threshold) => ({
+                  create: snapshot.thresholds.map((threshold: any) => ({
                     trafficLightLevelExternalId: BigInt(
                       threshold.trafficLightLevelId,
                     ),

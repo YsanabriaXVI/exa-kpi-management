@@ -69,6 +69,12 @@ export type ScorecardPeriod = {
   start: string;
   end: string;
   workflowStatus: string;
+  dependency?: {
+    canFinalize: boolean;
+    previousPeriodStart: string | null;
+    previousMonitoringStatus: string;
+    reasonCode: "PREVIOUS_INPUT_PERIOD_NOT_CLOSED" | "MONITORING_INTEGRATION_PENDING" | null;
+  };
   poolCompositionStatus: string;
   scorecardCompositionId: string | null;
   scorecardCompositionStatus:

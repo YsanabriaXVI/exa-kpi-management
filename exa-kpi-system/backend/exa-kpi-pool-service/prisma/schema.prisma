@@ -109,6 +109,7 @@ model KpiPoolInputPeriod {
   createdAt   DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
   pool        KpiPool                    @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_input_periods_pool")
   composition KpiPoolPeriodComposition?
+  overrides   KpiPoolPeriodConfigurationOverride[]
 
   @@unique([kpiPoolId, periodStart], map: "uq_kpi_pool_input_period")
   @@unique([kpiPoolId, periodKey], map: "uq_kpi_pool_input_period_key")
@@ -128,10 +129,53 @@ model KpiPoolPeriodComposition {
   finalizedByUserId BigInt?  @map("finalized_by_user_id")
   pool              KpiPool  @relation(fields: [kpiPoolId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_pool_period_compositions_pool")
   inputPeriod       KpiPoolInputPeriod @relation(fields: [inputPeriodId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_pool_period_compositions_input_period")
+  items             KpiPoolPeriodCompositionItem[]
 
   @@unique([kpiPoolId, periodStart], map: "uq_kpi_pool_period_composition")
   @@index([kpiPoolId, statusCode, periodStart], map: "ix_kpi_pool_period_compositions_status")
   @@map("kpi_pool_period_compositions")
+}
+
+model KpiPoolPeriodCompositionItem {
+  id                              BigInt   @id @default(autoincrement()) @map("kpi_pool_period_composition_item_id")
+  compositionId                   BigInt   @map("composition_id")
+  poolMembershipId                BigInt   @map("pool_membership_id")
+  kpiConfigurationExternalId      BigInt   @map("kpi_configuration_external_id")
+  configurationCodeSnapshot       String   @map("configuration_code_snapshot") @db.VarChar(40)
+  displayOrder                    Int      @map("display_order") @db.UnsignedInt
+  createdAt                       DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  composition                     KpiPoolPeriodComposition @relation(fields: [compositionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([compositionId, poolMembershipId], map: "uq_pool_composition_item_membership")
+  @@map("kpi_pool_period_composition_items")
+}
+
+model KpiPoolPeriodConfigurationOverride {
+  id                         BigInt   @id @default(autoincrement()) @map("kpi_pool_period_configuration_override_id")
+  kpiPoolId                  BigInt   @map("kpi_pool_id")
+  inputPeriodId              BigInt   @map("input_period_id")
+  poolMembershipId           BigInt   @map("pool_membership_id")
+  kpiConfigurationExternalId BigInt   @map("kpi_configuration_external_id")
+  fieldCode                  String   @map("field_code") @db.VarChar(60)
+  baseGlobalRevisionExternalId BigInt @map("base_global_revision_external_id")
+  baseGlobalValue            Json     @map("base_global_value")
+  overrideValue              Json     @map("override_value")
+  statusCode                 String   @default("ACTIVE") @map("status_code") @db.VarChar(30)
+  activeKey                  String?  @default("ACTIVE") @map("active_key") @db.VarChar(10)
+  supersededByGlobalRevisionExternalId BigInt? @map("superseded_by_global_revision_external_id")
+  supersededAt               DateTime? @map("superseded_at") @db.DateTime(3)
+  reason                     String?  @db.VarChar(500)
+  statusReason               String?  @map("status_reason") @db.VarChar(500)
+  version                    Int      @default(1) @db.UnsignedInt
+  createdAt                  DateTime @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId            BigInt?  @map("created_by_user_id")
+  updatedAt                  DateTime? @map("updated_at") @db.DateTime(3)
+  updatedByUserId            BigInt?  @map("updated_by_user_id")
+  inputPeriod                KpiPoolInputPeriod @relation(fields: [inputPeriodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([inputPeriodId, poolMembershipId, fieldCode, activeKey], map: "uq_pool_period_override_active_field")
+  @@index([kpiPoolId, inputPeriodId, kpiConfigurationExternalId], map: "ix_pool_period_override_resolution")
+  @@map("kpi_pool_period_configuration_overrides")
 }
 
 model KpiPoolArea {

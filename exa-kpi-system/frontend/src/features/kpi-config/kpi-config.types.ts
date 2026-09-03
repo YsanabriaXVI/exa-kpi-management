@@ -37,4 +37,6 @@ export type KpiConfigInput = {
   dataSource: string;
   ranges: TrafficLightRanges;
   isActive: boolean;
+  effectiveFrom?: string;
+  changeReason?: string;
 };

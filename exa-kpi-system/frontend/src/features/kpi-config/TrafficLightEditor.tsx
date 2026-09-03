@@ -3,11 +3,12 @@ import type { TrafficLightRanges } from "./kpi-config.types";
 type TrafficLightEditorProps = {
   value: TrafficLightRanges;
   onChange: (ranges: TrafficLightRanges) => void;
+  disabled?: boolean;
 };
 
 const clamp = (value: number) => Math.min(100, Math.max(0, value));
 
-export function TrafficLightEditor({ value, onChange }: TrafficLightEditorProps) {
+export function TrafficLightEditor({ value, onChange, disabled = false }: TrafficLightEditorProps) {
   const updateBox = (field: keyof TrafficLightRanges, raw: string) => {
     const next = clamp(Number(raw) || 0);
     onChange({ ...value, [field]: next });
@@ -64,6 +65,7 @@ export function TrafficLightEditor({ value, onChange }: TrafficLightEditorProps)
             <div className="range-input-row" key={row.key}>
               <span className={`range-name ${row.key}`}><i />{row.label}</span>
               <input
+                disabled={disabled}
                 type="number"
                 min="0"
                 max="100"
@@ -71,6 +73,7 @@ export function TrafficLightEditor({ value, onChange }: TrafficLightEditorProps)
                 onChange={(event) => updateBox(row.from, event.target.value)}
               />
               <input
+                disabled={disabled}
                 type="number"
                 min="0"
                 max="100"
@@ -94,6 +97,7 @@ export function TrafficLightEditor({ value, onChange }: TrafficLightEditorProps)
           />
           <div className="dual-range">
             <input
+              disabled={disabled}
               type="range"
               min="0"
               max="99"
@@ -102,6 +106,7 @@ export function TrafficLightEditor({ value, onChange }: TrafficLightEditorProps)
               onChange={(event) => updateRedBoundary(Number(event.target.value))}
             />
             <input
+              disabled={disabled}
               type="range"
               min="1"
               max="100"

@@ -165,6 +165,7 @@ model KpiConfiguration {
   primaryDataSource        DataSource                 @relation(fields: [primaryDataSourceId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_primary_source")
   status                   KpiConfigurationStatus     @relation(fields: [kpiConfigurationStatusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_status")
   revisions                KpiConfigurationRevision[]
+  changeAudits             KpiConfigurationChangeAudit[]
 
   @@index([kpiDefinitionId], map: "ix_kpi_configurations_definition")
   @@index([measurementUnitId], map: "ix_kpi_configurations_measurement_unit")
@@ -173,6 +174,23 @@ model KpiConfiguration {
   @@index([kpiConfigurationStatusId], map: "ix_kpi_configurations_status")
   @@index([deletedAt], map: "ix_kpi_configurations_deleted_at")
   @@map("kpi_configurations")
+}
+
+model KpiConfigurationChangeAudit {
+  id                     BigInt           @id @default(autoincrement()) @map("kpi_configuration_change_audit_id")
+  kpiConfigurationId     BigInt           @map("kpi_configuration_id")
+  configurationRevisionId BigInt?         @map("configuration_revision_id")
+  changeSource           String           @map("change_source") @db.VarChar(40)
+  effectiveFrom          DateTime?        @map("effective_from") @db.Date
+  oldValue               Json?            @map("old_value")
+  newValue               Json             @map("new_value")
+  reason                 String?          @db.VarChar(500)
+  changedAt              DateTime         @default(now()) @map("changed_at") @db.DateTime(3)
+  changedByUserId        BigInt?           @map("changed_by_user_id")
+  configuration          KpiConfiguration @relation(fields: [kpiConfigurationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([kpiConfigurationId, changedAt], map: "ix_kpi_configuration_change_audit")
+  @@map("kpi_configuration_change_audits")
 }
 
 model KpiConfigurationRevision {

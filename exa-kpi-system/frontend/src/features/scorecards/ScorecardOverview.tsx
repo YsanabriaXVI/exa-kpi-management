@@ -4,6 +4,7 @@ import { Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { scorecardService } from "./scorecard.service";
 import { ScorecardMultiSelect } from "./ScorecardMultiSelect";
+import { ConfigMultiSelect } from "../kpi-config/ConfigMultiSelect";
 import {
   SortableTableHeader,
   compareSortValues,
@@ -21,24 +22,26 @@ export function ScorecardOverview() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [departments, setDepartments] = useState<string[]>([]);
-  const [frequencies, setFrequencies] = useState<string[]>([]);
+  const [poolSources, setPoolSources] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [years, setYears] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<{ key: ScorecardSortKey; direction: SortDirection }>({ key: "code", direction: "asc" });
   const backendSort = sort.key === "code" ? "scorecardCode" : sort.key === "name" ? "scorecardName" : sort.key === "status" ? "statusCode" : "createdAt";
-  const query = useQuery({ queryKey: ["scorecards", { page, pageSize, search, departments, frequencies, statuses, years, backendSort, direction: sort.direction }], queryFn: () => scorecardService.listPage({ page, pageSize, search, department: departments, frequency: frequencies, status: statuses, year: years, sortBy: backendSort, sortOrder: sort.direction }), placeholderData: (previous) => previous });
+  const poolSourcesQuery = useQuery({ queryKey: ["scorecards", "pool-source-options"], queryFn: scorecardService.list, staleTime: 60 * 1000 });
+  const query = useQuery({ queryKey: ["scorecards", { page, pageSize, search, departments, poolSources, statuses, years, backendSort, direction: sort.direction }], queryFn: () => scorecardService.listPage({ page, pageSize, search, department: departments, poolId: poolSources, status: statuses, year: years, sortBy: backendSort, sortOrder: sort.direction }), placeholderData: (previous) => previous });
   const [actionMessage, setActionMessage] = useState("");
   const [scorecardToRemove, setScorecardToRemove] = useState<{ id: number; code: string } | null>(null);
   const remove = useMutation({ mutationFn: scorecardService.deactivate, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["scorecards"] }); setScorecardToRemove(null); setActionMessage("ScoreCard deactivated. Its historical records were preserved."); }, onError: (cause) => setActionMessage(cause instanceof Error ? cause.message : "The ScoreCard could not be deactivated.") });
   const records = query.data?.data ?? [];
   const sortedRecords = useMemo(() => [...records].sort((left, right) => compareSortValues(scorecardSortValue(left, sort.key), scorecardSortValue(right, sort.key), sort.direction)), [records, sort]);
   const options = (values: string[]) => [...new Set(values)].sort().map((value) => ({ value, label: value }));
+  const poolSourceOptions = [...new Map((poolSourcesQuery.data ?? []).filter((item) => item.poolId).map((item) => [String(item.poolId), { value: String(item.poolId), label: item.poolSource.split(" · ")[0], description: item.poolSource.split(" · ").slice(1).join(" · ") }])).values()];
   const totalItems = query.data?.meta.totalItems ?? 0;
   const totalPages = Math.max(1, query.data?.meta.totalPages ?? 1);
   const pageStart = (page - 1) * pageSize;
   useEffect(() => setPage((current) => Math.min(current, totalPages)), [totalPages]);
-  useEffect(() => setPage(1), [search, departments, frequencies, statuses, years]);
+  useEffect(() => setPage(1), [search, departments, poolSources, statuses, years]);
   const sortBy = (key: ScorecardSortKey) => {
     setSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" }));
     setPage(1);
@@ -50,7 +53,7 @@ export function ScorecardOverview() {
     <section className="scorecard-toolbar">
       <label className="scorecard-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search ScoreCard code, name or Pool..." /></label>
       <ScorecardMultiSelect label="Departments" options={options(records.flatMap((item) => item.departments))} selected={departments} onChange={setDepartments} />
-      <ScorecardMultiSelect label="Input Frequency" options={options(records.map((item) => item.inputFrequency))} selected={frequencies} onChange={setFrequencies} />
+      <div className="scorecard-pool-source-filter kpi-config-page"><ConfigMultiSelect label="KPI Pool Source" options={poolSourceOptions} selected={poolSources} onChange={setPoolSources} searchable searchPlaceholder="Search Pool code or name..." emptyText="No KPI Pool Source found." /></div>
       <ScorecardMultiSelect label="Status" options={options(records.map((item) => item.status)).map((option) => ({ ...option, label: title(option.label) }))} selected={statuses} onChange={setStatuses} />
       <ScorecardMultiSelect label="Year" options={options(records.map((item) => String(item.year)))} selected={years} onChange={setYears} />
     </section>

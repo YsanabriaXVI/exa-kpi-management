@@ -76,6 +76,7 @@ export type PoolScorecardUsage = {
     scorecardId: string;
     scorecardCode: string;
     scorecardName: string;
+    scorecardCompositionStatus: "PREPARING" | "FINALIZED";
     departments: string[];
   }>;
 };
@@ -196,6 +197,7 @@ export const scorecardService = {
     search?: string;
     status?: string[];
     department?: string[];
+    poolId?: string[];
     frequency?: string[];
     year?: string[];
     sortBy?: string;
@@ -210,6 +212,7 @@ export const scorecardService = {
     if (input.search) params.set("search", input.search);
     input.status?.forEach((value) => params.append("status", value));
     input.department?.forEach((value) => params.append("department", value));
+    input.poolId?.forEach((value) => params.append("poolId", value));
     input.frequency?.forEach((value) =>
       params.append("frequency", value.toUpperCase().replace(/ /g, "_")),
     );

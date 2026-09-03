@@ -80,6 +80,7 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
       DATABASE_URL: mysql://${KPI_POOL_MYSQL_USER:-exa_kpi_pool}:${KPI_POOL_MYSQL_PASSWORD:-exa_pool_dev}@mysql:3306/exa_kpi_pool
       KPI_MANAGEMENT_BASE_URL: http://exa-kpi-management-service:4001
+      SCORECARDS_BASE_URL: http://exa-scorecards-service:4003
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TEMPORARY_ACTOR_USER_ID: ${TEMPORARY_ACTOR_USER_ID:-1}
       NATS_ENABLED: "true"

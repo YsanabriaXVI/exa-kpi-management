@@ -70,9 +70,10 @@ function associationData(references: Awaited<ReturnType<typeof loadReferences>>,
 
 export const kpiPoolService = {
   async list(query: ListKpiPoolsQuery) {
+    const terms = query.search?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[.·–—_-]+/g, " ").toLowerCase().split(/\s+/).filter(Boolean) ?? [];
     const where: Prisma.KpiPoolWhereInput = {
       deletedAt: null,
-      ...(query.search ? { OR: [{ poolCode: { contains: query.search } }, { poolName: { contains: query.search } }] } : {}),
+      ...(terms.length ? { AND: terms.map((term) => ({ OR: [{ poolCode: { contains: term } }, { poolName: { contains: term } }] })) } : {}),
       ...(query.status?.length ? { statusCode: { in: query.status } } : {}),
       ...(query.companyId?.length ? { companies: { some: { externalCompanyId: { in: query.companyId.map(BigInt) } } } } : {}),
       ...(query.inputFrequencyId?.length ? { inputFrequencyExternalId: { in: query.inputFrequencyId.map(BigInt) } } : {}),

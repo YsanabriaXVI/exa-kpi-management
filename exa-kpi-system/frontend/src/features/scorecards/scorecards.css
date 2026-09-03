@@ -200,6 +200,7 @@ html[data-theme="dark"] .scope-summary-modal>footer{
 .scorecard-overview-page .scorecard-toolbar {
   grid-template-columns: minmax(285px, 360px) repeat(4, minmax(165px, 1fr));
 }
+.scorecard-pool-source-filter{min-width:0}.scorecard-pool-source-filter .config-multiselect,.scorecard-pool-source-filter .config-filter-trigger{width:100%;height:39px}.scorecard-pool-source-filter .config-filter-menu{min-width:280px}
 
 .scorecard-overview-page .scorecard-table-wrap {
   border: 0 !important;

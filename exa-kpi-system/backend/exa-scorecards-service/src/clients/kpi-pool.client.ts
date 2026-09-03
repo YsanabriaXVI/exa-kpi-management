@@ -29,6 +29,9 @@ async function request<T>(path: string): Promise<T> {
 }
 
 export const kpiPoolClient = {
+  async effectiveSettings(poolId: string, inputPeriodId: string, configurationId: string) {
+    return (await request<{ data: { global: Record<string, unknown>; effective: Record<string, unknown> & { kpiConfigurationRevisionId: string; goal: string|null }; sources: Record<string,string>; poolMembershipId: string } }>(`/api/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/effective-settings`)).data;
+  },
   async getPool(id: string) { return (await request<{ data: PoolRecord }>(`/api/v1/kpi-pools/${id}`)).data; },
   async periods(id: string) { return (await request<{ data: PoolPeriod[] }>(`/api/v1/kpi-pools/${id}/input-periods`)).data; },
   async period(id: string, poolInputPeriodId: string) {

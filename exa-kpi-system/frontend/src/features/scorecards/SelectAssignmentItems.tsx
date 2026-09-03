@@ -232,6 +232,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
         ? scorecardService.availableKpis(scorecardId, periodKey)
         : scorecardService.availableLinks(scorecardId, periodKey),
     enabled: scorecardId > 0 && Boolean(periodKey),
+    retry: false,
   });
   const category = (row: Option): AvailabilityFilter => {
     if (isKpi) {
@@ -906,8 +907,9 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
       )}
       {items.isError ? (
         <section className="scorecard-empty-state">
-          <h2>Eligible records could not be loaded</h2>
-          <p>{(items.error as Error).message}</p>
+          <h2>{items.error instanceof ScorecardApiError && items.error.code === "POOL_COMPOSITION_NOT_FINALIZED" ? "Pool Composition not finalized" : "Eligible records could not be loaded"}</h2>
+          <p>{items.error instanceof ScorecardApiError && items.error.code === "POOL_COMPOSITION_NOT_FINALIZED" ? `KPIs cannot be selected for ${formatPeriod(periodKey)} until its Pool Composition is finalized. If this is a later period, close the previous Monitoring Results period first and then finalize this Pool Composition.` : (items.error as Error).message}</p>
+          <button type="button" className="button secondary" onClick={() => items.refetch()}>Retry</button>
         </section>
       ) : (
         <section className="manage-table-section assignment-selection-records">

@@ -12,6 +12,7 @@ const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 
 type ScorecardRow = Prisma.ScorecardGetPayload<{ include: typeof include }>;
 type PoolPeriodRow = { kpiPoolExternalId: bigint; periodKey: string; periodStart: Date; compositionStatusCode: string };
+const searchTerms = (value?: string) => value?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[.·–—_-]+/g, " ").toLowerCase().split(/\s+/).filter(Boolean) ?? [];
 function currentComposition(value: ScorecardRow, poolPeriods: PoolPeriodRow[]) {
   const preparing = value.periodCompositions.find((composition) => composition.statusCode === "PREPARING");
   if (preparing) {
@@ -56,11 +57,12 @@ async function outbox(tx: Prisma.TransactionClient, scorecard: { id: bigint; agg
 
 export const scorecardService = {
   async list(query: ListScorecardsQuery) {
+    const terms = searchTerms(query.search);
     const scheduleFilters = query.frequency?.length || query.year?.length ? await prisma.poolReference.findMany({ where: { ...(query.frequency?.length ? { inputFrequencyCode: { in: query.frequency } } : {}), ...(query.year?.length ? { OR: query.year.map((year) => ({ validFrom: { gte: new Date(`${year}-01-01`), lte: new Date(`${year}-12-31`) } })) } : {}) }, select: { kpiPoolExternalId: true } }) : null;
     const schedulePoolIds = scheduleFilters?.map((pool) => pool.kpiPoolExternalId);
     const requestedPoolIds = query.poolId?.map(BigInt);
     const effectivePoolIds = schedulePoolIds && requestedPoolIds ? schedulePoolIds.filter((id) => requestedPoolIds.includes(id)) : schedulePoolIds ?? requestedPoolIds;
-    const where: Prisma.ScorecardWhereInput = { deletedAt: null, ...(query.search ? { OR: [{ code: { contains: query.search } }, { name: { contains: query.search } }, { poolCodeSnapshot: { contains: query.search } }, { poolNameSnapshot: { contains: query.search } }] } : {}), ...(query.status?.length ? { statusCode: { in: query.status } } : {}), ...(effectivePoolIds ? { kpiPoolExternalId: { in: effectivePoolIds } } : {}), ...(query.companyId?.length ? { companies: { some: { externalCompanyId: { in: query.companyId.map(BigInt) } } } } : {}), ...(query.department?.length ? { departments: { some: { departmentNameSnapshot: { in: query.department } } } } : {}) };
+    const where: Prisma.ScorecardWhereInput = { deletedAt: null, ...(terms.length ? { AND: terms.map((term) => ({ OR: [{ code: { contains: term } }, { name: { contains: term } }, { poolCodeSnapshot: { contains: term } }, { poolNameSnapshot: { contains: term } }] })) } : {}), ...(query.status?.length ? { statusCode: { in: query.status } } : {}), ...(effectivePoolIds ? { kpiPoolExternalId: { in: effectivePoolIds } } : {}), ...(query.companyId?.length ? { companies: { some: { externalCompanyId: { in: query.companyId.map(BigInt) } } } } : {}), ...(query.department?.length ? { departments: { some: { departmentNameSnapshot: { in: query.department } } } } : {}) };
     const skip = (query.page - 1) * query.pageSize;
     const sortField = { scorecardCode: "code", scorecardName: "name", statusCode: "statusCode", createdAt: "createdAt", updatedAt: "updatedAt" }[query.sortBy];
     const [rows, totalItems] = await prisma.$transaction([prisma.scorecard.findMany({ where, include, orderBy: { [sortField]: query.sortOrder }, skip, take: query.pageSize }), prisma.scorecard.count({ where })]);

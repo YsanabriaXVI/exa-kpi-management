@@ -27,6 +27,19 @@ export const addKpiPoolConfigurationsBodySchema = z.object({ configurationIds: z
   .transform(({ configurationIds, effectiveFromPeriod }) => ({ configurationIds: [...new Set(configurationIds)], effectiveFromPeriod }));
 export const retireKpiPoolConfigurationBodySchema = z.object({ effectiveFromPeriod: dateString.optional() }).strict();
 export const finalizePeriodCompositionBodySchema = z.object({ periodStart: dateString }).strict();
+export const poolOverrideParamsSchema = z.object({ id: positiveId, inputPeriodId: positiveId, configurationId: positiveId }).strict();
+export const globalConfigurationParamsSchema = z.object({ configurationId: positiveId }).strict();
+export const poolOverrideBodySchema = z.object({
+  goal: z.number().finite().nonnegative().optional(),
+  trafficLightThresholds: z.array(z.object({ code: z.enum(["RED","YELLOW","GREEN"]), rangeMinPercent: z.number(), rangeMaxPercent: z.number(), includesMin: z.boolean(), includesMax: z.boolean() }).strict()).length(3).optional(),
+  applyToFuturePeriods: z.boolean().default(true),
+  reason: z.string().trim().min(3).max(500),
+}).strict().refine((value) => value.goal !== undefined || value.trafficLightThresholds !== undefined, { message: "At least one overridable field is required" });
+export const resetPoolOverrideBodySchema = z.object({
+  fields: z.array(z.enum(["GOAL", "TRAFFIC_LIGHT_THRESHOLDS"])).min(1).max(2),
+  applyToFuturePeriods: z.boolean().default(true),
+  reason: z.string().trim().min(3).max(500),
+}).strict();
 export const extendKpiPoolValidityBodySchema = z.object({ validTo: dateString }).strict();
 export const replaceKpiPoolConfigurationBodySchema = z.object({ oldConfigurationId: positiveId, newConfigurationId: positiveId, effectiveFromPeriod: dateString.optional() }).strict()
   .refine((value) => value.oldConfigurationId !== value.newConfigurationId, "Replacement Configuration must be different");

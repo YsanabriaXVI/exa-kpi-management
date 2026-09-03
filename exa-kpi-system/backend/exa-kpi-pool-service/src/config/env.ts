@@ -15,6 +15,8 @@ const environmentSchema = z.object({
   TEMPORARY_ACTOR_USER_ID: z.coerce.bigint().positive().default(1n),
   KPI_MANAGEMENT_BASE_URL: z.string().url().default("http://localhost:4001"),
   KPI_MANAGEMENT_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(5_000),
+  SCORECARDS_BASE_URL: z.string().url().default("http://localhost:4003"),
+  SCORECARDS_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(5_000),
   NATS_ENABLED: booleanFromEnvironment,
   NATS_URL: z.string().url().default("nats://localhost:4222"),
   NATS_NAME: z.string().min(1).default("exa-kpi-pool-service"),

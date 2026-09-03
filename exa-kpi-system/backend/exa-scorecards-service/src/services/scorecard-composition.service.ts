@@ -173,6 +173,10 @@ async function outbox(tx: Prisma.TransactionClient, type: string, owner: { id: b
 }
 
 export const scorecardCompositionService = {
+  async frozenKpiUsage(poolId: bigint, periodKey: string, configurationId: bigint) {
+    const row = await prisma.scorecardPeriodKpi.findFirst({ where: { kpiPoolExternalId: poolId, periodKey, kpiConfigurationExternalId: configurationId, composition: { statusCode: "FINALIZED" } }, select: { composition: { select: { id: true, scorecardId: true } } } });
+    return { data: { frozen: Boolean(row), scorecardPeriodCompositionId: row?.composition.id.toString() ?? null, scorecardId: row?.composition.scorecardId.toString() ?? null } };
+  },
   async monitoringMaterialization(poolId: bigint, poolInputPeriodId: string) {
     const period = await kpiPoolClient.period(poolId.toString(), poolInputPeriodId);
     if (!period.poolCompositionId || period.workflowStatus !== "FINALIZED") {
@@ -195,7 +199,7 @@ export const scorecardCompositionService = {
         scorecardId: row.id.toString(), scorecardCode: row.code, scorecardName: row.name, lifecycle: row.statusCode,
         compositionStatus, scorecardPeriodCompositionId: composition?.id.toString() ?? null,
         departments: row.departments.map((department) => ({ id: department.externalDepartmentId.toString(), code: department.departmentCodeSnapshot, name: department.departmentNameSnapshot })),
-        directKpiAssignments: composition?.kpis.map((kpi) => ({ scorecardKpiAssignmentId: kpi.id.toString(), kpiConfigurationId: kpi.kpiConfigurationExternalId.toString(), kpiDefinitionId: kpi.kpiDefinitionExternalId.toString(), poolMembershipExternalId: kpi.kpiPoolMembershipExternalId.toString(), weightPercent: kpi.weightPercent.toFixed(4), displayOrder: kpi.displayOrder })) ?? [],
+        directKpiAssignments: composition?.kpis.map((kpi) => ({ scorecardKpiAssignmentId: kpi.id.toString(), kpiConfigurationId: kpi.kpiConfigurationExternalId.toString(), kpiConfigurationRevisionId: kpi.kpiConfigurationRevisionExternalId?.toString() ?? null, kpiDefinitionId: kpi.kpiDefinitionExternalId.toString(), poolMembershipExternalId: kpi.kpiPoolMembershipExternalId.toString(), effectiveSettings: kpi.effectiveSettingsSnapshot, settingsProvenance: kpi.settingsProvenanceSnapshot, weightPercent: kpi.weightPercent.toFixed(4), displayOrder: kpi.displayOrder })) ?? [],
         linkedScorecards: composition?.links.map((link) => ({ linkAssignmentId: link.id.toString(), linkedScorecardId: link.linkedScorecardId.toString(), linkedScorecardCompositionId: finalizedByScorecard.get(link.linkedScorecardId.toString())?.id.toString() ?? null, weightPercent: link.weightPercent.toFixed(4), displayOrder: link.displayOrder })) ?? [],
       };
     });
@@ -210,7 +214,16 @@ export const scorecardCompositionService = {
       prisma.scorecardPeriodComposition.findMany({ where: { scorecardId }, select: { id: true, periodKey: true, statusCode: true } }),
     ]);
     const byPeriod = new Map(compositions.map((row) => [row.periodKey, row]));
-    return { data: poolPeriods.map((period) => ({ ...period, poolCompositionStatus: period.poolCompositionId ? "FINALIZED" : period.workflowStatus, scorecardCompositionId: byPeriod.get(period.periodKey)?.id.toString() ?? null, scorecardCompositionStatus: byPeriod.get(period.periodKey)?.statusCode ?? (period.poolCompositionId ? "AVAILABLE" : "UNAVAILABLE") })) };
+    return { data: poolPeriods.map((period) => ({
+      ...period,
+      // A workflow fallback is not a finalized composition. Only the stable
+      // persisted composition identifier makes this period consumable here.
+      poolCompositionStatus: period.poolCompositionId ? "FINALIZED" : period.workflowStatus === "EDITABLE" ? "EDITABLE" : "UNAVAILABLE",
+      scorecardCompositionId: byPeriod.get(period.periodKey)?.id.toString() ?? null,
+      // A previously prepared Scorecard draft may remain stored, but it is not
+      // selectable until the owning Pool publishes this exact period.
+      scorecardCompositionStatus: period.poolCompositionId ? (byPeriod.get(period.periodKey)?.statusCode ?? "AVAILABLE") : "UNAVAILABLE",
+    })) };
   },
 
   async get(scorecardId: bigint, periodKey: string, actor: bigint) {
@@ -361,7 +374,12 @@ export const scorecardCompositionService = {
     for (const link of current.links) if (!await prisma.scorecardPeriodComposition.findFirst({ where: { scorecardId: link.linkedScorecardId, periodKey, statusCode: "FINALIZED" } })) throw new AppError(422, "LINKED_SCORECARD_COMPOSITION_NOT_FINALIZED", `${link.linkedScorecard.code} is not finalized for ${periodKey}`);
     const total = [...current.kpis, ...current.links].reduce((sum, row) => sum.plus(row.weightPercent), new Prisma.Decimal(0));
     if (!total.equals(new Prisma.Decimal("100.0000"))) throw new AppError(422, "SCORECARD_WEIGHT_TOTAL_INVALID", "KPI and Linked Scorecard weights must total exactly 100.0000", { total: total.toFixed(4) });
+    const resolvedSettings = new Map(await Promise.all(current.kpis.map(async (row) => [row.id.toString(), await kpiPoolClient.effectiveSettings(owner.kpiPoolExternalId.toString(), period.poolPeriodExternalId!.toString(), row.kpiConfigurationExternalId.toString())] as const)));
     return prisma.$transaction(async (tx) => {
+      for (const row of current.kpis) {
+        const resolved = resolvedSettings.get(row.id.toString())!;
+        await tx.scorecardPeriodKpi.update({ where: { id: row.id }, data: { kpiConfigurationRevisionExternalId: BigInt(resolved.effective.kpiConfigurationRevisionId), goalSnapshot: resolved.effective.goal, effectiveSettingsSnapshot: resolved.effective as Prisma.InputJsonValue, settingsProvenanceSnapshot: resolved.sources as Prisma.InputJsonValue } });
+      }
       const changed = await tx.scorecardPeriodComposition.updateMany({ where: { id: current.id, statusCode: "PREPARING" }, data: { statusCode: "FINALIZED", finalizedAt: new Date(), finalizedByUserId: actor, updatedByUserId: actor } });
       if (!changed.count) throw new AppError(409, "SCORECARD_COMPOSITION_ALREADY_FINALIZED", "The composition is no longer editable");
       const first = owner.statusCode === "DRAFT"; const aggregate = await tx.scorecard.update({ where: { id: owner.id }, data: { statusCode: first ? "ACTIVE" : owner.statusCode, aggregateVersion: { increment: first ? 2 : 1 }, updatedByUserId: actor } });
@@ -380,10 +398,10 @@ export const scorecardCompositionService = {
   async poolUsage(poolId: bigint, periodKey: string) {
     const compositions = await prisma.scorecardPeriodComposition.findMany({
       where: { kpiPoolExternalId: poolId, periodKey, kpis: { some: {} } },
-      select: { scorecard: { select: { id: true, code: true, name: true, departments: { orderBy: { displayOrder: "asc" }, select: { departmentNameSnapshot: true } } } }, kpis: { select: { kpiConfigurationExternalId: true, configurationCodeSnapshot: true, definitionCodeSnapshot: true, definitionNameSnapshot: true } } },
+      select: { statusCode: true, scorecard: { select: { id: true, code: true, name: true, departments: { orderBy: { displayOrder: "asc" }, select: { departmentNameSnapshot: true } } } }, kpis: { select: { kpiConfigurationExternalId: true, configurationCodeSnapshot: true, definitionCodeSnapshot: true, definitionNameSnapshot: true } } },
       orderBy: { scorecard: { code: "asc" } },
     });
-    const assignments = compositions.flatMap((composition) => composition.kpis.map((kpi) => ({ kpiConfigurationId: kpi.kpiConfigurationExternalId.toString(), configurationCode: kpi.configurationCodeSnapshot, kpiCode: kpi.definitionCodeSnapshot, kpiName: kpi.definitionNameSnapshot, scorecardId: composition.scorecard.id.toString(), scorecardCode: composition.scorecard.code, scorecardName: composition.scorecard.name, departments: composition.scorecard.departments.map((department) => department.departmentNameSnapshot) })));
+    const assignments = compositions.flatMap((composition) => composition.kpis.map((kpi) => ({ kpiConfigurationId: kpi.kpiConfigurationExternalId.toString(), configurationCode: kpi.configurationCodeSnapshot, kpiCode: kpi.definitionCodeSnapshot, kpiName: kpi.definitionNameSnapshot, scorecardId: composition.scorecard.id.toString(), scorecardCode: composition.scorecard.code, scorecardName: composition.scorecard.name, scorecardCompositionStatus: composition.statusCode, departments: composition.scorecard.departments.map((department) => department.departmentNameSnapshot) })));
     return { data: { poolId: poolId.toString(), periodKey, assignedKpiCount: new Set(assignments.map((row) => row.kpiConfigurationId)).size, scorecardsUsingCount: compositions.length, assignments } };
   },
 

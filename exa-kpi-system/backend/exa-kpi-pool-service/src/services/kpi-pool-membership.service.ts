@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, type KpiPool, type KpiPoolKpi } from "@prisma/client";
 import { kpiManagementClient, type KpiManagementConfiguration } from "../clients/kpi-management.client.js";
 import { prisma } from "../config/prisma.js";
-import { assertPeriodEditable, defaultTargetPeriod, formatDateOnly, poolPeriods, previousDay, resolvePoolPeriod, type InputPeriod } from "../domain/input-period.js";
+import { defaultTargetPeriod, formatDateOnly, poolPeriods, previousDay, resolvePoolPeriod, type InputPeriod } from "../domain/input-period.js";
 import { periodFinalizationGateway } from "../gateways/period-finalization.gateway.js";
 import type { AddKpiPoolConfigurationsBody, AvailableKpiConfigurationsQuery, ReplaceKpiPoolConfigurationBody, RetireKpiPoolConfigurationBody, TargetPeriodQuery } from "../schemas/kpi-pool.schema.js";
 import { AppError } from "../utils/app-error.js";
@@ -21,11 +21,14 @@ async function requirePool(id: bigint): Promise<PoolWithFrequency> {
   return Object.assign(pool, { frequency });
 }
 
-function targetPeriod(pool: PoolWithFrequency, requested?: string): InputPeriod {
-  const period = requested
-    ? resolvePoolPeriod(pool.validFrom, pool.validTo, pool.frequency.monthsPerPeriod, requested)
-    : defaultTargetPeriod(pool.validFrom, pool.validTo, pool.frequency.monthsPerPeriod, pool.statusCode);
-  assertPeriodEditable(pool.statusCode, period, pool.frequency.monthsPerPeriod);
+async function targetPeriod(pool: PoolWithFrequency, requested?: string): Promise<InputPeriod> {
+  if (pool.statusCode === "INACTIVE") throw new AppError(409, "POOL_INACTIVE", "Inactive Pools cannot change KPI membership");
+  const periods = poolPeriods(pool.validFrom, pool.validTo, pool.frequency.monthsPerPeriod);
+  const finalized = pool.statusCode === "DRAFT" ? new Set<string>() : new Set((await prisma.kpiPoolPeriodComposition.findMany({ where: { kpiPoolId: pool.id }, select: { periodStart: true } })).map((row) => formatDateOnly(row.periodStart)));
+  const editable = pool.statusCode === "DRAFT" ? periods[0] : periods.find((candidate) => !finalized.has(formatDateOnly(candidate.start)));
+  if (!editable) throw new AppError(409, "NO_EDITABLE_PERIOD", "Every Pool Input Period composition is already finalized");
+  const period = requested ? resolvePoolPeriod(pool.validFrom, pool.validTo, pool.frequency.monthsPerPeriod, requested) : editable;
+  if (period.start.getTime() !== editable.start.getTime()) throw new AppError(409, "POOL_PERIOD_NOT_EDITABLE", "Only the first non-finalized Pool Input Period can be prepared", { editablePeriodStart: formatDateOnly(editable.start) });
   return period;
 }
 
@@ -126,7 +129,7 @@ export const kpiPoolMembershipService = {
         issues.push({ configurationId: null, code: "INPUT_FREQUENCY_INACTIVE", message: "The Pool Input Frequency is inactive." });
       } else {
         try {
-          period = targetPeriod(Object.assign(pool, { frequency }));
+          period = await targetPeriod(Object.assign(pool, { frequency }));
           const finalized = await prisma.kpiPoolPeriodComposition.findUnique({ where: { kpiPoolId_periodStart: { kpiPoolId: pool.id, periodStart: period.start } } });
           if (finalized) issues.push({ configurationId: null, code: "POOL_PERIOD_LOCKED", message: "The target Pool period is already finalized." });
         } catch (error) {
@@ -184,18 +187,20 @@ export const kpiPoolMembershipService = {
     const persistedByStart = new Map(persistedPeriods.map((value) => [formatDateOnly(value.periodStart), value]));
     const finalizedByStart = new Map(finalized.map((value) => [formatDateOnly(value.periodStart), value]));
     const finalizedStarts = new Set(finalizedByStart.keys());
-    const today = new Date();
-    const firstEditableIndex = periods.findIndex((period) => !finalizedStarts.has(formatDateOnly(period.start)) && (pool.statusCode === "DRAFT" || period.start > today));
+    // The first non-finalized period remains the planning target even after its
+    // calendar start. Passing the start date must never fabricate a finalized
+    // Pool Composition: Scorecards can only consume a persisted composition ID.
+    const firstEditableIndex = periods.findIndex((period) => !finalizedStarts.has(formatDateOnly(period.start)));
     const data = await Promise.all(periods.map(async (period, index) => {
       const persistedFinalized = finalizedStarts.has(formatDateOnly(period.start));
-      const conservativelyLocked = pool.statusCode === "INACTIVE" || (pool.statusCode !== "DRAFT" && period.start <= today);
+      const conservativelyLocked = pool.statusCode === "INACTIVE";
       const isOnlyEditablePeriod = index === firstEditableIndex;
       const configurationStatus = persistedFinalized || conservativelyLocked ? "POOL_COMPOSITION_LOCKED" as const : isOnlyEditablePeriod ? "EDITABLE" as const : "FUTURE_NOT_AVAILABLE" as const;
       const dependency = await periodFinalizationGateway.evaluate(poolId, periods, index);
       const canEditComposition = configurationStatus === "EDITABLE";
       const lifecycleAllowsFinalization = lifecycleAllowsPeriodFinalization(pool.statusCode, index);
       const canFinalizeComposition = lifecycleAllowsFinalization && canEditComposition && dependency.canFinalize;
-      const workflowStatus = persistedFinalized || conservativelyLocked ? "FINALIZED" as const : canEditComposition ? "EDITABLE" as const : "FUTURE" as const;
+      const workflowStatus = persistedFinalized ? "FINALIZED" as const : canEditComposition ? "EDITABLE" as const : "FUTURE" as const;
       const persisted = persistedByStart.get(formatDateOnly(period.start));
       const composition = finalizedByStart.get(formatDateOnly(period.start));
       return { poolPeriodId: persisted?.id.toString() ?? null, poolCompositionId: composition?.id.toString() ?? null, periodKey: formatDateOnly(period.start).slice(0, 7), ...periodDto(period), configurationStatus, canEditComposition, canFinalizeComposition, workflowStatus, dependency };
@@ -222,7 +227,7 @@ export const kpiPoolMembershipService = {
 
   async add(poolId: bigint, input: AddKpiPoolConfigurationsBody, actor: bigint) {
     const initial = await requirePool(poolId);
-    const period = targetPeriod(initial, input.effectiveFromPeriod);
+    const period = await targetPeriod(initial, input.effectiveFromPeriod);
     await assertNotFinalized(poolId, period.start);
     const configurations = await lookupAndValidate(input.configurationIds, initial);
     return prisma.$transaction(async (tx) => {
@@ -259,7 +264,7 @@ export const kpiPoolMembershipService = {
 
   async retire(poolId: bigint, configurationId: bigint, input: RetireKpiPoolConfigurationBody, actor: bigint) {
     const initial = await requirePool(poolId);
-    const period = targetPeriod(initial, input.effectiveFromPeriod);
+    const period = await targetPeriod(initial, input.effectiveFromPeriod);
     await assertNotFinalized(poolId, period.start);
     if (initial.statusCode === "DRAFT") return this.remove(poolId, configurationId);
     return prisma.$transaction(async (tx) => {
@@ -278,7 +283,7 @@ export const kpiPoolMembershipService = {
 
   async replace(poolId: bigint, input: ReplaceKpiPoolConfigurationBody, actor: bigint) {
     const initial = await requirePool(poolId);
-    const period = targetPeriod(initial, input.effectiveFromPeriod);
+    const period = await targetPeriod(initial, input.effectiveFromPeriod);
     await assertNotFinalized(poolId, period.start);
     const [replacement] = await lookupAndValidate([input.newConfigurationId], initial);
     if (!replacement) throw new AppError(422, "KPI_CONFIGURATION_NOT_FOUND", "Replacement KPI Configuration was not found");
@@ -303,7 +308,7 @@ export const kpiPoolMembershipService = {
 
   async availability(poolId: bigint, query: AvailableKpiConfigurationsQuery) {
     const pool = await requirePool(poolId);
-    const period = targetPeriod(pool, query.periodStart);
+    const period = await targetPeriod(pool, query.periodStart);
     await assertNotFinalized(poolId, period.start);
     const catalog = await kpiManagementClient.listConfigurations(query);
     const effective = await prisma.kpiPoolKpi.findMany({ where: effectiveWhere(poolId, period) });
@@ -321,11 +326,10 @@ export const kpiPoolMembershipService = {
   async finalizePeriod(poolId: bigint, periodStart: string, actor: bigint) {
     const initial = await requirePool(poolId);
     const periods = poolPeriods(initial.validFrom, initial.validTo, initial.frequency.monthsPerPeriod);
-    const period = resolvePoolPeriod(initial.validFrom, initial.validTo, initial.frequency.monthsPerPeriod, periodStart);
+    const period = await targetPeriod(initial, periodStart);
     const periodIndex = periods.findIndex((candidate) => candidate.start.getTime() === period.start.getTime());
     const firstDraftComposition = initial.statusCode === "DRAFT" && periodIndex === 0;
     if (!lifecycleAllowsPeriodFinalization(initial.statusCode, periodIndex)) throw new AppError(409, "POOL_NOT_ACTIVE", "Only an ACTIVE Pool or its first DRAFT composition can be finalized");
-    assertPeriodEditable(initial.statusCode, period, initial.frequency.monthsPerPeriod);
     const dependency = await periodFinalizationGateway.evaluate(poolId, periods, periodIndex);
     if (!dependency.canFinalize) throw new AppError(409, "PREVIOUS_INPUT_PERIOD_NOT_CLOSED", "The previous Monitoring Input Period must be closed before this Pool composition can be finalized", dependency);
     return prisma.$transaction(async (tx) => {
@@ -341,6 +345,7 @@ export const kpiPoolMembershipService = {
       const inputPeriod = await tx.kpiPoolInputPeriod.findUnique({ where: { kpiPoolId_periodStart: { kpiPoolId: poolId, periodStart: period.start } } });
       if (!inputPeriod) throw new AppError(409, "POOL_INPUT_PERIOD_NOT_FOUND", "The persisted Pool Input Period was not found");
       const composition = await tx.kpiPoolPeriodComposition.create({ data: { kpiPoolId: poolId, inputPeriodId: inputPeriod.id, periodStart: period.start, periodEnd: period.end, statusCode: "POOL_COMPOSITION_LOCKED", kpiCountSnapshot: memberships.length, finalizedByUserId: actor } });
+      await tx.kpiPoolPeriodCompositionItem.createMany({ data: memberships.map((membership) => ({ compositionId: composition.id, poolMembershipId: membership.id, kpiConfigurationExternalId: membership.kpiConfigurationExternalId, configurationCodeSnapshot: membership.configurationCodeSnapshot, displayOrder: membership.displayOrder })) });
       await tx.kpiPool.update({ where: { id: poolId }, data: { statusCode: firstDraftComposition ? "ACTIVE" : initial.statusCode, aggregateVersion: { increment: firstDraftComposition ? 2 : 1 }, updatedAt: new Date(), updatedByUserId: actor } });
       if (firstDraftComposition) await writeOutbox(tx, initial, "kpi.pool.activated.v1", { poolCode: initial.poolCode, validFrom: formatDateOnly(initial.validFrom), validTo: formatDateOnly(initial.validTo), inputFrequencyId: initial.inputFrequencyExternalId.toString() });
       const finalizedConfigurations = new Map(lookup.data.map((configuration) => [configuration.id, configuration]));

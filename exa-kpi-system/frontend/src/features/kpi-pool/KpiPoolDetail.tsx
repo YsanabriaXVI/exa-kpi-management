@@ -214,7 +214,7 @@ export function KpiPoolDetail() {
             <button
               className="button pool-dark-button"
               disabled={pool.status === "INACTIVE" || selectedPeriod?.configurationStatus !== "EDITABLE"}
-              onClick={() => navigate(`/app/pool-kpis/manage-kpis?poolId=${pool.id}`)}
+              onClick={() => navigate(`/app/pool-kpis/manage-kpis?poolId=${pool.id}&period=${encodeURIComponent(viewingPeriod)}`)}
             >
               <Settings2 size={15} /> Manage KPIs in Pool
             </button>
@@ -317,6 +317,7 @@ export function KpiPoolDetail() {
                         >
                           <Eye size={14} />
                         </button>
+                        {kpi.configurationId && selectedPeriod?.poolPeriodId && usage?.assignments.find((item)=>item.kpiConfigurationId===kpi.configurationId)?.scorecardCompositionStatus !== "FINALIZED" && <button className="icon-button edit" title="Edit effective KPI settings for this Pool period" aria-label={`Edit ${kpi.configCode} for ${selectedPeriod.periodKey}`} onClick={() => navigate(`/app/kpi-management/config/set?mode=POOL_PERIOD_EDIT&kpiConfigId=${encodeURIComponent(kpi.configurationId!)}&poolId=${pool.id}&inputPeriodId=${selectedPeriod.poolPeriodId}&period=${selectedPeriod.start}`)}><Pencil size={14}/></button>}
                       </div>
                     </td>
                   </tr>
@@ -338,7 +339,7 @@ export function KpiPoolDetail() {
             totalPages={kpiTotalPages}
             onPage={setKpiPage}
             onPageSize={setKpiPageSize}
-            label="KPI Configurations"
+            label="KPI Configurations" 
           />
         </div></>}
       </section>

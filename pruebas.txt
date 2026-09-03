@@ -1,42 +1,1000 @@
-Desde la raíz del repositorio:
+ ## Dos tensiones que siguen abiertas
 
-  cd backend/exa-kpi-management-service
+  ### “Reducir gasto administrativo x%”
 
-  Ejecutar todas las pruebas:
+  La referencia v4 lo considera un caso confiable:
 
-  npm test
+  COMPARISON
+  GREATER_IS_BETTER
+  ABSOLUTE_VALUE
+  Comparison Detected = YES
 
-  Actualmente ejecuta 32 pruebas:
+  Pero el contexto más reciente ordena tratarlo como ambiguo entre:
 
-  src/tests/health.test.ts
-  src/tests/kpi-definition.test.ts
-  src/tests/kpi-definition.service.test.ts
+  Current expense
+  → DIRECT_CURRENT_VALUE
+  → LOWER_IS_BETTER
 
-  Ejecutar un archivo específico:
+  y:
 
-  npx vitest run src/tests/health.test.ts
+  Reduction achieved
+  → ACHIEVED_CHANGE
+  → GREATER_IS_BETTER
 
-  npx vitest run src/tests/kpi-definition.test.ts
+  Para futuros análisis aplicaré la decisión más reciente: debe quedar NEEDS_CONFIRMATION si no se indica baseline o forma de reporte.
 
-  npx vitest run src/tests/kpi-definition.service.test.ts
+  ### COMPARISON como Calculation Pattern
 
-  Modo watch durante desarrollo:
+  La referencia incluye COMPARISON como patrón, pero también afirma que Calculation Pattern y comparación son independientes.
 
-  npm run test:watch
+  Esto requiere una definición posterior. Por ahora entiendo que debemos preservar dos preguntas separadas:
 
-  Validación completa recomendada:
+  ¿Cómo se obtiene el valor actual?
+  DIRECT / DERIVED / MULTI_INPUT / COMPOSITE
 
-  npm run prisma:generate
-  npm run prisma:validate
-  npm run typecheck
-  npm test
-  npm run build
+  ¿Debe compararse contra un baseline?
+  NO / SAME_PERIOD_PREVIOUS_YEAR / PREVIOUS_PERIOD / CUSTOM
 
-  Desde la raíz, comprobar Docker y endpoints:
+  Un caso puramente comparativo podría seguir recibiendo la etiqueta de referencia COMPARISON, pero no asumiré todavía que sea un tipo físico exclusivo.
 
-  docker compose -f backend/docker-compose.yml ps
+  ## Criterio que usaré en adelante
 
-  Invoke-RestMethod http://localhost:4001/api/health/live
-  Invoke-RestMethod http://localhost:4001/api/health/ready
-  Invoke-RestMethod http://localhost:4001/api/v1/kpi-definitions
-  Invoke-RestMethod http://localhost:4001/api/v1/kpi-categories
+  Cuando haya diferencias entre fuentes:
+
+  1. Decisiones explícitas más recientes del usuario.
+  2. Principios arquitectónicos acordados.
+  3. Casos confiables del archivo v4.
+  4. Casos ambiguos del archivo v4.
+  5. Fixtures sintéticos, únicamente como pruebas.
+  6. Nunca convertir automáticamente una inferencia en decisión persistida.
+
+  Este archivo queda entendido como la base fundamental para Definition Assist, clasificación, preguntas y fixtures, pero no resuelve todavía la fórmula oficial de Compliance
+  comparativo ni los modelos físicos de snapshots, baselines o mappings.
+
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+› primero entiende esto: # CONFIRMACIÓN DE INTERPRETACIÓN — NO IMPLEMENTAR TODAVÍA
+
+  Tu interpretación general es correcta.
+
+  Gracias por detectar las contradicciones. Antes de cualquier diseño técnico,
+  toma las siguientes decisiones como confirmadas conceptualmente.
+
+  ## 1. Compliance Rate
+
+  Para un KPI comparativo donde el Goal permite obtener un Target Value:
+
+  Compliance Rate = Current Result / Target Value × 100
+
+  Ejemplo:
+
+  Baseline = 100,000
+  Goal = +10%
+  Target Value = 110,000
+  Current = 105,000
+
+  Derived Change = +5%
+  Compliance Rate = 95.45%
+  Goal Met = false
+
+  NO utilizar:
+
+  Achieved Change / Target Change
+
+  como Compliance Rate.
+
+  Ese cálculo representa otra posible métrica de progreso sobre el cambio,
+  pero NO será nuestro Compliance Rate por ahora.
+
+  Compliance puede superar 100%.
+
+  No aplicar cap todavía.
+
+  ---
+
+  ## 2. Calculation Pattern
+
+  Eliminar conceptualmente COMPARISON como Calculation Pattern exclusivo.
+
+  Calculation Pattern debe describir cómo se obtiene el Current Result.
+
+  Valores conceptuales actuales:
+
+  DIRECT
+  DERIVED
+  MULTI_INPUT_CURRENT_PERIOD
+  COMPOSITE
+
+  Comparison es una dimensión independiente.
+
+  Ejemplos:
+
+  Aumentar ventas:
+  DIRECT + PREVIOUS_PERIOD
+
+  ROA:
+  DERIVED + SAME_PERIOD_PREVIOUS_YEAR
+
+  ---
+
+  ## 3. Comparison Mode / Basis
+
+  CURRENT_PERIOD no debe utilizarse como Comparison Basis.
+
+  Cuando no existe comparación:
+
+  NONE
+
+  Modos conceptuales:
+
+  NONE
+  PREVIOUS_PERIOD
+  SAME_PERIOD_PREVIOUS_YEAR
+  CUSTOM_PERIOD
+
+  ---
+
+  ## 4. Behavior
+
+  Behavior describe la dirección favorable de la métrica empresarial evaluada.
+
+  Ejemplos:
+
+  Sales USD:
+  GREATER_IS_BETTER
+
+  Cost USD/KM:
+  LOWER_IS_BETTER
+
+  Incidents COUNT:
+  ZERO_IS_BETTER
+
+  Behavior NO describe Compliance.
+
+  Para comparaciones podemos mantener separadamente:
+
+  Comparison Direction:
+  INCREASE
+  REDUCTION
+
+  Ejemplo:
+
+  Reducir costo por KM 10%
+
+  Behavior:
+  LOWER_IS_BETTER
+
+  Comparison Direction:
+  REDUCTION
+
+  ---
+
+  ## 5. Pool Overrides
+
+  Confirmado conceptualmente:
+
+  KPI Configuration puede proporcionar defaults.
+
+  Pool Assignment puede establecer valores efectivos/contextuales, incluyendo:
+
+  - Goal
+  - Comparison Mode/Basis
+
+  cuando el negocio lo permita.
+
+  Al FINALIZED del Scorecard, los valores efectivos se congelan.
+
+  Cambios posteriores del Pool no modifican el Scorecard finalizado.
+
+  NO diseñar todavía cómo persistir estos overrides.
+
+  ---
+
+  ## 6. Historical Mapping
+
+  Para reutilizar resultados históricos, el mapping debe considerarse
+  principalmente entre KPI Configurations concretas, no únicamente entre
+  Definitions.
+
+  Ejemplo:
+
+  KPC-205-01
+  → historical equivalent →
+  KPC-088-02
+
+  Possible Existing KPI a nivel Definition sigue siendo solamente una sugerencia.
+
+  La reutilización histórica requiere confirmación empresarial.
+
+  ---
+
+  ## 7. Baseline Resolution Priority
+
+  Orden conceptual:
+
+  1. SELF_HISTORY
+  2. MAPPED_KPI_CONFIGURATION aprobado
+  3. MANUAL como fallback
+
+  Si ninguno existe:
+
+  BASELINE_MISSING / WAITING_FOR_BASELINE
+
+  Missing nunca equivale a 0.
+
+  ---
+
+  ## 8. Refresh y baseline manual
+
+  Refresh no debe reemplazar silenciosamente un baseline manual existente.
+
+  Si encuentra otro baseline compatible, debe requerirse una decisión explícita
+  antes de sustituirlo.
+
+  ---
+
+  ## 9. Correcciones históricas
+
+  Mientras un período de Monitoring está abierto, Refresh puede obtener una
+  corrección del resultado fuente.
+
+  Un período CLOSED no debe recalcularse silenciosamente si posteriormente cambia
+  el resultado utilizado como baseline.
+
+  Debe preservarse el valor/procedencia utilizados para la evaluación histórica.
+
+  El mecanismo técnico exacto todavía está abierto.
+
+  ---
+
+  ## 10. Goal Met
+
+  Goal Met es derivado.
+
+  Conceptualmente:
+
+  true
+  false
+  null
+
+  UI:
+
+  true  → ✅
+  false → ❌
+  null  → —
+
+  null significa que todavía no es evaluable.
+
+  Para GREATER_IS_BETTER:
+
+  goalMet = Current Result >= Target Value
+
+  Las reglas para otros Behaviors todavía están abiertas.
+
+  ---
+
+  ## TEMAS QUE SIGUEN ABIERTOS
+
+  NO decidir todavía:
+
+  - scoring exacto LOWER_IS_BETTER
+  - ZERO_IS_BETTER
+  - RANGE
+  - EQUAL_IS_BETTER
+  - BINARY
+  - MILESTONE
+  - caps de Compliance
+  - Traffic Lights
+  - reglas exactas de rounding
+  - permisos de Insert Baseline
+  - auditoría física exacta
+  - modelo de tablas
+  - schema Prisma
+  - migrations
+  - contratos API
+
+  NO IMPLEMENTAR todavía.
+
+  Actualiza únicamente tu modelo mental con estas decisiones y dime si,
+  con estas correcciones, queda alguna contradicción conceptual importante antes
+  de pasar posteriormente al diseño.
+
+
+• Sí. Con estas correcciones, el modelo conceptual queda mucho más consistente y no detecto ninguna contradicción central bloqueante.
+
+  Mi modelo mental actualizado es:
+
+  Calculation Pattern
+  → Cómo se obtiene Current Result
+
+  Comparison Mode
+  → Contra qué referencia se evalúa
+
+  Baseline Source
+  → De dónde se obtuvo el baseline
+
+  Behavior
+  → Qué dirección es favorable para la métrica empresarial
+
+  Comparison Direction
+  → Si se busca aumento o reducción respecto al baseline
+
+  Compliance
+  → Current Result / Target Value × 100
+
+  Goal Met
+  → Evaluación derivada según Behavior
+
+  ## Decisiones ya claras
+
+  - COMPARISON deja de ser Calculation Pattern.
+  - CURRENT_PERIOD deja de ser Comparison Basis.
+  - Ausencia de comparación se representa con NONE.
+  - Behavior describe la métrica empresarial, no el Compliance.
+  - Una comparación se agrega como dimensión independiente.
+  - Configuration proporciona defaults.
+  - Pool puede contextualizar Goal y Comparison Mode.
+  - FINALIZED congela los valores efectivos.
+  - Historical Mapping ocurre principalmente entre Configurations concretas.
+  - La prioridad del baseline es:
+
+  SELF_HISTORY
+  → MAPPED_KPI_CONFIGURATION aprobado
+  → MANUAL
+  → BASELINE_MISSING
+
+  - Refresh no sustituye silenciosamente un baseline manual.
+  - CLOSED preserva el baseline y la procedencia utilizados.
+  - Para GREATER_IS_BETTER:
+
+  goalMet = Current Result >= Target Value
+
+  - Compliance comparativo será:
+
+  Current Result / Target Value × 100
+
+  No se utilizará Achieved Change / Target Change como Compliance.
+
+  ## Aspectos pendientes, pero no contradictorios
+
+  Quedan algunas precisiones necesarias antes del diseño técnico.
+
+  ### Construcción del Target para reducción
+
+  Para crecimiento ya está definido:
+
+  Target = Baseline × (1 + Goal)
+
+  Para reducción todavía debe confirmarse formalmente si será:
+
+  Target = Baseline × (1 − Goal)
+
+  y cómo se representará el Goal:
+
+  10
+  10%
+  0.10
+  +10%
+  -10%
+
+  Esto afecta validación, no la separación conceptual.
+
+  ### Compliance para otros Behaviors
+
+  Current / Target es coherente con GREATER_IS_BETTER, pero no puede generalizarse automáticamente a:
+
+  LOWER_IS_BETTER
+  ZERO_IS_BETTER
+  RANGE
+  EQUAL_IS_BETTER
+
+  Ya está correctamente declarado como tema abierto.
+
+  ### Targets iguales o inferiores a cero
+
+  Para targets positivos:
+
+  Compliance >= 100%
+  ↔ goalMet = true
+
+  en GREATER_IS_BETTER.
+
+  Con Target igual a cero o negativo, esa equivalencia y la división requieren reglas específicas. Sigue abierto y no debe inferirse.
+
+  ### MULTI_INPUT_CURRENT_PERIOD
+
+  Debe precisarse posteriormente qué constituye su Current Result si todavía no existe una fórmula oficial:
+
+  - ¿se conserva un conjunto de inputs sin resultado final?
+  - ¿queda la Configuration no ejecutable?
+  - ¿se designa un input principal?
+
+  No contradice el modelo; define su ejecutabilidad.
+
+  ### CUSTOM_PERIOD
+
+  Está claro conceptualmente, pero aún falta definir:
+
+  - período único frente a rango;
+  - promedio, suma o valor final del rango;
+  - compatibilidad de cadencia;
+  - quién selecciona y confirma la referencia.
+
+  ### Cambios mientras Monitoring está abierto
+
+  Refresh puede traer una corrección histórica, pero falta definir:
+
+  - cuándo invalida la evaluación actual;
+  - si requiere ejecutar nuevamente Check Results;
+  - qué ocurre si el resultado estaba enviado o validado, pero no cerrado.
+
+  Nuevamente, es una regla de workflow pendiente, no una contradicción.
+
+  ## Única inconsistencia documental restante
+
+  La referencia v4 conserva vocabulario anterior:
+
+  Calculation Pattern = COMPARISON
+  Comparison Basis = CURRENT_PERIOD
+
+  y algunos casos de reducción usan GREATER_IS_BETTER porque describían el cambio derivado, no la métrica empresarial.
+
+  Eso ya no representa el modelo conceptual confirmado. En cualquier trabajo futuro consideraré las decisiones de este último documento como autoridad superior:
+
+  DIRECT | DERIVED | MULTI_INPUT_CURRENT_PERIOD | COMPOSITE
+
+  NONE | PREVIOUS_PERIOD | SAME_PERIOD_PREVIOUS_YEAR | CUSTOM_PERIOD
+
+  Behavior aplicado a la métrica empresarial
+
+  En conclusión: no queda una contradicción conceptual importante que impida pasar posteriormente al diseño. Quedan reglas deliberadamente abiertas sobre reducción, otros Behaviors,
+  targets no positivos, períodos personalizados, multi-input y workflow de correcciones. No asumiré ninguna hasta que se confirme.
+
+
+› haceme un reporte de las cosas que quedaron muy claras, dudas, inseguridades.
+
+
+• # Reporte de entendimiento del dominio KPI
+
+  ## 1. Aspectos que quedaron muy claros
+
+  ### Separación de responsabilidades
+
+  El flujo conceptual está definido así:
+
+  KPI Definition
+  → KPI Configuration
+  → KPI Pool
+  → Scorecard
+  → FINALIZED
+  → Frozen Snapshot
+  → Monitoring Results
+  → Evaluation
+  → Reports
+
+  Cada dominio tiene responsabilidades distintas y no debe absorber funciones de los demás.
+
+  ### KPI Definition
+
+  Representa el concepto empresarial reusable:
+
+  KPI-101
+  Aumentar ventas
+
+  Puede contener nombre, código, descripción, familia y conocimiento conceptual.
+
+  No contiene:
+
+  - resultados históricos;
+  - baselines;
+  - Compliance;
+  - Goal Met;
+  - configuración específica de cada período.
+
+  El usuario conserva siempre el control del nombre original.
+
+  ### KPI Configuration
+
+  Representa una forma operativa de utilizar una Definition.
+
+  Puede establecer defaults como:
+
+  - Behavior;
+  - Measurement Unit;
+  - Result Semantics;
+  - Input Frequency;
+  - Calculation Pattern;
+  - Goal;
+  - Comparison Mode;
+  - reglas de evaluación aprobadas.
+
+  No almacena resultados históricos.
+
+  ### Calculation Pattern
+
+  Describe exclusivamente cómo se obtiene Current Result.
+
+  Valores conceptuales actuales:
+
+  DIRECT
+  DERIVED
+  MULTI_INPUT_CURRENT_PERIOD
+  COMPOSITE
+
+  COMPARISON ya no es un Calculation Pattern.
+
+  ### Comparison Mode
+
+  Es una dimensión independiente del Calculation Pattern:
+
+  NONE
+  PREVIOUS_PERIOD
+  SAME_PERIOD_PREVIOUS_YEAR
+  CUSTOM_PERIOD
+
+  Ejemplos:
+
+  Sales:
+  DIRECT + PREVIOUS_PERIOD
+
+  ROA:
+  DERIVED + SAME_PERIOD_PREVIOUS_YEAR
+
+  ### Behavior
+
+  Describe la dirección favorable de la métrica empresarial evaluada:
+
+  Sales USD
+  → GREATER_IS_BETTER
+
+  Cost USD/KM
+  → LOWER_IS_BETTER
+
+  Incidents COUNT
+  → ZERO_IS_BETTER
+
+  No describe el Compliance ni debe inferirse únicamente a partir de palabras como “aumentar” o “reducir”.
+
+  ### Comparison Direction
+
+  Es independiente de Behavior:
+
+  INCREASE
+  REDUCTION
+
+  Ejemplo:
+
+  Reducir costo por KM 10%
+
+  Behavior:
+  LOWER_IS_BETTER
+
+  Comparison Direction:
+  REDUCTION
+
+  ### Unidades y resultados derivados
+
+  Los valores empresariales deben conservar su unidad real:
+
+  Current Result → USD
+  Baseline → USD
+  Target Value → USD
+  Derived Change → %
+  Compliance → %
+
+  Un Goal del 10% no convierte la Measurement Unit del KPI en porcentaje.
+
+  ### Pool
+
+  El Pool proporciona contexto temporal y operativo.
+
+  Puede establecer valores efectivos sobre defaults de Configuration, incluyendo conceptualmente:
+
+  - Goal;
+  - Comparison Mode.
+
+  Estos overrides solo pueden existir cuando el negocio los permita.
+
+  ### Scorecard y FINALIZED
+
+  El Scorecard:
+
+  - selecciona Configurations del Pool;
+  - asigna Weight;
+  - construye una composición;
+  - congela la configuración efectiva al finalizar.
+
+  Después de FINALIZED, los cambios en Definition, Configuration o Pool no deben afectar el Scorecard histórico.
+
+  ### Frozen Snapshot
+
+  Preserva las instrucciones exactas necesarias para evaluar el KPI tal como estaban al finalizar:
+
+  - identidad;
+  - revisión de Configuration;
+  - nombre vigente;
+  - Behavior;
+  - unidad;
+  - semántica;
+  - Calculation Pattern;
+  - frecuencia;
+  - Effective Goal;
+  - Comparison Mode;
+  - Weight;
+  - scoring y thresholds aplicables;
+  - procedencia relevante.
+
+  No es el Monitoring Result y no contiene razonamiento del Analyzer.
+
+  ### Monitoring
+
+  Monitoring trabaja con el Frozen Snapshot.
+
+  Es responsable de:
+
+  - Current Results;
+  - resolución del período requerido;
+  - baselines;
+  - Baseline Source;
+  - resultados derivados;
+  - Compliance;
+  - Goal Met;
+  - validación y cierre.
+
+  Monitoring nunca analiza el KPI Name.
+
+  ### Baseline Resolution
+
+  La prioridad conceptual quedó definida:
+
+  1. SELF_HISTORY
+  2. MAPPED_KPI_CONFIGURATION aprobado
+  3. MANUAL
+  4. BASELINE_MISSING
+
+  Reglas firmes:
+
+  Missing baseline ≠ 0
+
+  Baseline = 0 como denominador
+  → INVALID_BASELINE
+
+  Sin baseline válido
+  → WAITING_FOR_BASELINE
+  → Compliance = null
+  → Goal Met = null
+
+  ### Historical Mapping
+
+  El mapping debe establecerse principalmente entre KPI Configurations concretas:
+
+  KPC-205-01
+  → KPC-088-02
+
+  La similitud puede sugerir un mapping, pero nunca aprobarlo.
+
+  Family y Unit compatibles no son evidencia suficiente de equivalencia empresarial.
+
+  ### Refresh Baseline
+
+  Refresh:
+
+  - busca historia propia;
+  - después mappings aprobados;
+  - mantiene missing si no encuentra algo compatible;
+  - no elige cualquier KPI parecido;
+  - no reemplaza silenciosamente un baseline manual.
+
+  ### Períodos cerrados
+
+  Un Monitoring Period CLOSED debe preservar:
+
+  - baseline utilizado;
+  - valor utilizado;
+  - período resuelto;
+  - procedencia;
+  - evaluación histórica.
+
+  Una corrección posterior del resultado fuente no debe recalcular silenciosamente un período cerrado.
+
+  ### Compliance para el caso confirmado
+
+  Para un KPI comparativo con Target Value:
+
+  Compliance Rate =
+  Current Result / Target Value × 100
+
+  Ejemplo:
+
+  Baseline = 100,000
+  Goal = +10%
+  Target = 110,000
+  Current = 105,000
+
+  Compliance = 95.45%
+  Goal Met = false
+
+  No se utiliza:
+
+  Achieved Change / Target Change
+
+  Compliance puede superar 100% y no tiene cap por ahora.
+
+  ### Goal Met confirmado
+
+  Tiene tres estados:
+
+  true  → ✅
+  false → ❌
+  null  → —
+
+  Para GREATER_IS_BETTER:
+
+  goalMet = Current Result >= Target Value
+
+  null significa que todavía no puede evaluarse.
+
+  ———
+
+  ## 2. Dudas funcionales abiertas
+
+  ### Target de reducción
+
+  Falta confirmar si una reducción se traduce oficialmente como:
+
+  Target Value = Baseline × (1 − Goal)
+
+  También falta definir cómo se representa el Goal internamente:
+
+  10
+  10%
+  0.10
+  +10%
+  -10%
+
+  ### Compliance para otros Behaviors
+
+  No están definidas las fórmulas para:
+
+  LOWER_IS_BETTER
+  ZERO_IS_BETTER
+  RANGE
+  EQUAL_IS_BETTER
+  BINARY
+  MILESTONE
+
+  Tampoco sus reglas de goalMet.
+
+  ### Valores cero o negativos
+
+  Falta definir:
+
+  - Target igual a cero.
+  - Target negativo.
+  - Baseline negativo.
+  - Current Result negativo.
+  - Reducciones superiores al 100%.
+  - Casos financieros donde valores negativos puedan ser válidos.
+
+  ### Rounding
+
+  No están definidos:
+
+  - escala decimal;
+  - cuándo redondear;
+  - modo de redondeo;
+  - precisión de almacenamiento;
+  - precisión presentada en UI;
+  - si los cálculos encadenados usan valores redondeados o completos.
+
+  ### Caps de Compliance
+
+  Está confirmado que no se aplicará cap por ahora, pero sigue abierta la regla futura:
+
+  - si alguna familia tendrá cap;
+  - si será global o configurable;
+  - si afectará Compliance, Weighted Contribution o solamente presentación.
+
+  ### Traffic Lights
+
+  Falta definir:
+
+  - si se aplican sobre Compliance;
+  - si pueden usar otra métrica;
+  - cómo funcionan con Compliance superior a 100%;
+  - cómo se comportan cuando la evaluación es null;
+  - su relación con Goal Met.
+
+  ### CUSTOM_PERIOD
+
+  Falta determinar si representa:
+
+  - un período único;
+  - un rango;
+  - un promedio;
+  - una suma;
+  - un valor de cierre;
+  - otro agregado.
+
+  También falta definir cómo se valida su compatibilidad temporal.
+
+  ### MULTI_INPUT_CURRENT_PERIOD
+
+  Si no existe fórmula oficial, no está definido:
+
+  - si hay un Current Result principal;
+  - si se conservan únicamente inputs separados;
+  - si la Configuration queda bloqueada;
+  - si puede llegar a Monitoring;
+  - cómo se evalúa.
+
+  ### COMPOSITE
+
+  Se sabe que requiere fórmula y pesos oficiales, pero no están definidos:
+
+  - estructura de componentes;
+  - reglas de pesos;
+  - versionamiento;
+  - evaluación;
+  - tratamiento de inputs faltantes.
+
+  ### Baseline manual
+
+  Falta definir:
+
+  - quién puede ingresarlo;
+  - quién lo aprueba;
+  - evidencia obligatoria;
+  - razón requerida;
+  - posibilidad de edición;
+  - auditoría;
+  - tratamiento después de Submit, Validate o Close.
+
+  ### Refresh sobre baseline manual
+
+  Está claro que no puede reemplazarlo silenciosamente, pero falta definir:
+
+  - qué comparación muestra;
+  - quién autoriza el reemplazo;
+  - si conserva ambas versiones;
+  - si invalida la evaluación;
+  - si requiere una razón.
+
+  ### Historical mappings
+
+  Falta definir:
+
+  - aprobador;
+  - vigencia;
+  - versionamiento;
+  - alcance global o por Pool;
+  - alcance por organización o scope;
+  - revocación;
+  - auditoría;
+  - compatibilidad exacta.
+
+  ### Correcciones históricas
+
+  Mientras Monitoring está abierto, falta definir qué ocurre si Refresh encuentra un valor fuente corregido:
+
+  - si la evaluación pasa a STALE;
+  - si se requiere Check Results;
+  - qué ocurre en SUBMITTED;
+  - qué ocurre en VALIDATED;
+  - desde qué estado ya no se permite actualizar.
+
+  ———
+
+  ## 3. Inseguridades conceptuales controladas
+
+  No son contradicciones, pero requieren precisión antes del diseño.
+
+  ### Significado exacto de DIRECT
+
+  Debe aclararse si DIRECT significa exclusivamente que el usuario ingresa el valor o si también incluye valores obtenidos automáticamente desde EMS, ERP o API sin transformación.
+
+  Una definición más estable podría ser:
+
+  DIRECT = el KPI Result es el valor observado,
+  sin fórmula de transformación de negocio
+
+  La fuente de captura sería otra dimensión.
+
+  ### Behavior en métricas comparativas
+
+  Está confirmado que Behavior describe la métrica empresarial. Sin embargo, debe asegurarse que toda evaluación comparativa aplique coherentemente:
+
+  Behavior → Current/Target
+  Comparison Direction → construcción del Target
+
+  Especialmente para reducción y valores negativos.
+
+  ### Comparison Mode frente a Comparison Direction
+
+  Parecen dimensiones independientes:
+
+  Comparison Mode
+  → qué referencia usar
+
+  Comparison Direction
+  → qué tipo de cambio se persigue
+
+  Falta confirmar si Comparison Direction siempre es obligatorio cuando Mode no es NONE, o si puede derivarse de Behavior en algunos casos.
+
+  ### Definition frente a scope
+
+  La referencia indica que ubicación, flota y operación normalmente pertenecen a Configuration. Aún falta una regla empresarial precisa para saber cuándo el scope cambia tanto el
+  concepto que justifica otra Definition.
+
+  ### Frozen Snapshot frente a evaluación congelada
+
+  Se distinguen conceptualmente:
+
+  FINALIZED
+  → congela configuración operativa
+
+  CLOSED
+  → congela evaluación, resultado y baseline utilizados
+
+  Falta confirmar si serán dos snapshots diferentes o una evolución versionada del mismo agregado. No debe decidirse todavía físicamente.
+
+  ———
+
+  ## 4. Inconsistencias documentales que deberán corregirse
+
+  El archivo de referencia v4 todavía utiliza conceptos superados:
+
+  Calculation Pattern = COMPARISON
+  Comparison Basis = CURRENT_PERIOD
+
+  El modelo confirmado ahora es:
+
+  Calculation Pattern:
+  DIRECT
+  DERIVED
+  MULTI_INPUT_CURRENT_PERIOD
+  COMPOSITE
+
+  Comparison Mode:
+  NONE
+  PREVIOUS_PERIOD
+  SAME_PERIOD_PREVIOUS_YEAR
+  CUSTOM_PERIOD
+
+  También existen filas antiguas, como Reducir gasto administrativo x%, que resuelven automáticamente comparación y Behavior. El criterio más reciente exige mantener ese caso
+  ambiguo si no se conoce cómo se reportará el resultado o contra qué baseline se medirá.
+
+  Estas diferencias son documentales; las decisiones más recientes tienen prioridad.
+
+  ———
+
+  ## 5. Decisiones técnicas que no deben tomarse todavía
+
+  Continúan totalmente abiertas:
+
+  - tablas;
+  - columnas;
+  - relaciones;
+  - Prisma schema;
+  - migrations;
+  - endpoints;
+  - DTOs;
+  - contratos API;
+  - estructura física del Frozen Snapshot;
+  - almacenamiento físico del baseline;
+  - modelo físico de mappings;
+  - modelo físico de overrides;
+  - estrategia de eventos;
+  - sincronización entre servicios.
+
+  No debe deducirse una estructura física a partir del vocabulario del Analyzer o de la referencia.
+
+  ## Evaluación general
+
+  El dominio tiene una base conceptual sólida. Están especialmente claras la separación entre servicios, la captura del dato real, la independencia entre cálculo y comparación, la
+  inmutabilidad después de FINALIZED, la prioridad de resolución del baseline y el carácter derivado de Compliance y Goal Met.
+
+  Las mayores incertidumbres se concentran en el motor de evaluación para Behaviors distintos de GREATER, la construcción de targets de reducción, CUSTOM_PERIOD, mappings
+  históricos, baselines manuales y el workflow de correcciones. Ninguna de ellas debe resolverse mediante supuestos.
+ 

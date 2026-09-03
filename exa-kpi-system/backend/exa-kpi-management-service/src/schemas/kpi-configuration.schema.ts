@@ -38,6 +38,8 @@ export const kpiConfigurationBodySchema = z.object({
   scoringMethod: scoringMethod.nullable().optional().default(null), scoringRuleConfig: scoringRuleConfig.optional().default(null),
   scoringRuleConfigVersion: z.number().int().positive().nullable().optional().default(null), negativeResultPolicy: negativeResultPolicy.nullable().optional().default(null),
   scoringApprovalStatus: scoringApprovalStatus.optional().default("BLOCKED"),
+  effectiveFrom: dateOnly.optional(),
+  changeReason: z.string().trim().max(500).optional(),
 }).strict().superRefine((value, context) => {
   if (value.scoringApprovalStatus !== "APPROVED") return;
   for (const [field, configured] of [["resultSemantics", value.resultSemantics], ["evaluationTypeCode", value.evaluationTypeCode], ["scoringMethod", value.scoringMethod], ["negativeResultPolicy", value.negativeResultPolicy], ["scoringRuleConfigVersion", value.scoringRuleConfigVersion]] as const) {

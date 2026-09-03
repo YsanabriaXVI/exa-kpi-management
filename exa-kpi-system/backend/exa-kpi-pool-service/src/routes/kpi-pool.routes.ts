@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { activateKpiPool, addPoolKpiConfigurations, createKpiPool, deactivateKpiPool, extendKpiPoolValidity, finalizeKpiPoolPeriodComposition, getActivationReadiness, getKpiConfigurationUsage, getKpiPool, getKpiPoolLookups, getPoolAssignmentEligibility, listAvailableKpiConfigurations, listKpiPoolPeriods, listKpiPools, listPoolKpiConfigurations, removePoolKpiConfiguration, replacePoolKpiConfiguration, retirePoolKpiConfiguration, updateKpiPool } from "../controllers/kpi-pool.controller.js";
+import { activateKpiPool, addPoolKpiConfigurations, createKpiPool, deactivateKpiPool, extendKpiPoolValidity, finalizeKpiPoolPeriodComposition, getActivationReadiness, getEffectivePoolKpiSettings, getKpiConfigurationUsage, getKpiPool, getKpiPoolLookups, getPoolAssignmentEligibility, listAvailableKpiConfigurations, listEligibleGlobalEditPeriods, listKpiPoolPeriods, listKpiPools, listPoolKpiConfigurations, removePoolKpiConfiguration, replacePoolKpiConfiguration, resetPoolKpiOverride, retirePoolKpiConfiguration, savePoolKpiOverride, updateKpiPool } from "../controllers/kpi-pool.controller.js";
 
 export const kpiPoolRouter = Router();
 kpiPoolRouter.get("/lookups", getKpiPoolLookups);
@@ -7,6 +7,7 @@ kpiPoolRouter.get("/", listKpiPools);
 kpiPoolRouter.post("/", createKpiPool);
 kpiPoolRouter.post("/kpi-configuration-usage", getKpiConfigurationUsage);
 kpiPoolRouter.post("/assignment-eligibility", getPoolAssignmentEligibility);
+kpiPoolRouter.get("/global-edit-eligible-periods/:configurationId", listEligibleGlobalEditPeriods);
 kpiPoolRouter.get("/:id/kpi-configurations", listPoolKpiConfigurations);
 kpiPoolRouter.post("/:id/kpi-configurations", addPoolKpiConfigurations);
 kpiPoolRouter.post("/:id/kpi-configurations/replace", replacePoolKpiConfiguration);
@@ -15,6 +16,9 @@ kpiPoolRouter.delete("/:id/kpi-configurations/:configurationId", removePoolKpiCo
 kpiPoolRouter.get("/:id/available-kpi-configurations", listAvailableKpiConfigurations);
 kpiPoolRouter.get("/:id/input-periods", listKpiPoolPeriods);
 kpiPoolRouter.post("/:id/input-periods/finalize", finalizeKpiPoolPeriodComposition);
+kpiPoolRouter.get("/:id/input-periods/:inputPeriodId/kpi-configurations/:configurationId/effective-settings", getEffectivePoolKpiSettings);
+kpiPoolRouter.put("/:id/input-periods/:inputPeriodId/kpi-configurations/:configurationId/override", savePoolKpiOverride);
+kpiPoolRouter.post("/:id/input-periods/:inputPeriodId/kpi-configurations/:configurationId/override/reset", resetPoolKpiOverride);
 kpiPoolRouter.get("/:id/activation-readiness", getActivationReadiness);
 kpiPoolRouter.post("/:id/activate", activateKpiPool);
 kpiPoolRouter.post("/:id/deactivate", deactivateKpiPool);

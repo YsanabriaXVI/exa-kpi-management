@@ -15,6 +15,15 @@ const catalogConfigurationSchema = configurationSchema.extend({
 const metaSchema = z.object({ page: z.number(), pageSize: z.number(), totalItems: z.number(), totalPages: z.number() });
 const batchResponseSchema = z.object({ data: z.array(configurationSchema), notFoundIds: z.array(z.string()) });
 const catalogResponseSchema = z.object({ data: z.array(catalogConfigurationSchema), meta: metaSchema });
+const effectiveSnapshotSchema = z.object({
+  kpiConfigurationId: z.string(), kpiConfigurationRevisionId: z.string(), revisionNumber: z.number(), configCode: z.string(),
+  goal: z.string().nullable(), evaluationType: z.object({ id: z.string(), code: z.string(), name: z.string() }),
+  resultSemantics: z.string().nullable(), scoringMethod: z.string().nullable(), scoringRuleConfig: z.record(z.string(), z.unknown()).nullable(),
+  scoringRuleConfigVersion: z.number().nullable(), negativeResultPolicy: z.string().nullable(), scoringApprovalStatus: z.string(),
+  measurementUnit: z.object({ id: z.string(), code: z.string(), name: z.string(), symbol: z.string() }),
+  dataSource: z.object({ id: z.string(), code: z.string(), name: z.string() }),
+  thresholds: z.array(z.object({ id: z.string(), trafficLightLevelId: z.string(), code: z.string(), name: z.string(), rangeMinPercent: z.string().nullable(), rangeMaxPercent: z.string().nullable(), includesMin: z.boolean(), includesMax: z.boolean(), displayOrder: z.number() })),
+}).passthrough();
 
 export type KpiManagementConfiguration = z.infer<typeof configurationSchema>;
 export type KpiManagementCatalogConfiguration = z.infer<typeof catalogConfigurationSchema>;
@@ -36,6 +45,12 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
 }
 
 export const kpiManagementClient = {
+  async effectiveSnapshot(configurationId: string, periodStart: string, periodEnd: string) {
+    const payload = await request("/api/v1/internal/kpi-configurations/effective-snapshots", { method: "POST", body: JSON.stringify({ configurationIds: [configurationId], periodStart, periodEnd }) });
+    const parsed = z.object({ data: z.array(effectiveSnapshotSchema).length(1) }).safeParse(payload);
+    if (!parsed.success) throw new AppError(502, "KPI_MANAGEMENT_INVALID_RESPONSE", "KPI Management returned an invalid effective snapshot");
+    return parsed.data.data[0]!;
+  },
   async batchLookup(ids: string[]) {
     const payload = await request("/api/v1/kpi-configurations/batch-lookup", { method: "POST", body: JSON.stringify({ ids }) });
     const parsed = batchResponseSchema.safeParse(payload);

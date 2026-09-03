@@ -165,6 +165,16 @@ export const kpiPoolService = {
     }));
   },
   async getInputPeriods(poolId: number) { return poolApiRequest<PoolInputPeriods>(`/v1/kpi-pools/${poolId}/input-periods`); },
+  async getEligibleGlobalEditPeriods(configurationId: string) { return poolApiRequest<{ data: Array<{ periodKey:string; periodStart:string }>; meta:{ excludedFrozenPeriods:Array<{periodKey:string}> } }>(`/v1/kpi-pools/global-edit-eligible-periods/${configurationId}`); },
+  async getEffectiveSettings(poolId: number, inputPeriodId: string, configurationId: string) {
+    return poolApiRequest<{ data: { global: any; effective: any; sources: Record<string,string>; poolMembershipId: string; editability?: { editable:boolean; frozen:boolean; scorecardId:string|null; scorecardPeriodCompositionId:string|null } } }>(`/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/effective-settings`).then((response) => response.data);
+  },
+  async saveConfigurationOverride(poolId: number, inputPeriodId: string, configurationId: string, body: { goal?: number; trafficLightThresholds?: Array<{ code: "RED"|"YELLOW"|"GREEN"; rangeMinPercent: number; rangeMaxPercent: number; includesMin: boolean; includesMax: boolean }>; applyToFuturePeriods?: boolean; reason?: string }) {
+    return poolApiRequest<{ data: { global: any; effective: any; sources: Record<string,string> } }>(`/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/override`, { method: "PUT", body: JSON.stringify(body) }).then((response) => response.data);
+  },
+  async resetConfigurationOverride(poolId: number, inputPeriodId: string, configurationId: string, body: { fields:Array<"GOAL"|"TRAFFIC_LIGHT_THRESHOLDS">; applyToFuturePeriods?:boolean; reason:string }) {
+    return poolApiRequest<{ data: { global:any; effective:any; sources:Record<string,string> } }>(`/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/override/reset`, { method:"POST", body:JSON.stringify(body) }).then((response)=>response.data);
+  },
   async finalizePeriodComposition(poolId: number, periodStart: string) {
     return poolApiRequest<{ data: { poolId: string; poolStatus: "DRAFT" | "ACTIVE" | "INACTIVE"; periodStart: string; periodEnd: string; status: "POOL_COMPOSITION_LOCKED"; kpiCount: number } }>(`/v1/kpi-pools/${poolId}/input-periods/finalize`, { method: "POST", body: JSON.stringify({ periodStart }) });
   },

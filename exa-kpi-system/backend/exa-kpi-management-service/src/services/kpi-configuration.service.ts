@@ -227,7 +227,9 @@ export const kpiConfigurationService = {
       const c = await catalogs(tx, input, definition.kpiName);
       const latest = await tx.kpiConfigurationRevision.findFirst({ where: { kpiConfigurationId: id }, orderBy: { revisionNumber: "desc" } });
       await tx.kpiConfiguration.update({ where: { id }, data: { kpiConfigurationStatusId: c.status.id, updatedAt: new Date(), updatedByUserId: actor } });
-      const effectiveFrom = nextPeriodStart(new Date(), c.frequency.monthsPerPeriod);
+      const effectiveFrom = input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : nextPeriodStart(new Date(), c.frequency.monthsPerPeriod);
+      const now = new Date();
+      if (effectiveFrom < new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))) throw new AppError("Effective From cannot be historical", 422, "KPI_REVISION_EFFECTIVE_FROM_HISTORICAL");
       if (latest?.effectiveFrom.getTime() === effectiveFrom.getTime()) {
         await tx.kpiConfigurationRevision.update({ where: { id: latest.id }, data: { targetValue: input.goal, evaluationTypeId: c.evaluation.id, measurementUnitId: c.unit.id, dataSourceId: c.source.id, resultSemantics: input.resultSemantics, scoringMethod: input.scoringMethod, scoringRuleConfig: input.scoringRuleConfig === null ? Prisma.JsonNull : input.scoringRuleConfig as Prisma.InputJsonValue, scoringRuleConfigVersion: input.scoringRuleConfigVersion, negativeResultPolicy: input.negativeResultPolicy, scoringApprovalStatus: input.scoringApprovalStatus, changeReason: "Scheduled revision updated before becoming effective", updatedAt: new Date(), updatedByUserId: actor } });
         await tx.kpiConfigurationRevisionThreshold.deleteMany({ where: { kpiConfigurationRevisionId: latest.id } });
@@ -236,6 +238,8 @@ export const kpiConfigurationService = {
         if (latest && !latest.effectiveTo) await tx.kpiConfigurationRevision.update({ where: { id: latest.id }, data: { effectiveTo: new Date(effectiveFrom.getTime() - 86_400_000) } });
         await writeRevision(tx, id, (latest?.revisionNumber ?? 0) + 1, input, c.evaluation.id, c.unit.id, c.source.id, c.levels, effectiveFrom);
       }
+      const written = await tx.kpiConfigurationRevision.findFirstOrThrow({ where: { kpiConfigurationId: id, effectiveFrom }, orderBy: { revisionNumber: "desc" } });
+      await tx.kpiConfigurationChangeAudit.create({ data: { kpiConfigurationId: id, configurationRevisionId: written.id, changeSource: "GLOBAL_KPI_MANAGEMENT", effectiveFrom, oldValue: latest ? { revisionId: latest.id.toString(), targetValue: latest.targetValue?.toString() ?? null } : Prisma.JsonNull, newValue: { revisionId: written.id.toString(), targetValue: written.targetValue?.toString() ?? null }, reason: input.changeReason, changedByUserId: actor } });
       return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({ where: { id }, include }));
     });
   },
