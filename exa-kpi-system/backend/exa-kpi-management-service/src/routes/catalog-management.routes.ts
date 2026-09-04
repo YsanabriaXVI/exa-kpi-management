@@ -1,0 +1,21 @@
+import { Router } from "express";
+import { catalogUsage, createDataSource, createMeasurementUnit, createSubjectType, createSubjectValue, listDataSources, listMeasurementUnits, listSubjectTypes, listSubjectValues, toggleDataSource, toggleMeasurementUnit, toggleSubjectType, toggleSubjectValue, updateDataSource, updateMeasurementUnit, updateSubjectType, updateSubjectValue } from "../controllers/catalog-management.controller.js";
+
+export const catalogManagementRouter = Router();
+catalogManagementRouter.get("/usage/:kind/:id", catalogUsage);
+catalogManagementRouter.get("/subject-types", listSubjectTypes);
+catalogManagementRouter.post("/subject-types", createSubjectType);
+catalogManagementRouter.patch("/subject-types/:id", updateSubjectType);
+catalogManagementRouter.patch("/subject-types/:id/toggle", toggleSubjectType);
+catalogManagementRouter.get("/subject-types/:code/values", listSubjectValues);
+catalogManagementRouter.post("/subject-types/:code/values", createSubjectValue);
+catalogManagementRouter.patch("/subject-values/:id", updateSubjectValue);
+catalogManagementRouter.patch("/subject-values/:id/toggle", toggleSubjectValue);
+catalogManagementRouter.get("/measurement-units", listMeasurementUnits);
+catalogManagementRouter.post("/measurement-units", createMeasurementUnit);
+catalogManagementRouter.patch("/measurement-units/:id", updateMeasurementUnit);
+catalogManagementRouter.patch("/measurement-units/:id/toggle", toggleMeasurementUnit);
+catalogManagementRouter.get("/data-sources", listDataSources);
+catalogManagementRouter.post("/data-sources", createDataSource);
+catalogManagementRouter.patch("/data-sources/:id", updateDataSource);
+catalogManagementRouter.patch("/data-sources/:id/toggle", toggleDataSource);

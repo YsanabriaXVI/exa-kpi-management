@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Check,
   CircleAlert,
+  Database,
   CalendarDays,
   Plus,
   Search,
@@ -1201,6 +1202,16 @@ export function SetKpiConfigPage() {
                 : "Select an existing KPI Definition and define how it will be measured."}
           </p>
         </div>
+        {editMode !== "POOL_PERIOD_EDIT" && (
+          <button
+            type="button"
+            className="button secondary config-catalog-button"
+            onClick={() => navigate("/app/kpi-management/config/catalogs")}
+          >
+            <Database size={16} />
+            Manage Catalogs
+          </button>
+        )}
       </header>
 
       {isEditing && (

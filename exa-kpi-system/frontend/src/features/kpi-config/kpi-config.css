@@ -9,6 +9,7 @@
   align-items: flex-end;
   justify-content: space-between;
 }
+.config-catalog-button { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .config-page-header h1 {
   margin: 4px 0;
   font-size: 25px;
@@ -1637,7 +1638,7 @@ html[data-theme="dark"] .set-kpi-config-page select[aria-disabled="true"] {
 .goal-setup-v2-card select option,
 .result-definition-card select option { color: var(--ems-text); }
 .result-definition-card .config-fields-grid select { min-height: 44px; padding: 0 42px 0 13px; font-size: 13px; }
-.result-definition-card .official-result-unit-field { width: min(100%, 480px); }
+.result-definition-card .official-result-unit-field { width: min(100%, 800px); }
 @media (max-width: 800px) { .result-definition-card .official-result-unit-field { width: 100%; min-width: 0; } }
 .goal-unit-readonly { min-height: 44px; padding: 0 13px; display: flex; align-items: center; border: 1px solid #d7dee7; border-radius: 9px; color: #526275; background: var(--ems-surface-muted); font-size: 13px; font-weight: 700; }
 .semantic-goal-fields .overall-goal-value { max-width: 480px; }

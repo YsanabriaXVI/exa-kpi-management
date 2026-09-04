@@ -5,6 +5,7 @@ import { kpiDefinitionRouter } from "./kpi-definition.routes.js";
 import { kpiConfigurationRouter } from "./kpi-configuration.routes.js";
 import { inputFrequencyRouter } from "./input-frequency.routes.js";
 import { internalKpiConfigurationRouter } from "./internal-kpi-configuration.routes.js";
+import { catalogManagementRouter } from "./catalog-management.routes.js";
 
 export const apiRouter = Router();
 
@@ -14,3 +15,4 @@ apiRouter.use("/v1/kpi-categories", kpiCategoryRouter);
 apiRouter.use("/v1/kpi-configurations", kpiConfigurationRouter);
 apiRouter.use("/v1/internal/input-frequencies", inputFrequencyRouter);
 apiRouter.use("/v1/internal/kpi-configurations", internalKpiConfigurationRouter);
+apiRouter.use("/v1/catalog-management", catalogManagementRouter);
