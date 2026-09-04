@@ -32,6 +32,7 @@ export function KpiDefinitionOverview() {
   const [deleting, setDeleting] = useState<KpiDefinition | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [mutationError, setMutationError] = useState("");
+  const [recentDefinitions, setRecentDefinitions] = useState<KpiDefinition[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortBy, setSortBy] = useState<KpiDefinitionSortBy>("kpiCode");
@@ -59,7 +60,7 @@ export function KpiDefinitionOverview() {
       return isActive ? kpiDefinitionService.activate(definition.id) : kpiDefinitionService.deactivate(definition.id);
     },
     onMutate: () => setMutationError(""),
-    onSuccess: (saved, variables) => { void invalidate(); setCreating(false); setEditing(null); notify(variables.definition ? `${saved.kpiCode} was updated successfully.` : `${saved.kpiCode} was created successfully.`); },
+    onSuccess: (saved, variables) => { void invalidate(); setRecentDefinitions((current) => [saved, ...current.filter((item) => item.id !== saved.id)].slice(0, 25)); setCreating(false); setEditing(null); notify(variables.definition ? `${saved.kpiCode} was updated successfully.` : `${saved.kpiCode} was created successfully.`); },
     onError: (error) => setMutationError(errorMessage(error)),
   });
   const deleteMutation = useMutation({
@@ -68,6 +69,7 @@ export function KpiDefinitionOverview() {
     onError: (error) => { setDeleting(null); notify(errorMessage(error), "info"); },
   });
   const data = definitionsQuery.data?.data ?? [];
+  const assistDefinitions = [...recentDefinitions, ...data.filter((definition) => !recentDefinitions.some((recent) => recent.id === definition.id))];
   const meta = definitionsQuery.data?.meta ?? { page, pageSize, totalItems: 0, totalPages: 0 };
   const totalItems = (activeCountQuery.data?.meta.totalItems ?? 0) + (inactiveCountQuery.data?.meta.totalItems ?? 0);
   const changeSort = (field: KpiDefinitionSortBy) => { setSortOrder((current) => field === sortBy && current === "asc" ? "desc" : "asc"); setSortBy(field); setPage(1); };
@@ -104,7 +106,9 @@ export function KpiDefinitionOverview() {
       </tbody></table></div>
       <footer className="kpi-table-footer"><span>Showing <strong>{meta.totalItems ? (meta.page-1)*meta.pageSize+1 : 0}-{Math.min(meta.page*meta.pageSize,meta.totalItems)}</strong> of <strong>{meta.totalItems}</strong> definitions {definitionsQuery.isFetching && !definitionsQuery.isLoading ? "· Refreshing..." : ""}</span><RowsPerPageSelect value={pageSize} onChange={(value) => {setPageSize(value);setPage(1);}}/><PaginationControls page={meta.page} totalPages={Math.max(1,meta.totalPages)} onPage={setPage} label="KPI Definitions pagination"/></footer>
     </section>
-    {(creating || editing) && <KpiDefinitionModal definition={editing ?? undefined} categories={categoriesQuery.data ?? []} isSaving={saveMutation.isPending} serverError={mutationError} onClose={() => {setCreating(false);setEditing(null);setMutationError("");}} onSubmit={(input, isActive) => saveMutation.mutate({input,definition:editing ?? undefined,isActive})}/>}
+    {(creating || editing) && (
+      <KpiDefinitionModal definition={editing ?? undefined} categories={categoriesQuery.data ?? []} visibleDefinitions={assistDefinitions.filter((item) => item.id !== editing?.id)} isSaving={saveMutation.isPending} serverError={mutationError} onClose={() => {setCreating(false);setEditing(null);setMutationError("");}} onViewExisting={(id) => { setCreating(false); setEditing(null); navigate(`/app/kpi-management/definition/detail/${id}`); }} onSubmit={(input, isActive) => saveMutation.mutate({input,definition:editing ?? undefined,isActive})}/>
+    )}
     {deleting && <OverviewDeleteConfirmation title="Delete KPI Definition?" message={`${deleting.kpiCode} will disappear from KPI Definition Overview but remain stored in the database for audit history.`} pending={deleteMutation.isPending} onAccept={() => deleteMutation.mutate(deleting)} onCancel={() => setDeleting(null)} />}
     {toast && <div className={`kpi-toast ${toast.tone}`} role="status"><CheckCircle2 size={20}/><span>{toast.message}</span><button aria-label="Dismiss notification" onClick={() => setToast(null)}><X size={16}/></button></div>}
   </main>;

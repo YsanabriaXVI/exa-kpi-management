@@ -97,7 +97,9 @@ export const kpiDefinitionService = {
     const candidates = await prisma.kpiDefinition.findMany({
       where: { deletedAt: null, isActive: true, statusCode: "ACTIVE" },
       select: { id: true, kpiCode: true, kpiName: true, description: true },
-      orderBy: [{ kpiCode: "asc" }, { id: "asc" }],
+      // Keep the bounded candidate window fresh. Ranking remains deterministic below,
+      // while newly created Definitions are no longer excluded by an old-code-first slice.
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 500,
     });
     return {

@@ -44,8 +44,11 @@ export function autosuggestTokens(value: string): readonly string[] {
 }
 
 export function classifySuggestionEligibility(candidate: AutosuggestCandidate): SuggestionEligibility {
+  const identity = normalizeDefinitionText(`${candidate.code} ${candidate.name}`);
   const searchable = normalizeDefinitionText(`${candidate.code} ${candidate.name} ${candidate.description ?? ""}`);
-  if (ADMINISTRATIVE_PATTERN.test(searchable)) return "EXCLUDED";
+  // Descriptions can legitimately mention collaborators or scorecards as scope.
+  // Administrative markers exclude only when they identify the Definition itself.
+  if (ADMINISTRATIVE_PATTERN.test(identity)) return "EXCLUDED";
   if (LOW_PRIORITY_PATTERN.test(searchable)) return "LOW_PRIORITY";
   return "ELIGIBLE";
 }
@@ -53,6 +56,43 @@ export function classifySuggestionEligibility(candidate: AutosuggestCandidate): 
 const intersectionSize = (left: ReadonlySet<string>, right: ReadonlySet<string>): number => {
   let count = 0;
   for (const token of left) if (right.has(token)) count += 1;
+  return count;
+};
+
+const editDistance = (left: string, right: string): number => {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let previous = row[0]!;
+    row[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const current = row[rightIndex]!;
+      row[rightIndex] = Math.min(
+        row[rightIndex]! + 1,
+        row[rightIndex - 1]! + 1,
+        previous + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+      previous = current;
+    }
+  }
+  return row[right.length]!;
+};
+
+const tokensMatch = (left: string, right: string): boolean => {
+  if (left === right) return true;
+  if (left.length < 5 || right.length < 5) return false;
+  return 1 - (editDistance(left, right) / Math.max(left.length, right.length)) >= 0.82;
+};
+
+const fuzzyIntersectionSize = (left: readonly string[], right: readonly string[]): number => {
+  const usedRight = new Set<number>();
+  let count = 0;
+  for (const leftToken of new Set(left)) {
+    const matchIndex = right.findIndex((rightToken, index) => !usedRight.has(index) && tokensMatch(leftToken, rightToken));
+    if (matchIndex >= 0) {
+      usedRight.add(matchIndex);
+      count += 1;
+    }
+  }
   return count;
 };
 
@@ -82,7 +122,7 @@ export function calculateSimilarity(query: string, candidateName: string, eligib
   if (queryTokens.length === 0 || candidateTokens.length === 0) return 0;
   const querySet = new Set(queryTokens);
   const candidateSet = new Set(candidateTokens);
-  const intersection = intersectionSize(querySet, candidateSet);
+  const intersection = Math.max(intersectionSize(querySet, candidateSet), fuzzyIntersectionSize(queryTokens, candidateTokens));
   const union = new Set([...querySet, ...candidateSet]).size;
   const jaccard = intersection / union;
   const queryCoverage = intersection / querySet.size;

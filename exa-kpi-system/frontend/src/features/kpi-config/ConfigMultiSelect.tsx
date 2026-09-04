@@ -11,6 +11,7 @@ type Props = {
   searchable?: boolean;
   searchPlaceholder?: string;
   emptyText?: string;
+  showClearOption?: boolean;
 };
 
 export function ConfigMultiSelect({
@@ -21,6 +22,7 @@ export function ConfigMultiSelect({
   searchable = false,
   searchPlaceholder = "Search KPI...",
   emptyText = "No KPI found.",
+  showClearOption = true,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -144,7 +146,7 @@ export function ConfigMultiSelect({
               />
             </label>
           )}
-          <button
+          {showClearOption && <button
             type="button"
             className="config-filter-option"
             onClick={() => onChange([])}
@@ -155,7 +157,7 @@ export function ConfigMultiSelect({
             <span>
               <strong>All</strong>
             </span>
-          </button>
+          </button>}
           <div className="config-filter-option-list">
             {filtered.map((option) => {
               const checked = selected.includes(option.value);

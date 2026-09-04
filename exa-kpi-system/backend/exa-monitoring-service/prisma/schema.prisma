@@ -175,6 +175,11 @@ model MonitoringPeriodInput {
   kpiObjectiveSnapshot               String?                          @map("kpi_objective_snapshot") @db.Text
   goalTextSnapshot                   String?                          @map("goal_text_snapshot") @db.VarChar(255)
   goalValueSnapshot                  Decimal?                         @map("goal_value_snapshot") @db.Decimal(20, 6)
+  evaluationKindSnapshot             String                           @default("OVERALL") @map("evaluation_kind_snapshot") @db.VarChar(20)
+  subjectTypeSnapshot                String?                          @map("subject_type_snapshot") @db.VarChar(40)
+  subjectExternalIdSnapshot          String?                          @map("subject_external_id_snapshot") @db.VarChar(100)
+  subjectCodeSnapshot                String?                          @map("subject_code_snapshot") @db.VarChar(100)
+  subjectLabelSnapshot               String?                          @map("subject_label_snapshot") @db.VarChar(200)
   evaluationTypeExternalId           BigInt?                          @map("evaluation_type_id")
   evaluationTypeCodeSnapshot         String                           @map("evaluation_type_code_snapshot") @db.VarChar(40)
   resultSemanticsSnapshot            String?                          @map("result_semantics_snapshot") @db.VarChar(40)
@@ -202,9 +207,9 @@ model MonitoringPeriodInput {
   result                             KpiResult?
   validationIssues                   MonitoringValidationIssue[]
 
-  @@unique([monitoringPeriodId, kpiConfigurationExternalId], map: "uq_mpi_period_configuration")
+  @@index([monitoringPeriodId, kpiConfigurationExternalId], map: "ix_mpi_period_configuration")
   @@unique([monitoringPeriodId, displayOrder], map: "uq_mpi_period_order")
-  @@unique([monitoringPeriodId, scorecardKpiAssignmentExternalId], map: "uq_mpi_scorecard_assignment")
+  @@index([monitoringPeriodId, scorecardKpiAssignmentExternalId], map: "ix_mpi_scorecard_assignment")
   @@map("monitoring_period_inputs")
 }
 

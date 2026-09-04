@@ -4,6 +4,7 @@ import { kpiPoolClient } from "../clients/kpi-pool.client.js";
 import { scorecardsClient } from "../clients/scorecards.client.js";
 import type { MaterializeMonitoringPeriodBody } from "../schemas/monitoring-period.schema.js";
 import { AppError } from "../utils/app-error.js";
+import {parseFrozenEffectiveKpiSettings} from "../contracts/frozen-effective-kpi-settings.js";
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 const label = (value: string) =>
   new Intl.DateTimeFormat("en-US", {
@@ -133,8 +134,8 @@ export const monitoringPeriodService = {
         "NO_EXPECTED_RESULTS",
         "Finalized Scorecards do not contain direct KPI assignments",
       );
-    const byConfiguration = new Map(assignments.map(({ assignment }) => [assignment.kpiConfigurationId, assignment.effectiveSettings]));
     if (assignments.some(({ assignment }) => !assignment.kpiConfigurationRevisionId || !assignment.effectiveSettings)) throw new AppError(409, "FROZEN_SCORECARD_SETTINGS_MISSING", "A FINALIZED Scorecard is missing its frozen effective KPI settings");
+    const byConfiguration = new Map(assignments.map(({ assignment }) => [assignment.kpiConfigurationId, parseFrozenEffectiveKpiSettings(assignment.effectiveSettings)]));
     try {
       const created = await prisma.$transaction(
         async (tx) => {
@@ -224,7 +225,14 @@ export const monitoringPeriodService = {
           }
           let displayOrder = 0;
           for (const { scorecard, assignment } of assignments) {
-            const snapshot = byConfiguration.get(assignment.kpiConfigurationId)! as any;
+            const snapshot = byConfiguration.get(assignment.kpiConfigurationId)!;
+            const entityEvaluations = snapshot.evaluationScope === "BY_SUBJECT"
+              ? snapshot.subjectGoals.map((subject) => ({ kind: "ENTITY" as const, goal: subject.goal, subject, unit: snapshot.goalUnit }))
+              : [];
+            const evaluations = entityEvaluations.length
+              ? entityEvaluations
+              : [{ kind: "OVERALL" as const, goal: snapshot.goal, subject: null, unit: snapshot.measurementUnit }];
+            for (const evaluation of evaluations) {
             await tx.monitoringPeriodInput.create({
               data: {
                 monitoringPeriodId: periodRow.id,
@@ -244,11 +252,16 @@ export const monitoringPeriodService = {
                 kpiCodeSnapshot: snapshot.kpiCode,
                 kpiNameSnapshot: snapshot.kpiName,
                 kpiObjectiveSnapshot: snapshot.objective,
-                goalTextSnapshot: snapshot.goal,
+                goalTextSnapshot: evaluation.goal,
                 goalValueSnapshot:
-                  snapshot.goal === null
+                  evaluation.goal === null
                     ? null
-                    : new Prisma.Decimal(snapshot.goal),
+                    : new Prisma.Decimal(evaluation.goal),
+                evaluationKindSnapshot: evaluation.kind,
+                subjectTypeSnapshot: evaluation.kind === "ENTITY" ? snapshot.subjectType : null,
+                subjectExternalIdSnapshot: evaluation.subject?.subjectExternalId ?? null,
+                subjectCodeSnapshot: evaluation.subject?.subjectCode ?? null,
+                subjectLabelSnapshot: evaluation.subject?.subjectLabel ?? null,
                 evaluationTypeExternalId: BigInt(snapshot.evaluationType.id),
                 evaluationTypeCodeSnapshot: snapshot.evaluationType.code,
                 resultSemanticsSnapshot: snapshot.resultSemantics,
@@ -259,20 +272,18 @@ export const monitoringPeriodService = {
                 scoringRuleConfigVersionSnapshot: snapshot.scoringRuleConfigVersion,
                 negativeResultPolicySnapshot: snapshot.negativeResultPolicy,
                 scoringApprovalStatusSnapshot: snapshot.scoringApprovalStatus,
-                measurementUnitExternalId: BigInt(snapshot.measurementUnit.id),
-                measurementUnitCodeSnapshot: snapshot.measurementUnit.code,
-                measurementUnitNameSnapshot: snapshot.measurementUnit.name,
-                measurementUnitSymbolSnapshot: snapshot.measurementUnit.symbol,
+                measurementUnitExternalId: evaluation.unit.id ? BigInt(evaluation.unit.id) : null,
+                measurementUnitCodeSnapshot: evaluation.unit.code,
+                measurementUnitNameSnapshot: evaluation.unit.name,
+                measurementUnitSymbolSnapshot: evaluation.unit.symbol,
                 primaryDataSourceExternalId: BigInt(snapshot.dataSource.id),
                 primaryDataSourceCodeSnapshot: snapshot.dataSource.code,
                 primaryDataSourceNameSnapshot: snapshot.dataSource.name,
-                weightPercentSnapshot: new Prisma.Decimal(
-                  assignment.weightPercent,
-                ),
+                weightPercentSnapshot: new Prisma.Decimal(Number(assignment.weightPercent) / Math.max(1, entityEvaluations.length)),
                 displayOrder: ++displayOrder,
                 generatedAt: new Date(),
                 thresholds: {
-                  create: snapshot.thresholds.map((threshold: any) => ({
+                  create: snapshot.thresholds.map((threshold) => ({
                     trafficLightLevelExternalId: BigInt(
                       threshold.trafficLightLevelId,
                     ),
@@ -293,6 +304,7 @@ export const monitoringPeriodService = {
                 },
               },
             });
+            }
           }
           const scorecardById = new Map(
             projection.scorecards.map((item) => [item.scorecardId, item]),

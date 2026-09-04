@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const tx = vi.hoisted(() => ({
   kpiDefinition: { findFirst: vi.fn() },
-  measurementUnit: { findFirst: vi.fn() },
+  measurementUnit: { findFirst: vi.fn(), findMany: vi.fn() },
   dataSource: { findFirst: vi.fn() },
   inputFrequency: { findUnique: vi.fn() },
   kpiConfigurationStatus: { findUnique: vi.fn() },
@@ -11,6 +11,8 @@ const tx = vi.hoisted(() => ({
   kpiConfiguration: { findMany: vi.fn(), create: vi.fn(), findUniqueOrThrow: vi.fn() },
   kpiConfigurationRevision: { create: vi.fn() },
   kpiConfigurationRevisionThreshold: { createMany: vi.fn() },
+  kpiConfigurationRevisionSubjectGoal: { createMany: vi.fn() },
+  kpiConfigurationRevisionMeasurementInput: { createMany: vi.fn() },
 }));
 const db = vi.hoisted(() => ({
   $transaction: vi.fn(),
@@ -26,6 +28,10 @@ const input = {
   ranges: { redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100 },
   resultSemantics: null, evaluationTypeCode: null, scoringMethod: null, scoringRuleConfig: null,
   scoringRuleConfigVersion: null, negativeResultPolicy: null, scoringApprovalStatus: "BLOCKED" as const,
+  inputFrequencyCode: "MONTHLY", periodScope: "CURRENT_PERIOD" as const, goalMode: "SINGLE" as const,
+  evaluationScope: "OVERALL" as const, goalType: "SINGLE_VALUE" as const, goalAssignment: null, goalUnit: "kms", resultMethod: "DIRECT" as const, measurementInputs: [],
+  targetKind: "ABSOLUTE_TARGET" as const, rangeMinGoal: null, rangeMaxGoal: null, subjectType: null, subjectGoals: [],
+  comparisonDirection: null, calculationPattern: null, calculationTemplate: null, subjects: [],
 };
 
 beforeEach(() => {
@@ -33,6 +39,7 @@ beforeEach(() => {
   db.$transaction.mockImplementation((callback) => callback(tx));
   tx.kpiDefinition.findFirst.mockResolvedValue({ id: 4n, kpiCode: "KPI-050", kpiName: "Productivity kms/head" });
   tx.measurementUnit.findFirst.mockResolvedValue({ id: 1n, symbol: "kms" });
+  tx.measurementUnit.findMany.mockResolvedValue([]);
   tx.dataSource.findFirst.mockResolvedValue({ id: 2n, code: "INTEGRATOR_EMS", name: "Integrator - EMS" });
   tx.inputFrequency.findUnique.mockResolvedValue({ id: 3n, name: "Monthly" });
   tx.kpiConfigurationStatus.findUnique.mockResolvedValue({ id: 4n, code: "CONFIGURED" });
@@ -98,12 +105,14 @@ describe("kpiConfigurationService.batchLookup", () => {
         status: { code: "CONFIGURED" },
         definition: { kpiCode: "KPI-052", kpiName: "Transport damage", isActive: true, statusCode: "ACTIVE", deletedAt: null },
         inputFrequency: { code: "MONTHLY", name: "Monthly", isActive: true },
+        revisions: [],
       },
       {
         id: 10n, configCode: "KPC-050-01", kpiDefinitionId: 50n, inputFrequencyId: 1n,
         status: { code: "INACTIVE" },
         definition: { kpiCode: "KPI-050", kpiName: "Productivity", isActive: true, statusCode: "ACTIVE", deletedAt: null },
         inputFrequency: { code: "MONTHLY", name: "Monthly", isActive: true },
+        revisions: [],
       },
     ]);
 
@@ -121,11 +130,11 @@ describe("kpiConfigurationService.batchLookup", () => {
 
 describe("kpiConfigurationService.effectiveSnapshots", () => {
   const effectiveRecord = {
-    id: 10n, configCode: "KPC-050-01",
+    id: 10n, configCode: "KPC-050-01", status:{code:"CONFIGURED"}, inputFrequency:{code:"MONTHLY"},
     definition: { id: 50n, kpiCode: "KPI-050", kpiName: "Productivity", description: "Improve productivity" },
     measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" },
     primaryDataSource: { id: 2n, code: "EMS", name: "EMS" },
-    revisions: [{ id: 100n, revisionNumber: 1, targetValue: { toString: () => "100" }, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), effectiveTo: new Date("2026-08-31T00:00:00.000Z"), evaluationType: { id: 3n, code: "HIGHER_IS_BETTER", name: "Higher is better" }, measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" }, dataSource: { id: 2n, code: "EMS", name: "EMS" }, resultSemantics:"ABSOLUTE_VALUE",scoringMethod:"PROPORTIONAL",scoringRuleConfig:{floorPercent:0,capPercent:100},scoringRuleConfigVersion:1,negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", thresholds: [{ id: 4n, rangeMinPercent: { toString: () => "80" }, rangeMaxPercent: { toString: () => "100" }, includesMin: true, includesMax: true, displayOrder: 1, trafficLightLevel: { id: 5n, code: "GREEN", name: "Green" } }] }],
+    revisions: [{ id: 100n, revisionNumber: 1, targetValue: { toString: () => "100" }, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), effectiveTo: new Date("2026-08-31T00:00:00.000Z"), periodScope:"CURRENT_PERIOD",goalMode:"SINGLE",evaluationScope:"OVERALL",goalType:"SINGLE_VALUE",goalAssignment:null,subjectType:null,resultMethod:"DIRECT",calculationPattern:"DIRECT",calculationTemplate:null,measurementInputs:[],subjects:[],subjectGoals:[],groupGoalValue:null,groupGoalUnit:null,groupGoalLabel:null,goalUnit:{id:1n,code:"KMS",name:"Kilometers",symbol:"kms"}, evaluationType: { id: 3n, code: "HIGHER_IS_BETTER", name: "Higher is better" }, measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" }, dataSource: { id: 2n, code: "EMS", name: "EMS" }, resultSemantics:"ABSOLUTE_VALUE",scoringMethod:"PROPORTIONAL",scoringRuleConfig:{floorPercent:0,capPercent:100},scoringRuleConfigVersion:1,negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", thresholds: ["RED","YELLOW","GREEN"].map((code,index)=>({ id: BigInt(4+index), rangeMinPercent: { toString: () => "0" }, rangeMaxPercent: { toString: () => "100" }, includesMin: true, includesMax: true, displayOrder: index+1, trafficLightLevel: { id: BigInt(5+index), code, name: code } })) }],
   };
 
   it("returns the single revision covering the complete Input Period with snapshot catalogs", async () => {

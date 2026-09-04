@@ -8,6 +8,8 @@ const configurationSchema = z.object({
   definitionIsActive: z.boolean(), inputFrequencyId: z.string(), inputFrequencyCode: z.string(), inputFrequencyName: z.string(),
   inputFrequencyIsActive: z.boolean(), status: z.string(), isActive: z.boolean(),
   categoryName: z.string().optional(), measurementUnit: z.string().optional(), dataSource: z.string().optional(), goal: z.string().nullable().optional(),
+  evaluationScope: z.enum(["OVERALL", "BY_SUBJECT"]).optional(), goalUnit: z.string().optional(), subjectGoalCount: z.number().int().nonnegative().optional(), groupGoal: z.object({ value: z.string(), unit: z.string() }).nullable().optional(),
+  executability: z.object({ capabilityVersion:z.literal("KPI_EXECUTION_V1"),status:z.enum(["EXECUTABLE","BLOCKED"]),executable:z.boolean(),reasons:z.array(z.object({code:z.string(),message:z.string()})) }).nullable().optional(),
 });
 const catalogConfigurationSchema = configurationSchema.extend({
   categoryName: z.string(), measurementUnit: z.string(), dataSource: z.string(), goal: z.string().nullable(),
@@ -16,14 +18,20 @@ const metaSchema = z.object({ page: z.number(), pageSize: z.number(), totalItems
 const batchResponseSchema = z.object({ data: z.array(configurationSchema), notFoundIds: z.array(z.string()) });
 const catalogResponseSchema = z.object({ data: z.array(catalogConfigurationSchema), meta: metaSchema });
 const effectiveSnapshotSchema = z.object({
+  contractVersion: z.literal("EffectiveKpiSettingsV1"),
   kpiConfigurationId: z.string(), kpiConfigurationRevisionId: z.string(), revisionNumber: z.number(), configCode: z.string(),
   goal: z.string().nullable(), evaluationType: z.object({ id: z.string(), code: z.string(), name: z.string() }),
+  goalMode: z.enum(["SINGLE", "RANGE", "BY_SUBJECT"]), rangeMinGoal: z.string().nullable(), rangeMaxGoal: z.string().nullable(), subjectType: z.string().nullable(),
+  subjectGoals: z.array(z.object({ subjectExternalId: z.string(), subjectCode: z.string().nullable(), subjectLabel: z.string(), goal: z.string() })),
   resultSemantics: z.string().nullable(), scoringMethod: z.string().nullable(), scoringRuleConfig: z.record(z.string(), z.unknown()).nullable(),
   scoringRuleConfigVersion: z.number().nullable(), negativeResultPolicy: z.string().nullable(), scoringApprovalStatus: z.string(),
   measurementUnit: z.object({ id: z.string(), code: z.string(), name: z.string(), symbol: z.string() }),
   dataSource: z.object({ id: z.string(), code: z.string(), name: z.string() }),
   thresholds: z.array(z.object({ id: z.string(), trafficLightLevelId: z.string(), code: z.string(), name: z.string(), rangeMinPercent: z.string().nullable(), rangeMaxPercent: z.string().nullable(), includesMin: z.boolean(), includesMax: z.boolean(), displayOrder: z.number() })),
+  executability: z.object({ capabilityVersion:z.literal("KPI_EXECUTION_V1"),status:z.enum(["EXECUTABLE","BLOCKED"]),executable:z.boolean(),reasons:z.array(z.object({code:z.string(),message:z.string()})) }),
 }).passthrough();
+
+export type EffectiveKpiSettingsV1 = z.infer<typeof effectiveSnapshotSchema>;
 
 export type KpiManagementConfiguration = z.infer<typeof configurationSchema>;
 export type KpiManagementCatalogConfiguration = z.infer<typeof catalogConfigurationSchema>;

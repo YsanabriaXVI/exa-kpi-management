@@ -475,7 +475,6 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
     "#cf6680",
   ];
   const changeCount = selected.length + removed.length;
-  const candidateScorecards = linkCandidates.length;
   const linkedReadyCount = linkCandidates.filter(
     (row) =>
       category(row) === "SELECTED" && row.compositionStatus === "FINALIZED",

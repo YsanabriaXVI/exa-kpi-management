@@ -1,4 +1,17 @@
 export type KpiConfigStatus = "CONFIGURED" | "INCOMPLETE" | "INACTIVE";
+export type PeriodScope = "CURRENT_PERIOD" | "SAME_PERIOD_PREVIOUS_YEAR" | "PREVIOUS_PERIOD";
+export type GoalMode = "SINGLE" | "RANGE" | "BY_SUBJECT";
+export type EvaluationScope = "OVERALL" | "BY_SUBJECT";
+export type GoalType = "SINGLE_VALUE" | "RANGE";
+export type GoalAssignment = "SAME_GOAL_FOR_ALL" | "DIFFERENT_GOAL_PER_SUBJECT";
+export type ResultMethod = "DIRECT" | "CALCULATED_FROM_INPUTS";
+export type MeasurementInput = { name: string; unit: string; description: string };
+export type CalculationTemplate = "DIVIDE" | "PERCENT_RATIO" | "SUM" | "AVERAGE" | "DIFFERENCE";
+export type TargetKind = "ABSOLUTE_TARGET" | "CHANGE_TARGET" | "UPPER_LIMIT" | "LOWER_LIMIT" | "DEADLINE";
+export type SubjectType = "FLEET" | "EMPLOYEE" | "CUSTOMER" | "LOCATION" | "DEPARTMENT" | "COMPANY" | "OPERATION" | "PROJECT" | "ASSET";
+export type SubjectGoal = { subjectExternalId: string; subjectCode?: string | null; subjectLabel: string; goal: number };
+export type SubjectSelection = Omit<SubjectGoal, "goal">;
+export type GroupGoal = { value: number; unit: string; label: string };
 
 export type TrafficLightRanges = {
   redFrom: number;
@@ -16,6 +29,27 @@ export type KpiConfigRecord = {
   definitionCode: string;
   definitionName: string;
   goal: number;
+  inputFrequencyCode?: string;
+  inputFrequencyName?: string;
+  periodScope?: PeriodScope;
+  comparisonMode?: "NONE" | "SAME_PERIOD_PREVIOUS_YEAR" | "PREVIOUS_PERIOD";
+  comparisonDirection?: "INCREASE" | "REDUCTION" | null;
+  calculationPattern?: string | null;
+  calculationTemplate?: CalculationTemplate | null;
+  goalMode?: GoalMode;
+  evaluationScope?: EvaluationScope;
+  goalType?: GoalType;
+  goalAssignment?: GoalAssignment | null;
+  goalUnit?: string;
+  resultMethod?: ResultMethod;
+  measurementInputs?: MeasurementInput[];
+  targetKind?: TargetKind | null;
+  rangeMinGoal?: number | null;
+  rangeMaxGoal?: number | null;
+  subjectType?: SubjectType | null;
+  subjectGoals?: SubjectGoal[];
+  subjects?: SubjectSelection[];
+  groupGoal?: GroupGoal | null;
   measurementUnit: string;
   evaluationType: string;
   dataSource: string;
@@ -33,10 +67,38 @@ export type KpiConfigRecord = {
 export type KpiConfigInput = {
   definitionId: string | number;
   goal: number;
+  inputFrequencyCode: string;
+  periodScope: PeriodScope;
+  goalMode: GoalMode;
+  evaluationScope: EvaluationScope;
+  goalType: GoalType;
+  goalAssignment?: GoalAssignment | null;
+  goalUnit: string;
+  resultMethod: ResultMethod;
+  measurementInputs: MeasurementInput[];
+  calculationTemplate?: CalculationTemplate | null;
+  targetKind?: TargetKind | null;
+  rangeMinGoal?: number | null;
+  rangeMaxGoal?: number | null;
+  subjectType?: SubjectType | null;
+  subjectGoals?: SubjectGoal[];
+  subjects?: SubjectSelection[];
+  groupGoal?: GroupGoal | null;
+  resultSemantics?: string | null;
+  evaluationTypeCode?: string | null;
+  comparisonDirection?: "INCREASE" | "REDUCTION" | null;
+  calculationPattern?: string | null;
   measurementUnit: string;
   dataSource: string;
   ranges: TrafficLightRanges;
   isActive: boolean;
   effectiveFrom?: string;
   changeReason?: string;
+};
+
+export type KpiConfigLookups = {
+  measurementUnits: Array<{ id: string; code: string; name: string; symbol: string; isPercentage: boolean }>;
+  inputFrequencies: Array<{ id: string; code: string; name: string; monthsPerPeriod: number; periodsPerYear: number | null }>;
+  dataSources: Array<{ id: string; code: string; name: string; sourceType: string }>;
+  subjectCatalogs: Array<{ id: string; catalogId: string; subjectType: SubjectType; code: string; name: string }>;
 };

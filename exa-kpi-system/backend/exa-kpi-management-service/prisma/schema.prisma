@@ -23,20 +23,23 @@ model KpiCategory {
 }
 
 model MeasurementUnit {
-  id              BigInt             @id @default(autoincrement()) @map("measurement_unit_id")
-  code            String             @unique(map: "uq_measurement_units_code") @db.VarChar(50)
-  symbol          String             @unique(map: "uq_measurement_units_symbol") @db.VarChar(50)
-  name            String             @db.VarChar(120)
-  description     String?            @db.Text
-  decimalPlaces   Int                @default(2) @map("decimal_places") @db.SmallInt
-  isPercentage    Boolean            @default(false) @map("is_percentage")
-  isActive        Boolean            @default(true) @map("is_active")
-  createdAt       DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  createdByUserId BigInt?            @map("created_by_user_id")
-  updatedAt       DateTime?          @map("updated_at") @db.DateTime(3)
-  updatedByUserId BigInt?            @map("updated_by_user_id")
-  configurations  KpiConfiguration[]
-  configurationRevisions KpiConfigurationRevision[] @relation("RevisionMeasurementUnit")
+  id                             BigInt                                     @id @default(autoincrement()) @map("measurement_unit_id")
+  code                           String                                     @unique(map: "uq_measurement_units_code") @db.VarChar(50)
+  symbol                         String                                     @unique(map: "uq_measurement_units_symbol") @db.VarChar(50)
+  name                           String                                     @db.VarChar(120)
+  description                    String?                                    @db.Text
+  decimalPlaces                  Int                                        @default(2) @map("decimal_places") @db.SmallInt
+  isPercentage                   Boolean                                    @default(false) @map("is_percentage")
+  isActive                       Boolean                                    @default(true) @map("is_active")
+  createdAt                      DateTime                                   @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId                BigInt?                                    @map("created_by_user_id")
+  updatedAt                      DateTime?                                  @map("updated_at") @db.DateTime(3)
+  updatedByUserId                BigInt?                                    @map("updated_by_user_id")
+  configurations                 KpiConfiguration[]
+  configurationRevisions         KpiConfigurationRevision[]                 @relation("RevisionMeasurementUnit")
+  goalConfigurationRevisions     KpiConfigurationRevision[]                 @relation("RevisionGoalUnit")
+  groupGoalConfigurationRevisions KpiConfigurationRevision[]                @relation("RevisionGroupGoalUnit")
+  configurationMeasurementInputs KpiConfigurationRevisionMeasurementInput[]
 
   @@map("measurement_units")
 }
@@ -76,19 +79,19 @@ model TrafficLightLevel {
 }
 
 model DataSource {
-  id                 BigInt             @id @default(autoincrement()) @map("data_source_id")
-  code               String             @unique(map: "uq_data_sources_code") @db.VarChar(50)
-  name               String             @db.VarChar(120)
-  description        String?            @db.Text
-  sourceType         String             @map("source_type") @db.VarChar(30)
-  isExternal         Boolean            @default(false) @map("is_external")
-  supportsAutomation Boolean            @default(false) @map("supports_automation")
-  isActive           Boolean            @default(true) @map("is_active")
-  createdAt          DateTime           @default(now()) @map("created_at") @db.DateTime(3)
-  createdByUserId    BigInt?            @map("created_by_user_id")
-  updatedAt          DateTime?          @map("updated_at") @db.DateTime(3)
-  updatedByUserId    BigInt?            @map("updated_by_user_id")
-  configurations     KpiConfiguration[]
+  id                     BigInt                     @id @default(autoincrement()) @map("data_source_id")
+  code                   String                     @unique(map: "uq_data_sources_code") @db.VarChar(50)
+  name                   String                     @db.VarChar(120)
+  description            String?                    @db.Text
+  sourceType             String                     @map("source_type") @db.VarChar(30)
+  isExternal             Boolean                    @default(false) @map("is_external")
+  supportsAutomation     Boolean                    @default(false) @map("supports_automation")
+  isActive               Boolean                    @default(true) @map("is_active")
+  createdAt              DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId        BigInt?                    @map("created_by_user_id")
+  updatedAt              DateTime?                  @map("updated_at") @db.DateTime(3)
+  updatedByUserId        BigInt?                    @map("updated_by_user_id")
+  configurations         KpiConfiguration[]
   configurationRevisions KpiConfigurationRevision[] @relation("RevisionDataSource")
 
   @@index([sourceType], map: "ix_data_sources_source_type")
@@ -107,6 +110,22 @@ model KpiConfigurationStatus {
   configurations  KpiConfiguration[]
 
   @@map("kpi_configuration_statuses")
+}
+
+model KpiConfigurationSubjectCatalog {
+  id           BigInt   @id @default(autoincrement()) @map("kpi_configuration_subject_catalog_id")
+  subjectType  String   @map("subject_type") @db.VarChar(30)
+  externalId   String   @map("external_id") @db.VarChar(100)
+  code         String   @db.VarChar(100)
+  name         String   @db.VarChar(200)
+  displayOrder Int      @default(1) @map("display_order") @db.SmallInt
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(3)
+
+  @@unique([subjectType, externalId], map: "uq_kpi_configuration_subject_catalog_external")
+  @@unique([subjectType, code], map: "uq_kpi_configuration_subject_catalog_code")
+  @@index([subjectType, isActive, displayOrder], map: "ix_kpi_configuration_subject_catalog_lookup")
+  @@map("kpi_configuration_subject_catalog")
 }
 
 model EvaluationType {
@@ -146,24 +165,24 @@ model KpiDefinition {
 }
 
 model KpiConfiguration {
-  id                       BigInt                     @id @default(autoincrement()) @map("kpi_configuration_id")
-  kpiDefinitionId          BigInt                     @map("kpi_definition_id")
-  configCode               String                     @unique(map: "uq_kpi_configurations_code") @map("config_code") @db.VarChar(40)
-  measurementUnitId        BigInt                     @map("measurement_unit_id")
-  inputFrequencyId         BigInt                     @map("input_frequency_id")
-  primaryDataSourceId      BigInt                     @map("primary_data_source_id")
-  kpiConfigurationStatusId BigInt                     @map("kpi_configuration_status_id")
-  notes                    String?                    @db.Text
-  deletedAt                DateTime?                  @map("deleted_at") @db.DateTime(3)
-  createdAt                DateTime                   @default(now()) @map("created_at") @db.DateTime(3)
-  createdByUserId          BigInt?                    @map("created_by_user_id")
-  updatedAt                DateTime?                  @map("updated_at") @db.DateTime(3)
-  updatedByUserId          BigInt?                    @map("updated_by_user_id")
-  definition               KpiDefinition              @relation(fields: [kpiDefinitionId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_definition")
-  measurementUnit          MeasurementUnit            @relation(fields: [measurementUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_measurement_unit")
-  inputFrequency           InputFrequency             @relation(fields: [inputFrequencyId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_frequency")
-  primaryDataSource        DataSource                 @relation(fields: [primaryDataSourceId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_primary_source")
-  status                   KpiConfigurationStatus     @relation(fields: [kpiConfigurationStatusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_status")
+  id                       BigInt                        @id @default(autoincrement()) @map("kpi_configuration_id")
+  kpiDefinitionId          BigInt                        @map("kpi_definition_id")
+  configCode               String                        @unique(map: "uq_kpi_configurations_code") @map("config_code") @db.VarChar(40)
+  measurementUnitId        BigInt                        @map("measurement_unit_id")
+  inputFrequencyId         BigInt                        @map("input_frequency_id")
+  primaryDataSourceId      BigInt                        @map("primary_data_source_id")
+  kpiConfigurationStatusId BigInt                        @map("kpi_configuration_status_id")
+  notes                    String?                       @db.Text
+  deletedAt                DateTime?                     @map("deleted_at") @db.DateTime(3)
+  createdAt                DateTime                      @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId          BigInt?                       @map("created_by_user_id")
+  updatedAt                DateTime?                     @map("updated_at") @db.DateTime(3)
+  updatedByUserId          BigInt?                       @map("updated_by_user_id")
+  definition               KpiDefinition                 @relation(fields: [kpiDefinitionId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_definition")
+  measurementUnit          MeasurementUnit               @relation(fields: [measurementUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_measurement_unit")
+  inputFrequency           InputFrequency                @relation(fields: [inputFrequencyId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_frequency")
+  primaryDataSource        DataSource                    @relation(fields: [primaryDataSourceId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_primary_source")
+  status                   KpiConfigurationStatus        @relation(fields: [kpiConfigurationStatusId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configurations_status")
   revisions                KpiConfigurationRevision[]
   changeAudits             KpiConfigurationChangeAudit[]
 
@@ -177,55 +196,129 @@ model KpiConfiguration {
 }
 
 model KpiConfigurationChangeAudit {
-  id                     BigInt           @id @default(autoincrement()) @map("kpi_configuration_change_audit_id")
-  kpiConfigurationId     BigInt           @map("kpi_configuration_id")
-  configurationRevisionId BigInt?         @map("configuration_revision_id")
-  changeSource           String           @map("change_source") @db.VarChar(40)
-  effectiveFrom          DateTime?        @map("effective_from") @db.Date
-  oldValue               Json?            @map("old_value")
-  newValue               Json             @map("new_value")
-  reason                 String?          @db.VarChar(500)
-  changedAt              DateTime         @default(now()) @map("changed_at") @db.DateTime(3)
-  changedByUserId        BigInt?           @map("changed_by_user_id")
-  configuration          KpiConfiguration @relation(fields: [kpiConfigurationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  id                      BigInt           @id @default(autoincrement()) @map("kpi_configuration_change_audit_id")
+  kpiConfigurationId      BigInt           @map("kpi_configuration_id")
+  configurationRevisionId BigInt?          @map("configuration_revision_id")
+  changeSource            String           @map("change_source") @db.VarChar(40)
+  effectiveFrom           DateTime?        @map("effective_from") @db.Date
+  oldValue                Json?            @map("old_value")
+  newValue                Json             @map("new_value")
+  reason                  String?          @db.VarChar(500)
+  changedAt               DateTime         @default(now()) @map("changed_at") @db.DateTime(3)
+  changedByUserId         BigInt?          @map("changed_by_user_id")
+  configuration           KpiConfiguration @relation(fields: [kpiConfigurationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([kpiConfigurationId, changedAt], map: "ix_kpi_configuration_change_audit")
   @@map("kpi_configuration_change_audits")
 }
 
 model KpiConfigurationRevision {
-  id                 BigInt                              @id @default(autoincrement()) @map("kpi_configuration_revision_id")
-  kpiConfigurationId BigInt                              @map("kpi_configuration_id")
-  revisionNumber     Int                                 @map("revision_number") @db.UnsignedInt
-  targetValue        Decimal?                            @map("target_value") @db.Decimal(20, 6)
-  evaluationTypeId   BigInt                              @map("evaluation_type_id")
-  measurementUnitId  BigInt                              @map("measurement_unit_id")
-  dataSourceId        BigInt                              @map("data_source_id")
-  resultSemantics    String?                             @map("result_semantics") @db.VarChar(40)
-  scoringMethod      String?                             @map("scoring_method") @db.VarChar(40)
-  scoringRuleConfig  Json?                               @map("scoring_rule_config")
-  scoringRuleConfigVersion Int?                          @map("scoring_rule_config_version") @db.UnsignedInt
-  negativeResultPolicy String?                           @map("negative_result_policy") @db.VarChar(20)
-  scoringApprovalStatus String                            @default("BLOCKED") @map("scoring_approval_status") @db.VarChar(30)
-  effectiveFrom      DateTime                            @map("effective_from") @db.Date
-  effectiveTo        DateTime?                           @map("effective_to") @db.Date
-  changeReason       String?                             @map("change_reason") @db.VarChar(500)
-  createdAt          DateTime                            @default(now()) @map("created_at") @db.DateTime(3)
-  createdByUserId    BigInt?                             @map("created_by_user_id")
-  updatedAt          DateTime?                           @map("updated_at") @db.DateTime(3)
-  updatedByUserId    BigInt?                             @map("updated_by_user_id")
-  configuration      KpiConfiguration                    @relation(fields: [kpiConfigurationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_configuration")
-  evaluationType     EvaluationType                      @relation(fields: [evaluationTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_evaluation_type")
-  measurementUnit    MeasurementUnit                     @relation("RevisionMeasurementUnit", fields: [measurementUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_measurement_unit")
-  dataSource          DataSource                         @relation("RevisionDataSource", fields: [dataSourceId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_data_source")
-  thresholds         KpiConfigurationRevisionThreshold[]
+  id                       BigInt                                     @id @default(autoincrement()) @map("kpi_configuration_revision_id")
+  kpiConfigurationId       BigInt                                     @map("kpi_configuration_id")
+  revisionNumber           Int                                        @map("revision_number") @db.UnsignedInt
+  targetValue              Decimal?                                   @map("target_value") @db.Decimal(20, 6)
+  evaluationTypeId         BigInt                                     @map("evaluation_type_id")
+  measurementUnitId        BigInt                                     @map("measurement_unit_id")
+  dataSourceId             BigInt                                     @map("data_source_id")
+  resultSemantics          String?                                    @map("result_semantics") @db.VarChar(40)
+  periodScope              String                                     @default("CURRENT_PERIOD") @map("period_scope") @db.VarChar(40)
+  comparisonMode           String                                     @default("NONE") @map("comparison_mode") @db.VarChar(40)
+  comparisonDirection      String?                                    @map("comparison_direction") @db.VarChar(30)
+  calculationPattern       String?                                    @map("calculation_pattern") @db.VarChar(40)
+  calculationTemplate      String?                                    @map("calculation_template") @db.VarChar(40)
+  evaluationScope          String                                     @default("OVERALL") @map("evaluation_scope") @db.VarChar(30)
+  goalType                 String                                     @default("SINGLE_VALUE") @map("goal_type") @db.VarChar(30)
+  goalAssignment           String?                                    @map("goal_assignment") @db.VarChar(40)
+  goalUnitId               BigInt                                     @map("goal_unit_id")
+  resultMethod             String                                     @default("DIRECT") @map("result_method") @db.VarChar(40)
+  goalMode                 String                                     @default("SINGLE") @map("goal_mode") @db.VarChar(30)
+  targetKind               String?                                    @map("target_kind") @db.VarChar(30)
+  rangeMinValue            Decimal?                                   @map("range_min_value") @db.Decimal(20, 6)
+  rangeMaxValue            Decimal?                                   @map("range_max_value") @db.Decimal(20, 6)
+  subjectType              String?                                    @map("subject_type") @db.VarChar(30)
+  groupGoalValue           Decimal?                                   @map("group_goal_value") @db.Decimal(20, 6)
+  groupGoalUnitId          BigInt?                                    @map("group_goal_unit_id")
+  groupGoalLabel           String?                                    @map("group_goal_label") @db.VarChar(200)
+  scoringMethod            String?                                    @map("scoring_method") @db.VarChar(40)
+  scoringRuleConfig        Json?                                      @map("scoring_rule_config")
+  scoringRuleConfigVersion Int?                                       @map("scoring_rule_config_version") @db.UnsignedInt
+  negativeResultPolicy     String?                                    @map("negative_result_policy") @db.VarChar(20)
+  scoringApprovalStatus    String                                     @default("BLOCKED") @map("scoring_approval_status") @db.VarChar(30)
+  effectiveFrom            DateTime                                   @map("effective_from") @db.Date
+  effectiveTo              DateTime?                                  @map("effective_to") @db.Date
+  changeReason             String?                                    @map("change_reason") @db.VarChar(500)
+  createdAt                DateTime                                   @default(now()) @map("created_at") @db.DateTime(3)
+  createdByUserId          BigInt?                                    @map("created_by_user_id")
+  updatedAt                DateTime?                                  @map("updated_at") @db.DateTime(3)
+  updatedByUserId          BigInt?                                    @map("updated_by_user_id")
+  configuration            KpiConfiguration                           @relation(fields: [kpiConfigurationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_configuration")
+  evaluationType           EvaluationType                             @relation(fields: [evaluationTypeId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_evaluation_type")
+  measurementUnit          MeasurementUnit                            @relation("RevisionMeasurementUnit", fields: [measurementUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_measurement_unit")
+  goalUnit                 MeasurementUnit                            @relation("RevisionGoalUnit", fields: [goalUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_goal_unit")
+  groupGoalUnit            MeasurementUnit?                           @relation("RevisionGroupGoalUnit", fields: [groupGoalUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_group_goal_unit")
+  dataSource               DataSource                                 @relation("RevisionDataSource", fields: [dataSourceId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_configuration_revisions_data_source")
+  thresholds               KpiConfigurationRevisionThreshold[]
+  subjectGoals             KpiConfigurationRevisionSubjectGoal[]
+  subjects                 KpiConfigurationRevisionSubject[]
+  measurementInputs        KpiConfigurationRevisionMeasurementInput[]
 
   @@unique([kpiConfigurationId, revisionNumber], map: "uq_kpi_configuration_revision_number")
   @@index([kpiConfigurationId, effectiveFrom, effectiveTo], map: "ix_kpi_configuration_revisions_effective_lookup")
   @@index([evaluationTypeId], map: "ix_kpi_configuration_revisions_evaluation_type")
   @@index([measurementUnitId], map: "ix_kpi_configuration_revisions_measurement_unit")
+  @@index([goalUnitId], map: "ix_kpi_configuration_revisions_goal_unit")
+  @@index([groupGoalUnitId], map: "ix_kpi_configuration_revisions_group_goal_unit")
   @@index([dataSourceId], map: "ix_kpi_configuration_revisions_data_source")
   @@map("kpi_configuration_revisions")
+}
+
+model KpiConfigurationRevisionSubject {
+  id                         BigInt                   @id @default(autoincrement()) @map("kpi_configuration_revision_subject_id")
+  kpiConfigurationRevisionId BigInt                   @map("kpi_configuration_revision_id")
+  subjectType                String                   @map("subject_type") @db.VarChar(30)
+  subjectExternalId          String                   @map("subject_external_id") @db.VarChar(100)
+  subjectCodeSnapshot        String?                  @map("subject_code_snapshot") @db.VarChar(100)
+  subjectLabelSnapshot       String                   @map("subject_label_snapshot") @db.VarChar(200)
+  displayOrder               Int                      @default(1) @map("display_order") @db.SmallInt
+  createdAt                  DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
+  revision                   KpiConfigurationRevision @relation(fields: [kpiConfigurationRevisionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_revision_subjects_revision")
+
+  @@unique([kpiConfigurationRevisionId, subjectType, subjectExternalId], map: "uq_kpi_revision_subject")
+  @@index([kpiConfigurationRevisionId, displayOrder], map: "ix_kpi_revision_subjects_order")
+  @@map("kpi_configuration_revision_subjects")
+}
+
+model KpiConfigurationRevisionMeasurementInput {
+  id                         BigInt                   @id @default(autoincrement()) @map("kpi_configuration_revision_measurement_input_id")
+  kpiConfigurationRevisionId BigInt                   @map("kpi_configuration_revision_id")
+  inputName                  String                   @map("input_name") @db.VarChar(160)
+  inputUnitId                BigInt                   @map("input_unit_id")
+  description                String?                  @db.VarChar(500)
+  displayOrder               Int                      @default(1) @map("display_order") @db.SmallInt
+  createdAt                  DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
+  revision                   KpiConfigurationRevision @relation(fields: [kpiConfigurationRevisionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_revision_measurement_inputs_revision")
+  inputUnit                  MeasurementUnit          @relation(fields: [inputUnitId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_kpi_revision_measurement_inputs_unit")
+
+  @@index([kpiConfigurationRevisionId, displayOrder], map: "ix_kpi_revision_measurement_inputs_order")
+  @@index([inputUnitId], map: "ix_kpi_revision_measurement_inputs_unit")
+  @@map("kpi_configuration_revision_measurement_inputs")
+}
+
+model KpiConfigurationRevisionSubjectGoal {
+  id                         BigInt                   @id @default(autoincrement()) @map("kpi_configuration_revision_subject_goal_id")
+  kpiConfigurationRevisionId BigInt                   @map("kpi_configuration_revision_id")
+  subjectType                String                   @map("subject_type") @db.VarChar(30)
+  subjectExternalId          String                   @map("subject_external_id") @db.VarChar(100)
+  subjectCodeSnapshot        String?                  @map("subject_code_snapshot") @db.VarChar(100)
+  subjectLabelSnapshot       String                   @map("subject_label_snapshot") @db.VarChar(200)
+  goalValue                  Decimal                  @map("goal_value") @db.Decimal(20, 6)
+  displayOrder               Int                      @default(1) @map("display_order") @db.SmallInt
+  createdAt                  DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
+  revision                   KpiConfigurationRevision @relation(fields: [kpiConfigurationRevisionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_revision_subject_goals_revision")
+
+  @@unique([kpiConfigurationRevisionId, subjectType, subjectExternalId], map: "uq_kpi_revision_subject_goal")
+  @@index([kpiConfigurationRevisionId, displayOrder], map: "ix_kpi_revision_subject_goals_order")
+  @@map("kpi_configuration_revision_subject_goals")
 }
 
 model KpiConfigurationRevisionThreshold {

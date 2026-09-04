@@ -1,4 +1,4 @@
-import type { KpiConfigInput, KpiConfigRecord } from "./kpi-config.types";
+import type { KpiConfigInput, KpiConfigLookups, KpiConfigRecord } from "./kpi-config.types";
 import { apiRequest } from "../../api/http-client";
 
 let configurations: KpiConfigRecord[] = [
@@ -63,13 +63,6 @@ let configurations: KpiConfigRecord[] = [
 
 const wait = () => new Promise((resolve) => window.setTimeout(resolve, 220));
 
-const determineEvaluationType = (name: string) => {
-  const normalizedName = name.toLowerCase();
-  return /(daño|incidente|costo|tiempo|error|reduc)/.test(normalizedName)
-    ? "Lower is better"
-    : "Higher is better";
-};
-
 export const kpiConfigMockService = {
   async list() {
     await wait();
@@ -91,7 +84,7 @@ export const kpiConfigMockService = {
     const nextId = Math.max(0, ...configurations.map((config) => config.id)) + 1;
     const created: KpiConfigRecord = {
       ...input,
-      evaluationType: determineEvaluationType(definition.name),
+      evaluationType: input.evaluationTypeCode === "LOWER_IS_BETTER" ? "Lower is better" : "Higher is better",
       id: nextId,
       code: `KPC-${String(input.definitionId).padStart(3, "0")}-${String(nextId).padStart(3, "0")}`,
       definitionCode: definition.code,
@@ -121,7 +114,7 @@ export const kpiConfigMockService = {
       ...input,
       definitionCode: definition.code,
       definitionName: definition.name,
-      evaluationType: determineEvaluationType(definition.name),
+      evaluationType: input.evaluationTypeCode === "LOWER_IS_BETTER" ? "Lower is better" : "Higher is better",
       updatedAt: new Date().toISOString(),
       updatedBy: "Carlos Gomez",
     };
@@ -163,6 +156,7 @@ export const kpiConfigMockService = {
 const envelope = <T>(path: string, init?: RequestInit) => apiRequest<{ data: T }>(path, init).then((response) => response.data);
 
 export const kpiConfigService = {
+  lookups() { return envelope<KpiConfigLookups>("/v1/kpi-configurations/lookups"); },
   async list(): Promise<KpiConfigRecord[]> {
     const response = await apiRequest<{ data: KpiConfigRecord[] }>("/v1/kpi-configurations?page=1&pageSize=100");
     return response.data;

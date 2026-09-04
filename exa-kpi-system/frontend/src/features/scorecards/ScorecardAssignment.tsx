@@ -143,7 +143,6 @@ export function ScorecardAssignment() {
   const scopeModalDragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   const selectorRef = useRef<HTMLDivElement>(null);
   const selectorUserEditedRef = useRef(false);
-  const selectedScorecardLabel = scorecardQuery.data ? `${scorecardQuery.data.code} · ${scorecardQuery.data.name}` : "";
   const normalizeSelectorText = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[.·—–_-]+/g, " ").replace(/\s+/g, " ").trim();
   const selectorResults = useMemo(() => {
     const selectedLabel = scorecardQuery.data ? `${scorecardQuery.data.code} · ${scorecardQuery.data.name}` : "";

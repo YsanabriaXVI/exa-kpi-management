@@ -11,6 +11,19 @@ const candidates = [
 ] as const;
 
 describe("Definition Assist Autosuggest ranking", () => {
+  it("keeps a business KPI whose description legitimately mentions collaborators", () => {
+    const ranked = rankAutosuggestCandidates("Cumplimento de metas de proyectos", [{
+      id: "63", code: "KPI-115", name: "Cumplimiento de proyectos del período actual (por características)",
+      description: "Observar la aportación de cada colaborador al alcanzar la meta.",
+    }]);
+    expect(ranked[0]).toMatchObject({ id: "63", matchType: "RELATED" });
+  });
+
+  it("recognizes a newly created KPI through a single-token typo", () => {
+    const ranked = rankAutosuggestCandidates("Cumplimento", [{ id: "63", code: "KPI-115", name: "Cumplimiento", description: "Business KPI" }]);
+    expect(ranked[0]).toMatchObject({ id: "63" });
+    expect(ranked[0]?.similarityScore).toBeGreaterThanOrEqual(65);
+  });
   it("treats normalized accents, case and punctuation as an exact match", () => {
     expect(calculateSimilarity("CÓSTO por KM — Cabezales", "costo por km - cabezales")).toBe(100);
   });

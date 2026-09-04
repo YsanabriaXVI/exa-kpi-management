@@ -41,13 +41,14 @@ function eligibilityReason(configuration: KpiManagementConfiguration, frequencyI
   if (!configuration.definitionIsActive) return "KPI_DEFINITION_INACTIVE";
   if (!configuration.inputFrequencyIsActive) return "INPUT_FREQUENCY_INACTIVE";
   if (configuration.inputFrequencyId !== frequencyId.toString()) return "FREQUENCY_MISMATCH";
+  if (configuration.executability && !configuration.executability.executable) return configuration.executability.reasons[0]?.code ?? "KPI_CONFIGURATION_NOT_EXECUTABLE";
 }
 
 function throwEligibility(reason: string, configuration: KpiManagementConfiguration): never {
   throw new AppError(422, reason, `${configuration.configCode} is not eligible for this Pool`, { configurationId: configuration.id });
 }
 
-function membershipDto(value: KpiPoolKpi, configuration?: KpiManagementConfiguration) {
+function membershipDto(value: KpiPoolKpi, configuration?: KpiManagementConfiguration, effectiveGoal?: string | null) {
   return {
     membershipId: value.id.toString(), id: value.kpiConfigurationExternalId.toString(), configurationId: value.kpiConfigurationExternalId.toString(),
     definitionId: value.kpiDefinitionExternalId.toString(), configCode: value.configurationCodeSnapshot,
@@ -55,10 +56,56 @@ function membershipDto(value: KpiPoolKpi, configuration?: KpiManagementConfigura
     inputFrequencyId: value.inputFrequencyExternalIdSnapshot.toString(), inputFrequencyCode: value.inputFrequencyCodeSnapshot,
     displayOrder: value.displayOrder, isRequired: value.isRequired,
     effectiveFrom: formatDateOnly(value.effectiveFrom), effectiveTo: value.effectiveTo ? formatDateOnly(value.effectiveTo) : null,
-    categoryName: configuration?.categoryName ?? null, goal: configuration?.goal ?? null,
+    categoryName: configuration?.categoryName ?? null, goal: effectiveGoal ?? configuration?.goal ?? null,
     measurementUnit: configuration?.measurementUnit ?? null, dataSource: configuration?.dataSource ?? null,
     isActive: configuration?.isActive ?? true,
   };
+}
+
+async function effectiveGoalsForPeriod(
+  poolId: bigint,
+  period: InputPeriod,
+  memberships: KpiPoolKpi[],
+) {
+  if (!memberships.length) return new Map<string, string>();
+  const effectiveGoals = new Map<string, string>();
+  const globalSnapshots = await Promise.all(
+    memberships.map((membership) =>
+      kpiManagementClient.effectiveSnapshot(
+        membership.kpiConfigurationExternalId.toString(),
+        formatDateOnly(period.start),
+        formatDateOnly(period.end),
+      ),
+    ),
+  );
+  memberships.forEach((membership, index) => {
+    const goal = globalSnapshots[index]?.goal;
+    if (goal !== null && goal !== undefined)
+      effectiveGoals.set(membership.id.toString(), goal);
+  });
+  const inputPeriod = await prisma.kpiPoolInputPeriod.findUnique({
+    where: {
+      kpiPoolId_periodStart: { kpiPoolId: poolId, periodStart: period.start },
+    },
+    select: { id: true },
+  });
+  if (!inputPeriod) return effectiveGoals;
+  const overrides = await prisma.kpiPoolPeriodConfigurationOverride.findMany({
+    where: {
+      inputPeriodId: inputPeriod.id,
+      poolMembershipId: { in: memberships.map((membership) => membership.id) },
+      fieldCode: "GOAL",
+      activeKey: "ACTIVE",
+    },
+    select: { poolMembershipId: true, overrideValue: true },
+  });
+  overrides.forEach((override) =>
+    effectiveGoals.set(
+      override.poolMembershipId.toString(),
+      String(override.overrideValue),
+    ),
+  );
+  return effectiveGoals;
 }
 
 function periodDto(period: InputPeriod) { return { start: formatDateOnly(period.start), end: formatDateOnly(period.end) }; }
@@ -210,9 +257,9 @@ export const kpiPoolMembershipService = {
   },
 
   async usage(configurationIds: string[]) {
-    const memberships = await prisma.kpiPoolKpi.findMany({ where: { kpiConfigurationExternalId: { in: configurationIds.map(BigInt) }, pool: { deletedAt: null } }, select: { kpiConfigurationExternalId: true, pool: { select: { id: true, poolCode: true, poolName: true, statusCode: true } } }, orderBy: [{ kpiConfigurationExternalId: "asc" }, { kpiPoolId: "asc" }] });
-    const grouped = new Map<string, Array<{ id: string; code: string; name: string; status: string }>>();
-    for (const item of memberships) { const key = item.kpiConfigurationExternalId.toString(); const pools = grouped.get(key) ?? []; if (!pools.some((pool) => pool.id === item.pool.id.toString())) pools.push({ id: item.pool.id.toString(), code: item.pool.poolCode, name: item.pool.poolName, status: item.pool.statusCode }); grouped.set(key, pools); }
+    const memberships = await prisma.kpiPoolKpi.findMany({ where: { kpiConfigurationExternalId: { in: configurationIds.map(BigInt) }, pool: { deletedAt: null } }, select: { kpiConfigurationExternalId: true, pool: { select: { id: true, poolCode: true, poolName: true, statusCode: true, validTo: true } } }, orderBy: [{ kpiConfigurationExternalId: "asc" }, { kpiPoolId: "asc" }] });
+    const grouped = new Map<string, Array<{ id: string; code: string; name: string; status: string; validTo: string }>>();
+    for (const item of memberships) { const key = item.kpiConfigurationExternalId.toString(); const pools = grouped.get(key) ?? []; if (!pools.some((pool) => pool.id === item.pool.id.toString())) pools.push({ id: item.pool.id.toString(), code: item.pool.poolCode, name: item.pool.poolName, status: item.pool.statusCode, validTo: formatDateOnly(item.pool.validTo) }); grouped.set(key, pools); }
     return { data: configurationIds.map((configurationId) => ({ configurationId, usedIn: grouped.get(configurationId)?.length ?? 0, pools: grouped.get(configurationId) ?? [] })) };
   },
 
@@ -222,7 +269,8 @@ export const kpiPoolMembershipService = {
     const rows = await prisma.kpiPoolKpi.findMany({ where: effectiveWhere(poolId, period), orderBy: [{ displayOrder: "asc" }, { id: "asc" }] });
     const lookup = rows.length ? await kpiManagementClient.batchLookup(rows.map((row) => row.kpiConfigurationExternalId.toString())) : { data: [], notFoundIds: [] };
     const configurations = new Map(lookup.data.map((configuration) => [configuration.id, configuration]));
-    return { data: rows.map((row) => membershipDto(row, configurations.get(row.kpiConfigurationExternalId.toString()))), meta: { targetPeriod: periodDto(period) } };
+    const effectiveGoals = await effectiveGoalsForPeriod(poolId, period, rows);
+    return { data: rows.map((row) => membershipDto(row, configurations.get(row.kpiConfigurationExternalId.toString()), effectiveGoals.get(row.id.toString()))), meta: { targetPeriod: periodDto(period) } };
   },
 
   async add(poolId: bigint, input: AddKpiPoolConfigurationsBody, actor: bigint) {
@@ -314,12 +362,14 @@ export const kpiPoolMembershipService = {
     const effective = await prisma.kpiPoolKpi.findMany({ where: effectiveWhere(poolId, period) });
     const configurations = new Map(effective.map((row) => [row.kpiConfigurationExternalId.toString(), row]));
     const definitions = new Map(effective.map((row) => [row.kpiDefinitionExternalId.toString(), row]));
+    const effectiveGoals = await effectiveGoalsForPeriod(poolId, period, effective);
     return { data: catalog.data.map((configuration) => {
       let availability = "AVAILABLE_TO_ADD"; let reasonCode: string | null = null; let conflict: string | null = null;
       if (configurations.has(configuration.id)) availability = "ALREADY_IN_POOL";
       else if (definitions.has(configuration.definitionId)) { availability = "NOT_AVAILABLE"; reasonCode = "KPI_DEFINITION_ALREADY_EFFECTIVE"; conflict = definitions.get(configuration.definitionId)!.configurationCodeSnapshot; }
       else { reasonCode = eligibilityReason(configuration, pool.inputFrequencyExternalId) ?? null; if (reasonCode) availability = "NOT_AVAILABLE"; }
-      return { ...configuration, availability, reasonCode, conflictingConfigurationCode: conflict };
+      const membership = configurations.get(configuration.id);
+      return { ...configuration, goal: membership ? effectiveGoals.get(membership.id.toString()) ?? configuration.goal : configuration.goal, availability, reasonCode, conflictingConfigurationCode: conflict };
     }), meta: { ...catalog.meta, targetPeriod: periodDto(period), configurationStatus: "EDITABLE", editabilitySource: "CONSERVATIVE_FUTURE_ONLY" } };
   },
 

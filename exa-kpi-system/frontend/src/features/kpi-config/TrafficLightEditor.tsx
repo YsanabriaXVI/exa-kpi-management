@@ -4,11 +4,12 @@ type TrafficLightEditorProps = {
   value: TrafficLightRanges;
   onChange: (ranges: TrafficLightRanges) => void;
   disabled?: boolean;
+  stepNumber?: number;
 };
 
 const clamp = (value: number) => Math.min(100, Math.max(0, value));
 
-export function TrafficLightEditor({ value, onChange, disabled = false }: TrafficLightEditorProps) {
+export function TrafficLightEditor({ value, onChange, disabled = false, stepNumber = 5 }: TrafficLightEditorProps) {
   const updateBox = (field: keyof TrafficLightRanges, raw: string) => {
     const next = clamp(Number(raw) || 0);
     onChange({ ...value, [field]: next });
@@ -49,13 +50,13 @@ export function TrafficLightEditor({ value, onChange, disabled = false }: Traffi
     <section className="traffic-editor">
       <div className="traffic-heading">
         <div className="traffic-heading-title">
-          <span className="step-number">3</span>
+          <span className="step-number">{stepNumber}</span>
           <div>
             <h2>Traffic Light</h2>
-            <p>Edit the six values or drag either handle on the visual range.</p>
+            <p>Scoring thresholds for supported evaluation methods. Runtime compatibility is validated separately.</p>
           </div>
         </div>
-        <span>Score scale: 0–100</span>
+        <span>Legacy thresholds · Step {stepNumber} review</span>
       </div>
 
       <div className="traffic-editor-grid">

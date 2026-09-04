@@ -1,7 +1,7 @@
 import { apiRequest } from "../../api/http-client";
 import type {
   CreateKpiDefinitionInput, KpiCategory, KpiDefinition, KpiDefinitionListParams,
-  KpiDefinitionConfigurationsResponse, LegacyKpiDefinitionOption, PaginatedResponse, UpdateKpiDefinitionInput,
+  AnalyzerResponse, KpiDefinitionConfigurationsResponse, KpiDefinitionSuggestionsResponse, LegacyKpiDefinitionOption, PaginatedResponse, UpdateKpiDefinitionInput,
 } from "./kpi-definition.types";
 
 const envelope = <T>(path: string, init?: RequestInit) => apiRequest<{ data: T }>(path, init).then((response) => response.data);
@@ -12,6 +12,8 @@ export const kpiDefinitionKeys = {
   detail: (id: string) => [...kpiDefinitionKeys.all, "detail", id] as const,
   configurations: (id: string, page = 1) => [...kpiDefinitionKeys.detail(id), "configurations", page] as const,
   search: (term: string) => [...kpiDefinitionKeys.all, "search", term] as const,
+  suggestions: (term: string, limit: number) => [...kpiDefinitionKeys.all, "suggestions", term, limit] as const,
+  analysis: (name: string) => [...kpiDefinitionKeys.all, "analysis", name] as const,
   categories: ["kpi-categories"] as const,
 };
 
@@ -31,6 +33,13 @@ export const kpiDefinitionService = {
     return apiRequest<KpiDefinitionConfigurationsResponse>(`/v1/kpi-definitions/${id}/configurations?page=${page}&pageSize=${pageSize}`);
   },
   listCategories() { return envelope<KpiCategory[]>("/v1/kpi-categories"); },
+  suggestions(queryText: string, limit = 6, signal?: AbortSignal) {
+    const query = new URLSearchParams({ q: queryText, limit: String(limit) });
+    return envelope<KpiDefinitionSuggestionsResponse>(`/v1/kpi-definitions/suggestions?${query}`, { signal });
+  },
+  analyze(name: string, signal?: AbortSignal) {
+    return envelope<AnalyzerResponse>("/v1/kpi-definitions/analyze", { method: "POST", body: JSON.stringify({ name }), signal });
+  },
   create(input: CreateKpiDefinitionInput) {
     return envelope<KpiDefinition>("/v1/kpi-definitions", { method: "POST", body: JSON.stringify(input) });
   },

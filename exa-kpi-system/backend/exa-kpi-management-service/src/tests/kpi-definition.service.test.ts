@@ -34,7 +34,7 @@ describe("kpiDefinitionService", () => {
     expect(db.kpiDefinition.findMany).toHaveBeenCalledWith({
       where: { deletedAt: null, isActive: true, statusCode: "ACTIVE" },
       select: { id: true, kpiCode: true, kpiName: true, description: true },
-      orderBy: [{ kpiCode: "asc" }, { id: "asc" }],
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 500,
     });
     expect(result).toMatchObject({ query: "costo por km cabezales", normalizedQuery: "costo por km cabezales" });

@@ -1,10 +1,26 @@
 export type PoolStatus = "DRAFT" | "ACTIVE" | "INACTIVE";
 
-export type PoolLookup = { id: string; code: string; name: string; displayOrder: number };
-export type PoolLookups = { areas: PoolLookup[]; companies: PoolLookup[]; inputFrequencies: PoolLookup[] };
+export type PoolLookup = {
+  id: string;
+  code: string;
+  name: string;
+  displayOrder: number;
+};
+export type PoolLookups = {
+  areas: PoolLookup[];
+  companies: PoolLookup[];
+  inputFrequencies: PoolLookup[];
+};
 export type PoolListParams = {
-  page: number; pageSize: number; search?: string; status?: string[]; companyId?: string[];
-  inputFrequencyId?: string[]; issueYear?: string[]; sortBy: string; sortOrder: "asc" | "desc";
+  page: number;
+  pageSize: number;
+  search?: string;
+  status?: string[];
+  companyId?: string[];
+  inputFrequencyId?: string[];
+  issueYear?: string[];
+  sortBy: string;
+  sortOrder: "asc" | "desc";
 };
 
 export type PoolKpi = {
@@ -34,18 +50,31 @@ export type PoolInputPeriod = {
   periodKey: string;
   start: string;
   end: string;
-  configurationStatus: "EDITABLE" | "POOL_COMPOSITION_LOCKED" | "FUTURE_NOT_AVAILABLE";
+  configurationStatus:
+    "EDITABLE" | "POOL_COMPOSITION_LOCKED" | "FUTURE_NOT_AVAILABLE";
   canEditComposition: boolean;
   canFinalizeComposition: boolean;
-  workflowStatus: "EDITABLE" | "FINALIZED" | "FUTURE";
+  workflowStatus: "EDITABLE" | "FINALIZED" | "FUTURE" | "CLOSED";
   dependency: {
     canFinalize: boolean;
     previousPeriodStart: string | null;
-    previousMonitoringStatus: "NOT_REQUIRED" | "UNKNOWN" | "OPEN" | "PENDING" | "CLOSED" | "CLOSED_WITH_APPROVED_EXCEPTION";
-    reasonCode: "PREVIOUS_INPUT_PERIOD_NOT_CLOSED" | "MONITORING_INTEGRATION_PENDING" | null;
+    previousMonitoringStatus:
+      | "NOT_REQUIRED"
+      | "UNKNOWN"
+      | "OPEN"
+      | "PENDING"
+      | "CLOSED"
+      | "CLOSED_WITH_APPROVED_EXCEPTION";
+    reasonCode:
+      | "PREVIOUS_INPUT_PERIOD_NOT_CLOSED"
+      | "MONITORING_INTEGRATION_PENDING"
+      | null;
   };
 };
-export type PoolInputPeriods = { data: PoolInputPeriod[]; meta: { defaultPeriodStart: string | null; editabilitySource: string } };
+export type PoolInputPeriods = {
+  data: PoolInputPeriod[];
+  meta: { defaultPeriodStart: string | null; editabilitySource: string };
+};
 
 export type PoolScorecard = {
   code: string;
@@ -74,19 +103,21 @@ export type KpiPoolRecord = {
   status: PoolStatus;
   kpiCount?: number;
   scorecardCount?: number;
-  operationalPeriod?: { periodKey: string; start: string; end: string; status: "FINALIZED" | "PREPARING"; kpiCount: number | null; next: { periodKey: string; start: string; status: "PREPARING" } | null } | null;
+  operationalPeriod?: {
+    periodKey: string;
+    start: string;
+    end: string;
+    status: "FINALIZED" | "PREPARING";
+    kpiCount: number | null;
+    next: { periodKey: string; start: string; status: "PREPARING" } | null;
+  } | null;
   kpis: PoolKpi[];
   scorecards: PoolScorecard[];
 };
 
 export type KpiPoolInput = Pick<
   KpiPoolRecord,
-  | "name"
-  | "companies"
-  | "frequency"
-  | "validFrom"
-  | "validTo"
-  | "description"
+  "name" | "companies" | "frequency" | "validFrom" | "validTo" | "description"
 > & {
   companyIds: string[];
   poolAreaIds: string[];

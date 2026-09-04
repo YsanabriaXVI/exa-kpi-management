@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { freezeEffectiveKpiSettings } from "../contracts/frozen-effective-kpi-settings.js";
 import { kpiPoolClient } from "../clients/kpi-pool.client.js";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
@@ -378,7 +379,8 @@ export const scorecardCompositionService = {
     return prisma.$transaction(async (tx) => {
       for (const row of current.kpis) {
         const resolved = resolvedSettings.get(row.id.toString())!;
-        await tx.scorecardPeriodKpi.update({ where: { id: row.id }, data: { kpiConfigurationRevisionExternalId: BigInt(resolved.effective.kpiConfigurationRevisionId), goalSnapshot: resolved.effective.goal, effectiveSettingsSnapshot: resolved.effective as Prisma.InputJsonValue, settingsProvenanceSnapshot: resolved.sources as Prisma.InputJsonValue } });
+        const frozen=freezeEffectiveKpiSettings(resolved.effective);
+        await tx.scorecardPeriodKpi.update({ where: { id: row.id }, data: { kpiConfigurationRevisionExternalId: BigInt(resolved.effective.kpiConfigurationRevisionId), goalSnapshot: resolved.effective.goal, effectiveSettingsSnapshot: frozen as Prisma.InputJsonValue, settingsProvenanceSnapshot: resolved.sources as Prisma.InputJsonValue } });
       }
       const changed = await tx.scorecardPeriodComposition.updateMany({ where: { id: current.id, statusCode: "PREPARING" }, data: { statusCode: "FINALIZED", finalizedAt: new Date(), finalizedByUserId: actor, updatedByUserId: actor } });
       if (!changed.count) throw new AppError(409, "SCORECARD_COMPOSITION_ALREADY_FINALIZED", "The composition is no longer editable");

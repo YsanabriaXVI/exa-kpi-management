@@ -2,6 +2,7 @@ import type { NextFunction,Request,Response } from "express";
 import { batchLookupKpiConfigurationsBodySchema,effectiveKpiConfigurationSnapshotsBodySchema,internalKpiConfigurationCatalogQuerySchema,kpiConfigurationBodySchema,kpiConfigurationIdParamsSchema,listKpiConfigurationsQuerySchema } from "../schemas/kpi-configuration.schema.js";
 import { kpiConfigurationService } from "../services/kpi-configuration.service.js";
 export async function listKpiConfigurations(req:Request,res:Response,next:NextFunction){try{res.json(await kpiConfigurationService.list(listKpiConfigurationsQuerySchema.parse(req.query)));}catch(e){next(e)}}
+export async function listKpiConfigurationLookups(_req:Request,res:Response,next:NextFunction){try{res.json({data:await kpiConfigurationService.lookups()});}catch(e){next(e)}}
 export async function batchLookupKpiConfigurations(req:Request,res:Response,next:NextFunction){try{res.json(await kpiConfigurationService.batchLookup(batchLookupKpiConfigurationsBodySchema.parse(req.body)));}catch(e){next(e)}}
 export async function listInternalKpiConfigurationCatalog(req:Request,res:Response,next:NextFunction){try{res.json(await kpiConfigurationService.internalCatalog(internalKpiConfigurationCatalogQuerySchema.parse(req.query)));}catch(e){next(e)}}
 export async function effectiveKpiConfigurationSnapshots(req:Request,res:Response,next:NextFunction){try{res.json(await kpiConfigurationService.effectiveSnapshots(effectiveKpiConfigurationSnapshotsBodySchema.parse(req.body)));}catch(e){next(e)}}

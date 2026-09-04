@@ -1,5 +1,6 @@
 import { env } from "../config/env.js";
 import { AppError } from "../utils/app-error.js";
+import { parseEffectiveKpiSettings } from "../contracts/frozen-effective-kpi-settings.js";
 
 export type PoolRecord = { id: string; poolCode: string; poolName: string; status: string; issueYear: number; validFrom: string; validTo: string; inputFrequency: { id: string; code: string }; companies: Array<{ id: string; code: string; name: string }>; areas: Array<{ id: string; code: string; name: string }> };
 export type PoolPeriod = { poolPeriodId: string | null; poolCompositionId: string | null; periodKey: string; start: string; end: string; workflowStatus: string };
@@ -30,7 +31,8 @@ async function request<T>(path: string): Promise<T> {
 
 export const kpiPoolClient = {
   async effectiveSettings(poolId: string, inputPeriodId: string, configurationId: string) {
-    return (await request<{ data: { global: Record<string, unknown>; effective: Record<string, unknown> & { kpiConfigurationRevisionId: string; goal: string|null }; sources: Record<string,string>; poolMembershipId: string } }>(`/api/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/effective-settings`)).data;
+    const data=(await request<{ data: { global: unknown; effective: unknown; sources: Record<string,string>; poolMembershipId: string } }>(`/api/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/effective-settings`)).data;
+    return {...data,effective:parseEffectiveKpiSettings(data.effective)};
   },
   async getPool(id: string) { return (await request<{ data: PoolRecord }>(`/api/v1/kpi-pools/${id}`)).data; },
   async periods(id: string) { return (await request<{ data: PoolPeriod[] }>(`/api/v1/kpi-pools/${id}/input-periods`)).data; },

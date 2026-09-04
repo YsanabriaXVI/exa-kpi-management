@@ -33,6 +33,7 @@ export function KpiConfigOverview() {
   const [selectedConfigIds, setSelectedConfigIds] = useState<number[]>([]);
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<KpiConfigRecord | null>(null);
+  const [goalDetailConfig, setGoalDetailConfig] = useState<KpiConfigRecord | null>(null);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<{ key: ConfigSortKey; direction: SortDirection }>({
     key: "code",
@@ -162,6 +163,8 @@ export function KpiConfigOverview() {
             <SortableTableHeader active={sort.key === "trafficLight"} direction={sort.direction} onSort={() => sortBy("trafficLight")}>Traffic Light</SortableTableHeader>
             <SortableTableHeader active={sort.key === "usedIn"} direction={sort.direction} onSort={() => sortBy("usedIn")}>Used In</SortableTableHeader>
             <SortableTableHeader active={sort.key === "status"} direction={sort.direction} onSort={() => sortBy("status")}>Status</SortableTableHeader>
+            <SortableTableHeader active={sort.key === "createdAt"} direction={sort.direction} onSort={() => sortBy("createdAt")}>Created At</SortableTableHeader>
+            <SortableTableHeader active={sort.key === "updatedAt"} direction={sort.direction} onSort={() => sortBy("updatedAt")}>Updated At</SortableTableHeader>
             <th>Actions</th>
           </tr></thead>
           <tbody>{paginated.length ? paginated.map((config) => (
@@ -169,12 +172,14 @@ export function KpiConfigOverview() {
               <td className="config-selection-column"><button type="button" className={`config-row-checkbox ${selectedConfigIds.includes(config.id) ? "checked" : ""}`} disabled={config.status !== "CONFIGURED"} title={config.status === "CONFIGURED" ? "Select KPI Configuration" : "Only configured and active KPIs can be sent to a Pool"} onClick={(event) => { event.stopPropagation(); toggleConfiguration(config.id); }} aria-label={`Select ${config.code}`}>{selectedConfigIds.includes(config.id) && <Check size={13} />}</button></td>
               <td>{config.status === "INCOMPLETE" ? <span className="pending-value">Not assigned</span> : <span className="code-pill">{config.code}</span>}</td>
               <td><strong>{config.definitionCode}</strong><small>{config.definitionName}</small></td>
-              <td>{config.status === "INCOMPLETE" ? <span className="pending-value">Pending</span> : config.goal}</td>
+              <td>{config.status === "INCOMPLETE" ? <span className="pending-value">Pending</span> : <GoalOverviewCell config={config} onView={() => setGoalDetailConfig(config)} />}</td>
               <td>{config.measurementUnit || <span className="pending-value">Pending</span>}</td>
               <td>{config.dataSource || <span className="pending-value">Pending</span>}</td>
               <td>{config.status === "INCOMPLETE" ? <span className="pending-value">Not configured</span> : <TrafficDots ranges={config.ranges} />}</td>
               <td>{config.usedIn} {config.usedIn === 1 ? "Pool" : "Pools"}</td>
               <td><span className="config-status-cell"><span className={`config-status ${config.status.toLowerCase()}`}>{formatStatus(config.status)}</span>{config.status === "INCOMPLETE" && <span className="incomplete-help" tabIndex={0} aria-label="Why this KPI is incomplete"><CircleHelp size={15} /><span role="tooltip">This active KPI Definition does not have a KPI Configuration yet. Select Configure KPI to define its goal, unit, data source and traffic-light ranges.</span></span>}</span></td>
+              <td><time dateTime={config.createdAt}>{formatTableDate(config.createdAt)}</time></td>
+              <td><time dateTime={config.updatedAt}>{formatTableDate(config.updatedAt)}</time></td>
               <td><div className="table-actions">
                 <button className="icon-button edit" title={config.status === "INCOMPLETE" ? "Configure KPI" : "Edit KPI"} onClick={(event) => {
                   event.stopPropagation();
@@ -185,7 +190,7 @@ export function KpiConfigOverview() {
                 {config.status !== "INCOMPLETE" && <><button className="icon-button view" title="View details" onClick={(event) => { event.stopPropagation(); navigate(`/app/kpi-management/config/detail-record?kpiConfigId=${config.id}`); }}><Eye size={14} /></button><button className="icon-button delete" title="Delete" aria-label={`Delete ${config.code}`} disabled={deleteMutation.isPending} onClick={(event) => { event.stopPropagation(); setConfigToDelete(config); }}><Trash2 size={14} /></button></>}
               </div></td>
             </tr>
-          )) : <tr><td colSpan={10} className="table-message">No KPI Configurations found.</td></tr>}</tbody>
+          )) : <tr><td colSpan={12} className="table-message">No KPI Configurations found.</td></tr>}</tbody>
         </table>
         <footer className="config-table-footer">
           <span>
@@ -197,8 +202,60 @@ export function KpiConfigOverview() {
       </div>
       {sendModalOpen && <SendToPoolModal configurations={selectedConfigurations} onClose={() => setSendModalOpen(false)} onAssigned={() => setSelectedConfigIds([])} />}
       {configToDelete && <OverviewDeleteConfirmation title="Remove KPI Configuration?" message={`${configToDelete.code} will disappear from the active Overview. Its historical data will remain preserved.`} pending={deleteMutation.isPending} onAccept={() => deleteMutation.mutate(configToDelete.id)} onCancel={() => setConfigToDelete(null)} />}
+      {goalDetailConfig && <SubjectGoalsModal config={goalDetailConfig} onClose={() => setGoalDetailConfig(null)} />}
     </main>
   );
+}
+
+function GoalOverviewCell({ config, onView }: { config: KpiConfigRecord; onView: () => void }) {
+  const mode = config.evaluationScope === "BY_SUBJECT" ? "BY_SUBJECT" : config.goalMode ?? "SINGLE";
+  if (mode === "RANGE") {
+    return <div className="overview-goal-value"><strong>{formatGoal(config.rangeMinGoal ?? 0)}–{formatGoal(config.rangeMaxGoal ?? 0)}</strong><small>{config.measurementUnit}</small></div>;
+  }
+  if (mode === "BY_SUBJECT") {
+    const goals = config.subjectGoals ?? [];
+    const values = goals.map((item) => item.goal);
+    const minimum = values.length ? Math.min(...values) : null;
+    const maximum = values.length ? Math.max(...values) : null;
+    const historical = Boolean(config.periodScope && config.periodScope !== "CURRENT_PERIOD");
+    const unit = config.goalUnit || config.measurementUnit;
+    return <div className="overview-subject-goal">
+      <strong>By {subjectTypeLabel(config.subjectType)} · {goals.length} {goals.length === 1 ? "goal" : "goals"}</strong>
+      <small>{minimum === null ? "No entity goals" : minimum === maximum ? `${formatSignedGoal(minimum, historical)} ${unit}` : `${formatSignedGoal(minimum, historical)}–${formatSignedGoal(maximum!, historical)} ${unit}`}</small>
+      <button type="button" disabled={!goals.length} onClick={(event) => { event.stopPropagation(); onView(); }}>View goals</button>
+    </div>;
+  }
+  const historical = config.periodScope && config.periodScope !== "CURRENT_PERIOD";
+  return <div className="overview-goal-value"><strong>{formatSignedGoal(config.goal, Boolean(historical))}</strong><small>{historical ? "% target change" : config.measurementUnit}</small></div>;
+}
+
+function SubjectGoalsModal({ config, onClose }: { config: KpiConfigRecord; onClose: () => void }) {
+  const historical = config.periodScope && config.periodScope !== "CURRENT_PERIOD";
+  const unit = config.goalUnit || config.measurementUnit;
+  return <div className="subject-goals-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="subject-goals-modal" role="dialog" aria-modal="true" aria-labelledby="subject-goals-title">
+      <header><div><span>{config.code}</span><h2 id="subject-goals-title">Goals by {subjectTypeLabel(config.subjectType)}</h2><p>{config.definitionCode} — {config.definitionName}</p></div><button type="button" aria-label="Close goals" onClick={onClose}><X size={17} /></button></header>
+      <div className="subject-goals-list"><div className="subject-goals-list-head"><span>Entity</span><span>Goal</span></div>{(config.subjectGoals ?? []).map((item) => <div className="subject-goals-list-row" key={item.subjectExternalId}><strong>{item.subjectLabel}</strong><span>{formatSignedGoal(item.goal, Boolean(historical))} {unit}</span></div>)}</div>
+      {config.groupGoal && <div className="overview-group-goal"><span>Group Goal</span><strong>{formatGoal(config.groupGoal.value)} {config.groupGoal.unit}</strong></div>}
+      <footer><span>{config.subjectGoals?.length ?? 0} configured {(config.subjectGoals?.length ?? 0) === 1 ? "entity" : "entities"}</span><button type="button" className="button secondary" onClick={onClose}>Close</button></footer>
+    </section>
+  </div>;
+}
+
+function formatGoal(value: number) {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(value);
+}
+
+function formatTableDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "2-digit" }).format(new Date(value));
+}
+
+function formatSignedGoal(value: number, showPositiveSign: boolean) {
+  return `${showPositiveSign && value > 0 ? "+" : ""}${formatGoal(value)}`;
+}
+
+function subjectTypeLabel(subjectType?: KpiConfigRecord["subjectType"]) {
+  return ({ FLEET: "Fleet", EMPLOYEE: "Collaborator", CUSTOMER: "Customer", LOCATION: "Location", DEPARTMENT: "Department", COMPANY: "Company", OPERATION: "Operation", PROJECT: "Project", ASSET: "Asset / Equipment" } as const)[subjectType ?? "COMPANY"] ?? "Subject";
 }
 
 function findDuplicatedDefinitions(configurations: KpiConfigRecord[]) {
@@ -212,7 +269,7 @@ function findDuplicatedDefinitions(configurations: KpiConfigRecord[]) {
   return [...duplicated.values()];
 }
 
-type ConfigSortKey = "code" | "definition" | "unit" | "goal" | "dataSource" | "trafficLight" | "usedIn" | "status";
+type ConfigSortKey = "code" | "definition" | "unit" | "goal" | "dataSource" | "trafficLight" | "usedIn" | "status" | "createdAt" | "updatedAt";
 
 function statusRank(status: KpiConfigRecord["status"]) {
   return { CONFIGURED: 0, INACTIVE: 1, INCOMPLETE: 2 }[status];
@@ -223,6 +280,10 @@ function configSortValue(config: KpiConfigRecord, key: ConfigSortKey) {
     case "definition": return `${config.definitionCode} ${config.definitionName}`;
     case "unit": return config.measurementUnit;
     case "trafficLight": return config.ranges.redFrom;
+    case "goal": {
+      const subjectValues = config.subjectGoals?.map((item) => item.goal) ?? [];
+      return config.goalMode === "RANGE" ? config.rangeMinGoal ?? 0 : config.goalMode === "BY_SUBJECT" ? (subjectValues.length ? Math.min(...subjectValues) : 0) : config.goal;
+    }
     default: return config[key];
   }
 }
