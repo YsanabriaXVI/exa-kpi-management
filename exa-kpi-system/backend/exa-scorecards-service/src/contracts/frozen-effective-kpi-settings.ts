@@ -1,9 +1,10 @@
+import { historicalFields, historicalContractError } from "./historical-contract.js";
 import { z } from "zod";
 import { AppError } from "../utils/app-error.js";
 
 const executabilitySchema=z.object({capabilityVersion:z.literal("KPI_EXECUTION_V1"),status:z.enum(["EXECUTABLE","BLOCKED"]),executable:z.boolean(),reasons:z.array(z.object({code:z.string(),message:z.string()}))});
 const effectiveSchema=z.object({
-  contractVersion:z.literal("EffectiveKpiSettingsV1"),kpiConfigurationId:z.string(),kpiConfigurationRevisionId:z.string(),revisionNumber:z.number(),configCode:z.string(),
+  contractVersion:z.literal("EffectiveKpiSettingsV1"),...historicalFields,kpiConfigurationId:z.string(),kpiConfigurationRevisionId:z.string(),revisionNumber:z.number(),configCode:z.string(),
   kpiDefinitionId:z.string(),kpiCode:z.string(),kpiName:z.string(),objective:z.string().nullable(),goal:z.string().nullable(),goalMode:z.enum(["SINGLE","RANGE","BY_SUBJECT"]),
   evaluationScope:z.enum(["OVERALL","BY_SUBJECT"]),goalUnit:z.object({id:z.string(),code:z.string(),name:z.string(),symbol:z.string()}),measurementUnit:z.object({id:z.string(),code:z.string(),name:z.string(),symbol:z.string()}),
   subjectType:z.string().nullable(),subjects:z.array(z.object({subjectExternalId:z.string(),subjectCode:z.string().nullable(),subjectLabel:z.string()})),subjectGoals:z.array(z.object({subjectExternalId:z.string(),subjectCode:z.string().nullable(),subjectLabel:z.string(),goal:z.string().nullable()})),
@@ -11,5 +12,5 @@ const effectiveSchema=z.object({
 }).passthrough();
 export type EffectiveKpiSettingsV1=z.infer<typeof effectiveSchema>;
 export type FrozenEffectiveKpiSettingsV1=Omit<EffectiveKpiSettingsV1,"contractVersion">&{contractVersion:"FrozenEffectiveKpiSettingsV1"};
-export function parseEffectiveKpiSettings(value:unknown):EffectiveKpiSettingsV1 { const parsed=effectiveSchema.safeParse(value); if(!parsed.success) throw new AppError(502,"KPI_POOL_CONTRACT_ERROR","KPI Pool returned invalid Effective KPI Settings",{issues:parsed.error.issues}); return parsed.data; }
-export function freezeEffectiveKpiSettings(value:EffectiveKpiSettingsV1):FrozenEffectiveKpiSettingsV1 { if(!value.executability.executable) throw new AppError(422,"KPI_CONFIGURATION_NOT_EXECUTABLE",`${value.configCode} cannot be finalized`,{configurationId:value.kpiConfigurationId,reasons:value.executability.reasons}); return {...value,contractVersion:"FrozenEffectiveKpiSettingsV1"}; }
+export function parseEffectiveKpiSettings(value:unknown):EffectiveKpiSettingsV1 { const parsed=effectiveSchema.safeParse(value); if(!parsed.success) throw new AppError(502,"KPI_POOL_CONTRACT_ERROR","KPI Pool returned invalid Effective KPI Settings",{issues:parsed.error.issues}); if(historicalContractError(parsed.data)) throw new AppError(422,"HISTORICAL_CONTRACT_INVALID","Incomplete historical contract"); return parsed.data; }
+export function freezeEffectiveKpiSettings(value:EffectiveKpiSettingsV1):FrozenEffectiveKpiSettingsV1 { if(historicalContractError(value)) throw new AppError(422,"HISTORICAL_CONTRACT_INVALID","Incomplete historical contract"); if(!value.executability.executable) throw new AppError(422,"KPI_CONFIGURATION_NOT_EXECUTABLE",`${value.configCode} cannot be finalized`,{configurationId:value.kpiConfigurationId,reasons:value.executability.reasons}); return {...value,contractVersion:"FrozenEffectiveKpiSettingsV1"}; }

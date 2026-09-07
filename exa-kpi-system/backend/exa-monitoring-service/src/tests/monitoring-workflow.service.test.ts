@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const tx = vi.hoisted(() => ({
   monitoringPeriod: { findUnique: vi.fn(), updateMany: vi.fn() },
+  monitoringPeriodScorecard: { findMany: vi.fn().mockResolvedValue([]) },
   monitoringPeriodStatus: { findUnique: vi.fn() },
   monitoringPeriodInput: { count: vi.fn(), findMany: vi.fn() },
   monitoringValidationRun: { findFirst: vi.fn(), updateMany: vi.fn(), aggregate: vi.fn(), create: vi.fn() },
@@ -22,19 +23,23 @@ beforeEach(() => {
 });
 
 describe("Monitoring workflow", () => {
-  it("persists a KPI-level critical finding when business scoring remains BLOCKED", async () => {
-    tx.monitoringPeriod.findUnique.mockResolvedValue({ id: 1n, version: 1, status: { code: "DRAFT" } });
-    tx.monitoringPeriodInput.findMany.mockResolvedValue([{ id: 10n, kpiConfigurationExternalId: 20n, kpiCodeSnapshot: "KPI-BLOCKED", isRequired: true, result: { resultValue: 1, calculationStatus: "NOT_CALCULABLE", calculationErrorCode: "SCORING_CONFIGURATION_NOT_APPROVED", calculationVersion: "SCORING_V1" } }]);
-    tx.monitoringValidationRun.updateMany.mockResolvedValue({ count: 0 });
-    tx.monitoringValidationRun.aggregate.mockResolvedValue({ _max: { runNo: null } });
-    tx.monitoringValidationRun.create.mockResolvedValue({ id: 30n });
-    tx.monitoringValidationIssue.createMany.mockResolvedValue({ count: 1 });
-    tx.monitoringPeriod.updateMany.mockResolvedValue({ count: 1 });
-    await monitoringWorkflowService.validate("1", { version: 1 }, 7n);
-    expect(tx.monitoringValidationIssue.createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ monitoringPeriodInputId: 10n, findingCode: "SCORING_CONFIGURATION_NOT_APPROVED", severity: "CRITICAL", blocksSubmit: true, blocksApproval: true })] });
-    expect(tx.monitoringPeriod.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ validationStatus: "BLOCKED" }) }));
+  it("rejects a Check based on older Results even if its stored status says CURRENT", async () => {
+    tx.monitoringPeriod.findUnique.mockResolvedValue({id:1n,version:4,resultsVersion:5,currentScoringResultsVersion:5,validationRunAt:new Date(),validationStatus:"PASSED",status:{code:"DRAFT"}});
+    tx.monitoringValidationRun.findFirst.mockResolvedValue({id:8n,basedOnResultsVersion:4,status:"CURRENT",issues:[]});
+    await expect(monitoringWorkflowService.submit("1",{version:4},7n)).rejects.toMatchObject({code:"VALIDATION_REQUIRED"});
+    expect(tx.monitoringPeriod.updateMany).not.toHaveBeenCalled();
   });
 
+  it("keeps the Results and Check versions unchanged when returning for correction", async () => {
+    tx.monitoringPeriod.findUnique.mockResolvedValue({id:1n,version:9,resultsVersion:4,currentScoringResultsVersion:4,status:{code:"SUBMITTED"}});
+    tx.monitoringPeriodStatus.findUnique.mockResolvedValue({id:1n,code:"DRAFT"});
+    tx.monitoringPeriod.updateMany.mockResolvedValue({count:1});
+    await monitoringWorkflowService.returnForCorrection("1",{version:9,reason:"Please review these Results"},7n);
+    const data=tx.monitoringPeriod.updateMany.mock.calls[0]![0].data;
+    expect(data).not.toHaveProperty("resultsVersion");
+    expect(data).not.toHaveProperty("currentScoringResultsVersion");
+    expect(tx.monitoringValidationRun.updateMany).not.toHaveBeenCalled();
+  });
   it("requires persisted validation before Submit", async () => {
     tx.monitoringPeriod.findUnique.mockResolvedValue({ id: 1n, version: 1, validationRunAt: null, validationStatus: null, status: { code: "DRAFT" } });
     await expect(monitoringWorkflowService.submit("1", { version: 1 }, 7n)).rejects.toMatchObject({ code: "VALIDATION_REQUIRED" });
@@ -42,8 +47,8 @@ describe("Monitoring workflow", () => {
   });
 
   it("transitions validated Draft results to Submitted with optimistic locking and audit", async () => {
-    tx.monitoringPeriod.findUnique.mockResolvedValue({ id: 1n, kpiPoolExternalId:9n,poolInputPeriodExternalId:10n,periodKey:"2026-08",version: 3, validationRunAt: new Date(), validationStatus: "PASSED", status: { code: "DRAFT" } });
-    tx.monitoringValidationRun.findFirst.mockResolvedValue({ id: 8n, status: "CURRENT", issues: [] });
+    tx.monitoringPeriod.findUnique.mockResolvedValue({ id: 1n, kpiPoolExternalId:9n,poolInputPeriodExternalId:10n,periodKey:"2026-08",version: 3, resultsVersion: 1, currentScoringResultsVersion: 1, validationRunAt: new Date(), validationStatus: "PASSED", status: { code: "DRAFT" } });
+    tx.monitoringValidationRun.findFirst.mockResolvedValue({ id: 8n, basedOnResultsVersion: 1, status: "CURRENT", issues: [] });
     tx.monitoringPeriodStatus.findUnique.mockResolvedValue({ id: 2n, code: "SUBMITTED" });
     tx.monitoringPeriod.updateMany.mockResolvedValue({ count: 1 });
     await monitoringWorkflowService.submit("1", { version: 3 }, 7n);

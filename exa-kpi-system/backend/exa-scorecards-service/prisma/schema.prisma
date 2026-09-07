@@ -234,6 +234,7 @@ model ScorecardPeriodEmployeeScope {
 }
 
 model ScorecardPeriodKpi {
+  entityWeights                Json?                       @map("entity_weights")
   id                           BigInt                     @id @default(autoincrement()) @map("scorecard_period_kpi_id")
   scorecardPeriodCompositionId BigInt                     @map("scorecard_period_composition_id")
   kpiPoolMembershipExternalId  BigInt                     @map("kpi_pool_membership_external_id")

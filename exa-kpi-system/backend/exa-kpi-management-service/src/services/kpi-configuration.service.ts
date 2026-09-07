@@ -75,7 +75,7 @@ export const kpiConfigurationService = {
     const records = await prisma.kpiConfiguration.findMany({
       where: { id: { in: input.configurationIds.map(BigInt) }, deletedAt: null },
       select: {
-        id: true, configCode: true, status: { select: { code: true } }, inputFrequency: { select: { code: true } },
+        id: true, configCode: true, status: { select: { code: true } }, inputFrequency: { select: { id: true, code: true, monthsPerPeriod: true } },
         definition: { select: { id: true, kpiCode: true, kpiName: true, description: true } },
         revisions: { where: { effectiveFrom: { lte: periodStart }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: periodEnd } }] }, orderBy: { revisionNumber: "asc" }, include: { ...revisionRelations, thresholds: { orderBy: { displayOrder: "asc" }, include: { trafficLightLevel: true } } } },
       },
@@ -93,6 +93,9 @@ export const kpiConfigurationService = {
         kpiConfigurationId: id, kpiConfigurationRevisionId: revision.id.toString(), revisionNumber: revision.revisionNumber,
         effectiveFrom: revision.effectiveFrom.toISOString().slice(0, 10), effectiveTo: revision.effectiveTo?.toISOString().slice(0, 10) ?? null,
         configCode: record.configCode, kpiDefinitionId: record.definition.id.toString(), kpiCode: record.definition.kpiCode, kpiName: record.definition.kpiName, objective: record.definition.description,
+        periodScope: revision.periodScope, comparisonMode: revision.comparisonMode, comparisonDirection: revision.comparisonDirection, targetKind: revision.targetKind,
+        historicalCapabilityVersion: revision.periodScope === "CURRENT_PERIOD" ? null : "HISTORICAL_COMPARISON_V1",
+        inputFrequency: { id: record.inputFrequency.id.toString(), code: record.inputFrequency.code, monthsPerPeriod: record.inputFrequency.monthsPerPeriod },
         goal: revision.targetValue?.toString() ?? null, goalMode: revision.goalMode, rangeMinGoal: revision.rangeMinValue?.toString() ?? null, rangeMaxGoal: revision.rangeMaxValue?.toString() ?? null, subjectType: revision.subjectType,
         evaluationScope: revision.evaluationScope, goalType: revision.goalType, goalAssignment: revision.goalAssignment,
         goalUnit: { id: (revision.goalUnit ?? revision.measurementUnit).id.toString(), code: (revision.goalUnit ?? revision.measurementUnit).code, name: (revision.goalUnit ?? revision.measurementUnit).name, symbol: (revision.goalUnit ?? revision.measurementUnit).symbol },
@@ -108,7 +111,7 @@ export const kpiConfigurationService = {
         dataSource: { id: revision.dataSource.id.toString(), code: revision.dataSource.code, name: revision.dataSource.name },
         thresholds: revision.thresholds.map((threshold) => ({ id: threshold.id.toString(), trafficLightLevelId: threshold.trafficLightLevel.id.toString(), code: threshold.trafficLightLevel.code, name: threshold.trafficLightLevel.name, rangeMinPercent: threshold.rangeMinPercent.toString(), rangeMaxPercent: threshold.rangeMaxPercent.toString(), includesMin: threshold.includesMin, includesMax: threshold.includesMax, displayOrder: threshold.displayOrder })),
       };
-      return { ...snapshot, contractVersion: "EffectiveKpiSettingsV1", executability: evaluateKpiExecutability({ active: record.status.code === "CONFIGURED", evaluationScope: revision.evaluationScope, periodScope: revision.periodScope, goal: snapshot.goal, goalMode: revision.goalMode, goalUnit: snapshot.goalUnit, measurementUnit: snapshot.measurementUnit, dataSource: snapshot.dataSource, frequencyCode: record.inputFrequency.code, evaluationType: snapshot.evaluationType, resultSemantics: revision.resultSemantics, scoringMethod: revision.scoringMethod, scoringApprovalStatus: revision.scoringApprovalStatus, resultMethod: revision.resultMethod, subjectType: revision.subjectType, subjects: snapshot.subjects, subjectGoals: snapshot.subjectGoals, groupGoal: snapshot.groupGoal, thresholds: snapshot.thresholds }) };
+      return { ...snapshot, contractVersion: "EffectiveKpiSettingsV1", executability: evaluateKpiExecutability({ active: record.status.code === "CONFIGURED", evaluationScope: revision.evaluationScope, periodScope: revision.periodScope, comparisonDirection: revision.comparisonDirection, targetKind: revision.targetKind, scoringRuleConfig: revision.scoringRuleConfig, monthsPerPeriod: record.inputFrequency.monthsPerPeriod, goal: snapshot.goal, goalMode: revision.goalMode, goalUnit: snapshot.goalUnit, measurementUnit: snapshot.measurementUnit, dataSource: snapshot.dataSource, frequencyCode: record.inputFrequency.code, evaluationType: snapshot.evaluationType, resultSemantics: revision.resultSemantics, scoringMethod: revision.scoringMethod, scoringApprovalStatus: revision.scoringApprovalStatus, resultMethod: revision.resultMethod, subjectType: revision.subjectType, subjects: snapshot.subjects, subjectGoals: snapshot.subjectGoals, groupGoal: snapshot.groupGoal, thresholds: snapshot.thresholds }) };
     }) };
   },
   async internalCatalog(query: InternalKpiConfigurationCatalogQuery) {
@@ -130,7 +133,7 @@ export const kpiConfigurationService = {
           id: true, configCode: true, kpiDefinitionId: true, inputFrequencyId: true,
           status: { select: { code: true } },
           definition: { select: { kpiCode: true, kpiName: true, isActive: true, statusCode: true, deletedAt: true, category: { select: { name: true } } } },
-          inputFrequency: { select: { code: true, name: true, isActive: true } },
+          inputFrequency: { select: { id: true, code: true, name: true, isActive: true, monthsPerPeriod: true } },
           measurementUnit: { select: { symbol: true, name: true } },
           primaryDataSource: { select: { name: true } },
           revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true, evaluationScope: true, scoringApprovalStatus: true, groupGoalValue: true, measurementUnit: { select: { symbol: true, name: true } }, goalUnit: { select: { symbol: true } }, groupGoalUnit: { select: { symbol: true } }, subjectGoals: { select: { id: true } }, dataSource: { select: { name: true } } } },
@@ -169,7 +172,7 @@ export const kpiConfigurationService = {
         inputFrequencyId: true,
         status: { select: { code: true } },
         definition: { select: { kpiCode: true, kpiName: true, isActive: true, statusCode: true, deletedAt: true, category: { select: { name: true } } } },
-        inputFrequency: { select: { code: true, name: true, isActive: true } },
+        inputFrequency: { select: { id: true, code: true, name: true, isActive: true, monthsPerPeriod: true } },
         measurementUnit: { select: { symbol: true, name: true } },
         primaryDataSource: { select: { name: true } },
         revisions: { orderBy: { revisionNumber: "desc" }, take: 1, include: revisionRelations },
@@ -180,7 +183,7 @@ export const kpiConfigurationService = {
       data: input.ids.flatMap((id) => {
         const record = byId.get(id);
         const revision = record?.revisions[0];
-        const executability = record && revision ? evaluateKpiExecutability({ active: record.status.code === "CONFIGURED", evaluationScope: revision.evaluationScope, periodScope: revision.periodScope, goal: revision.targetValue?.toString() ?? null, goalMode: revision.goalMode, goalUnit: revision.goalUnit, measurementUnit: revision.measurementUnit, dataSource: revision.dataSource, frequencyCode: record.inputFrequency.code, evaluationType: revision.evaluationType, resultSemantics: revision.resultSemantics, scoringMethod: revision.scoringMethod, scoringApprovalStatus: revision.scoringApprovalStatus, resultMethod: revision.resultMethod, subjectType: revision.subjectType, subjects: revision.subjects.map((item) => ({ subjectExternalId: item.subjectExternalId })), subjectGoals: revision.subjects.map((subject) => ({ subjectExternalId: subject.subjectExternalId, goal: (revision.subjectGoals.find((item) => item.subjectExternalId === subject.subjectExternalId)?.goalValue ?? revision.targetValue)?.toString() ?? null })), groupGoal: revision.groupGoalValue == null ? null : { value: revision.groupGoalValue.toString() }, thresholds: revision.thresholds.map((item) => ({ code: item.trafficLightLevel.code, rangeMinPercent: item.rangeMinPercent.toString(), rangeMaxPercent: item.rangeMaxPercent.toString() })) }) : null;
+        const executability = record && revision ? evaluateKpiExecutability({ active: record.status.code === "CONFIGURED", evaluationScope: revision.evaluationScope, periodScope: revision.periodScope, comparisonDirection: revision.comparisonDirection, targetKind: revision.targetKind, scoringRuleConfig: revision.scoringRuleConfig, monthsPerPeriod: record.inputFrequency.monthsPerPeriod, goal: revision.targetValue?.toString() ?? null, goalMode: revision.goalMode, goalUnit: revision.goalUnit, measurementUnit: revision.measurementUnit, dataSource: revision.dataSource, frequencyCode: record.inputFrequency.code, evaluationType: revision.evaluationType, resultSemantics: revision.resultSemantics, scoringMethod: revision.scoringMethod, scoringApprovalStatus: revision.scoringApprovalStatus, resultMethod: revision.resultMethod, subjectType: revision.subjectType, subjects: revision.subjects.map((item) => ({ subjectExternalId: item.subjectExternalId })), subjectGoals: revision.subjects.map((subject) => ({ subjectExternalId: subject.subjectExternalId, goal: (revision.subjectGoals.find((item) => item.subjectExternalId === subject.subjectExternalId)?.goalValue ?? revision.targetValue)?.toString() ?? null })), groupGoal: revision.groupGoalValue == null ? null : { value: revision.groupGoalValue.toString() }, thresholds: revision.thresholds.map((item) => ({ code: item.trafficLightLevel.code, rangeMinPercent: item.rangeMinPercent.toString(), rangeMaxPercent: item.rangeMaxPercent.toString() })) }) : null;
         return record ? [{
           id,
           configCode: record.configCode,
@@ -259,7 +262,7 @@ export const kpiConfigurationService = {
           const c = await catalogs(tx,input,definition.kpiName);
           const configCode = await nextConfigCode(tx, definition.id, definition.kpiCode);
           const created = await tx.kpiConfiguration.create({data:{kpiDefinitionId:definition.id,configCode,measurementUnitId:c.unit.id,inputFrequencyId:c.frequency.id,primaryDataSourceId:c.source.id,kpiConfigurationStatusId:c.status.id,createdByUserId:actor}});
-          await writeRevision(tx,created.id,1,input,c.evaluation.id,c.unit.id,c.goalUnit.id,c.groupGoalUnit?.id ?? null,c.inputUnits,c.source.id,c.levels);
+          await writeRevision(tx,created.id,1,input,c.evaluation.id,c.unit.id,c.goalUnit.id,c.groupGoalUnit?.id ?? null,c.inputUnits,c.source.id,c.levels,input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : new Date());
           return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({where:{id:created.id},include}));
         });
       } catch (error) {

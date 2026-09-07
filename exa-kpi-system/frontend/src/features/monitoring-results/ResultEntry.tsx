@@ -1,4 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ManualResultEntry } from "./ManualResultEntry";
+import { PoolPeriodExplorer } from "./PoolPeriodExplorer";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -285,9 +287,18 @@ function normalizeResolverPoolSearch(value: string) {
 }
 
 export function ResultEntry() {
+  const [params] = useSearchParams();
+  const periodId = params.get("monitoringPeriodId");
+  return periodId ? <ManualResultEntry key={periodId} periodId={periodId}/> : <main className="monitor-page result-entry-page"><header className="monitor-header"><div><h1>Result Entry</h1><p>Select a Pool and Input Period to start or continue the Results workflow.</p></div></header><PoolPeriodExplorer/></main>;
+}
+
+function ResultEntryResolver() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selectedMonitoringPeriodId, setSelectedMonitoringPeriodId] = useState(searchParams.get("monitoringPeriodId") ?? "");
+  useEffect(() => {
+    if (selectedMonitoringPeriodId) navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${selectedMonitoringPeriodId}`, { replace: true });
+  }, [selectedMonitoringPeriodId, navigate]);
   const [selectedPoolId, setSelectedPoolId] = useState(searchParams.get("poolId") ?? "");
   const [selectedPoolPeriodId, setSelectedPoolPeriodId] = useState(searchParams.get("poolInputPeriodId") ?? "");
   const [poolSearch, setPoolSearch] = useState("");

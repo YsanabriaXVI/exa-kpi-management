@@ -1,6 +1,6 @@
+import { freezeWeightedSettings, entityWeights, type EntityWeight } from "../contracts/evaluation-weights.js";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import { freezeEffectiveKpiSettings } from "../contracts/frozen-effective-kpi-settings.js";
 import { kpiPoolClient } from "../clients/kpi-pool.client.js";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
@@ -72,7 +72,7 @@ async function finalizedPeriod(poolId: bigint, periodKey: string) {
         });
         for (const membership of memberships) {
           await tx.scorecardPeriodKpi.updateMany({
-            where: { kpiPoolMembershipExternalId: BigInt(membership.membershipId) },
+            where: { kpiPoolMembershipExternalId: BigInt(membership.membershipId), composition: { statusCode: "PREPARING" } },
             data: { categoryNameSnapshot: membership.categoryName, goalSnapshot: membership.goal, dataSourceSnapshot: membership.dataSource, measurementUnitSnapshot: membership.measurementUnit },
           });
         }
@@ -115,6 +115,19 @@ function editable(owner: { statusCode: string }, composition: { statusCode: stri
 }
 function canPrepare(owner: { statusCode: string }) { if (owner.statusCode === "INACTIVE") throw new AppError(409, "SCORECARD_INACTIVE", "An inactive Scorecard cannot create or change compositions"); }
 
+async function assignmentDto(value: FullComposition, poolId: bigint) {
+  const result = dto(value);
+  if (value.statusCode === "FINALIZED") return result;
+  for (const item of result.kpis) {
+    const row = value.kpis.find(row => row.id.toString() === item.id)!;
+    const resolved = await kpiPoolClient.effectiveSettings(poolId.toString(), value.poolPeriodExternalId!.toString(), item.kpiConfigurationExternalId);
+    item.evaluationScope = resolved.effective.evaluationScope;
+    item.evaluations = resolved.effective.evaluationScope === "BY_SUBJECT" ? entityWeights(resolved.effective, (row.entityWeights ?? []) as EntityWeight[], false) : [];
+    item.goalUnit = resolved.effective.goalUnit.symbol;
+    item.resultUnit = resolved.effective.measurementUnit.symbol;
+  }
+  return result;
+}
 function dto(value: FullComposition) {
   const kpiWeight = value.kpis.reduce((sum, row) => sum.plus(row.weightPercent), new Prisma.Decimal(0));
   const linkWeight = value.links.reduce((sum, row) => sum.plus(row.weightPercent), new Prisma.Decimal(0));
@@ -129,6 +142,10 @@ function dto(value: FullComposition) {
       id: row.id.toString(), poolMembershipExternalId: row.kpiPoolMembershipExternalId.toString(),
       kpiDefinitionExternalId: row.kpiDefinitionExternalId.toString(), kpiConfigurationExternalId: row.kpiConfigurationExternalId.toString(),
       definitionCode: row.definitionCodeSnapshot, definitionName: row.definitionNameSnapshot,
+      evaluationScope: (row.effectiveSettingsSnapshot as any)?.evaluationScope as string | undefined,
+      evaluations: ((row.effectiveSettingsSnapshot as any)?.evaluationWeightsVersion === "EXPLICIT_ENTITY_V1" ? (row.effectiveSettingsSnapshot as any).subjectGoals : []) as Array<{subjectExternalId:string;subjectCode:string|null;subjectLabel:string;goal:string|null;weight:string|null}>,
+      goalUnit: (row.effectiveSettingsSnapshot as any)?.goalUnit?.symbol as string | undefined,
+      resultUnit: (row.effectiveSettingsSnapshot as any)?.measurementUnit?.symbol as string | undefined,
       configurationCode: row.configurationCodeSnapshot, categoryName: row.categoryNameSnapshot, goal: row.goalSnapshot,
       dataSource: row.dataSourceSnapshot, measurementUnit: row.measurementUnitSnapshot, weight: row.weightPercent.toFixed(4), displayOrder: row.displayOrder,
     })),
@@ -229,9 +246,9 @@ export const scorecardCompositionService = {
 
   async get(scorecardId: bigint, periodKey: string, actor: bigint) {
     const owner = await scorecard(scorecardId);
-    const existing = await findComposition(scorecardId, periodKey); if (existing && (existing.scopeCustomizedAt !== null || existing.statusCode === "FINALIZED")) return dto(existing); canPrepare(owner);
+    const existing = await findComposition(scorecardId, periodKey); if (existing && (existing.scopeCustomizedAt !== null || existing.statusCode === "FINALIZED")) return assignmentDto(existing, owner.kpiPoolExternalId); canPrepare(owner);
     const period = await finalizedPeriod(owner.kpiPoolExternalId, periodKey);
-    return dto(await getOrCreate(owner, period, actor));
+    return assignmentDto(await getOrCreate(owner, period, actor), owner.kpiPoolExternalId);
   },
 
   async availableKpis(scorecardId: bigint, periodKey: string) {
@@ -357,10 +374,19 @@ export const scorecardCompositionService = {
     const result = await prisma.scorecardPeriodLink.deleteMany({ where: { scorecardPeriodCompositionId: current.id, linkedScorecardId: linkedId } }); if (!result.count) throw new AppError(404, "LINKED_SCORECARD_NOT_FOUND", "Linked Scorecard is not selected");
   },
 
-  async updateWeights(scorecardId: bigint, periodKey: string, input: { kpis: Array<{ kpiConfigurationExternalId: string; weight: number }>; linkedScorecards: Array<{ linkedScorecardId: string; weight: number }> }) {
+  async updateWeights(scorecardId: bigint, periodKey: string, input: { kpis: Array<{ kpiConfigurationExternalId: string; weight: number; entityWeights?: EntityWeight[] }>; linkedScorecards: Array<{ linkedScorecardId: string; weight: number }> }) {
     const owner = await scorecard(scorecardId); const current = await findComposition(scorecardId, periodKey); if (!current) throw new AppError(404, "SCORECARD_COMPOSITION_NOT_FOUND", "Scorecard Composition was not found"); editable(owner, current);
     await prisma.$transaction(async (tx) => {
-      for (const item of input.kpis) if (!(await tx.scorecardPeriodKpi.updateMany({ where: { scorecardPeriodCompositionId: current.id, kpiConfigurationExternalId: BigInt(item.kpiConfigurationExternalId) }, data: { weightPercent: new Prisma.Decimal(item.weight) } })).count) throw new AppError(422, "SCORECARD_KPI_NOT_FOUND", "A KPI weight targets an item outside this composition");
+      const locked = await tx.scorecardPeriodComposition.updateMany({ where: { id: current.id, statusCode: "PREPARING" }, data: { updatedAt: new Date() } });
+      if (!locked.count) throw new AppError(409, "SCORECARD_COMPOSITION_ALREADY_FINALIZED", "The composition is read-only");
+      for (const item of input.kpis) {
+        const row = current.kpis.find(row => row.kpiConfigurationExternalId.toString() === item.kpiConfigurationExternalId);
+        if (!row) throw new AppError(422, "SCORECARD_KPI_NOT_FOUND", "A KPI weight targets an item outside this composition");
+        const resolved = await kpiPoolClient.effectiveSettings(owner.kpiPoolExternalId.toString(), current.poolPeriodExternalId!.toString(), item.kpiConfigurationExternalId);
+        const entities = resolved.effective.evaluationScope === "BY_SUBJECT" ? entityWeights(resolved.effective, item.entityWeights ?? (row.entityWeights ?? []) as EntityWeight[], false) : null;
+        if (!entities && item.entityWeights?.length) throw new AppError(422, "SCORECARD_ENTITY_NOT_FOUND", "OVERALL has no entity weights");
+        await tx.scorecardPeriodKpi.updateMany({ where: { id: row.id }, data: { entityWeights: entities ? entities.map(({subjectExternalId, weight}) => ({subjectExternalId, weight})) : Prisma.DbNull, weightPercent: entities ? entities.reduce((sum, entity) => sum.plus(entity.weight ?? 0), new Prisma.Decimal(0)) : new Prisma.Decimal(item.weight) } });
+      }
       for (const item of input.linkedScorecards) if (!(await tx.scorecardPeriodLink.updateMany({ where: { scorecardPeriodCompositionId: current.id, linkedScorecardId: BigInt(item.linkedScorecardId) }, data: { weightPercent: new Prisma.Decimal(item.weight) } })).count) throw new AppError(422, "LINKED_SCORECARD_NOT_FOUND", "A linked weight targets an item outside this composition");
     });
     return dto((await findComposition(scorecardId, periodKey))!);
@@ -373,13 +399,25 @@ export const scorecardCompositionService = {
     if (current.kpis.some((row) => !allowed.has(row.kpiPoolMembershipExternalId.toString()))) throw new AppError(422, "KPI_NOT_IN_FINALIZED_POOL_COMPOSITION", "A KPI no longer belongs to this Pool Composition");
     await assertNoCycle(prisma, scorecardId, periodKey, current.links.map((row) => row.linkedScorecardId));
     for (const link of current.links) if (!await prisma.scorecardPeriodComposition.findFirst({ where: { scorecardId: link.linkedScorecardId, periodKey, statusCode: "FINALIZED" } })) throw new AppError(422, "LINKED_SCORECARD_COMPOSITION_NOT_FINALIZED", `${link.linkedScorecard.code} is not finalized for ${periodKey}`);
-    const total = [...current.kpis, ...current.links].reduce((sum, row) => sum.plus(row.weightPercent), new Prisma.Decimal(0));
-    if (!total.equals(new Prisma.Decimal("100.0000"))) throw new AppError(422, "SCORECARD_WEIGHT_TOTAL_INVALID", "KPI and Linked Scorecard weights must total exactly 100.0000", { total: total.toFixed(4) });
     const resolvedSettings = new Map(await Promise.all(current.kpis.map(async (row) => [row.id.toString(), await kpiPoolClient.effectiveSettings(owner.kpiPoolExternalId.toString(), period.poolPeriodExternalId!.toString(), row.kpiConfigurationExternalId.toString())] as const)));
+    const frozenSettings = new Map(current.kpis.map(row => {
+      const settings = resolvedSettings.get(row.id.toString())!.effective;
+      const frozen = freezeWeightedSettings(settings, (row.entityWeights ?? []) as EntityWeight[]);
+      return [row.id.toString(), frozen] as const;
+    }));
+    const total = current.kpis.reduce((sum, row) => {
+      const frozen = frozenSettings.get(row.id.toString())!;
+      return sum.plus(frozen.evaluationScope === "BY_SUBJECT" ? (frozen.subjectGoals as Array<{weight:string}>).reduce((subtotal, entity) => subtotal.plus(entity.weight), new Prisma.Decimal(0)) : row.weightPercent);
+    }, current.links.reduce((sum, row) => sum.plus(row.weightPercent), new Prisma.Decimal(0)));
+    if (!total.equals(new Prisma.Decimal("100.0000"))) throw new AppError(422, "SCORECARD_WEIGHT_TOTAL_INVALID", "KPI and Linked Scorecard weights must total exactly 100.0000", { total: total.toFixed(4) });
     return prisma.$transaction(async (tx) => {
+      const locked = await tx.scorecardPeriodComposition.updateMany({ where: { id: current.id, statusCode: "PREPARING" }, data: { updatedAt: new Date() } });
+      if (!locked.count) throw new AppError(409, "SCORECARD_COMPOSITION_ALREADY_FINALIZED", "The composition is read-only");
+      const fresh = await tx.scorecardPeriodKpi.findMany({ where: { scorecardPeriodCompositionId: current.id } });
+      if (fresh.length !== current.kpis.length || fresh.some(row => { const previous = current.kpis.find(item => item.id === row.id); return !previous || !row.weightPercent.equals(previous.weightPercent) || JSON.stringify(row.entityWeights) !== JSON.stringify(previous.entityWeights); })) throw new AppError(409, "SCORECARD_WEIGHT_CONFLICT", "Weights changed while finalizing; reload and try again");
       for (const row of current.kpis) {
         const resolved = resolvedSettings.get(row.id.toString())!;
-        const frozen=freezeEffectiveKpiSettings(resolved.effective);
+        const frozen=frozenSettings.get(row.id.toString())!;
         await tx.scorecardPeriodKpi.update({ where: { id: row.id }, data: { kpiConfigurationRevisionExternalId: BigInt(resolved.effective.kpiConfigurationRevisionId), goalSnapshot: resolved.effective.goal, effectiveSettingsSnapshot: frozen as Prisma.InputJsonValue, settingsProvenanceSnapshot: resolved.sources as Prisma.InputJsonValue } });
       }
       const changed = await tx.scorecardPeriodComposition.updateMany({ where: { id: current.id, statusCode: "PREPARING" }, data: { statusCode: "FINALIZED", finalizedAt: new Date(), finalizedByUserId: actor, updatedByUserId: actor } });

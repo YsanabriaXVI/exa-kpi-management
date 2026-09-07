@@ -136,6 +136,7 @@ export const monitoringPeriodService = {
       );
     if (assignments.some(({ assignment }) => !assignment.kpiConfigurationRevisionId || !assignment.effectiveSettings)) throw new AppError(409, "FROZEN_SCORECARD_SETTINGS_MISSING", "A FINALIZED Scorecard is missing its frozen effective KPI settings");
     const byConfiguration = new Map(assignments.map(({ assignment }) => [assignment.kpiConfigurationId, parseFrozenEffectiveKpiSettings(assignment.effectiveSettings)]));
+    // Historical capability is validated by parseFrozenEffectiveKpiSettings.
     try {
       const created = await prisma.$transaction(
         async (tx) => {
@@ -227,7 +228,7 @@ export const monitoringPeriodService = {
           for (const { scorecard, assignment } of assignments) {
             const snapshot = byConfiguration.get(assignment.kpiConfigurationId)!;
             const entityEvaluations = snapshot.evaluationScope === "BY_SUBJECT"
-              ? snapshot.subjectGoals.map((subject) => ({ kind: "ENTITY" as const, goal: subject.goal, subject, unit: snapshot.goalUnit }))
+              ? snapshot.subjectGoals.map((subject) => ({ kind: "ENTITY" as const, goal: subject.goal, subject, unit: snapshot.measurementUnit }))
               : [];
             const evaluations = entityEvaluations.length
               ? entityEvaluations
@@ -235,6 +236,7 @@ export const monitoringPeriodService = {
             for (const evaluation of evaluations) {
             await tx.monitoringPeriodInput.create({
               data: {
+                effectiveSettingsSnapshot: snapshot as Prisma.InputJsonValue,
                 monitoringPeriodId: periodRow.id,
                 monitoringPeriodScorecardId: localScorecards.get(
                   scorecard.scorecardId,
@@ -279,7 +281,7 @@ export const monitoringPeriodService = {
                 primaryDataSourceExternalId: BigInt(snapshot.dataSource.id),
                 primaryDataSourceCodeSnapshot: snapshot.dataSource.code,
                 primaryDataSourceNameSnapshot: snapshot.dataSource.name,
-                weightPercentSnapshot: new Prisma.Decimal(Number(assignment.weightPercent) / Math.max(1, entityEvaluations.length)),
+                weightPercentSnapshot: new Prisma.Decimal(evaluation.subject ? evaluation.subject.weight! : assignment.weightPercent),
                 displayOrder: ++displayOrder,
                 generatedAt: new Date(),
                 thresholds: {

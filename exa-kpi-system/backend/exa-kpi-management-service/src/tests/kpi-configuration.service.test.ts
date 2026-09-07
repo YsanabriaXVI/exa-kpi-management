@@ -130,7 +130,7 @@ describe("kpiConfigurationService.batchLookup", () => {
 
 describe("kpiConfigurationService.effectiveSnapshots", () => {
   const effectiveRecord = {
-    id: 10n, configCode: "KPC-050-01", status:{code:"CONFIGURED"}, inputFrequency:{code:"MONTHLY"},
+    id: 10n, configCode: "KPC-050-01", status:{code:"CONFIGURED"}, inputFrequency:{id:1n,code:"MONTHLY",monthsPerPeriod:1},
     definition: { id: 50n, kpiCode: "KPI-050", kpiName: "Productivity", description: "Improve productivity" },
     measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" },
     primaryDataSource: { id: 2n, code: "EMS", name: "EMS" },
@@ -145,6 +145,17 @@ describe("kpiConfigurationService.effectiveSnapshots", () => {
     expect(result.data[0]).toMatchObject({ kpiConfigurationId: "10", kpiConfigurationRevisionId: "100", revisionNumber: 1, goal: "100", evaluationType: { code: "HIGHER_IS_BETTER" }, resultSemantics:"ABSOLUTE_VALUE",scoringMethod:"PROPORTIONAL",scoringRuleConfig:{floorPercent:0,capPercent:100},scoringRuleConfigVersion:1,negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", measurementUnit: { code: "KMS" }, dataSource: { code: "EMS" } });
   });
 
+  it.each(["PREVIOUS_PERIOD","SAME_PERIOD_PREVIOUS_YEAR"])("explicitly propagates the executable historical contract for %s",async reference=>{
+    const revision={...effectiveRecord.revisions[0],periodScope:reference,comparisonMode:reference,comparisonDirection:"INCREASE",targetKind:"CHANGE_TARGET",
+      targetValue:{toString:()=>"10"},goalUnit:{id:2n,code:"PERCENT",name:"Percent",symbol:"%"},
+      thresholds:effectiveRecord.revisions[0]!.thresholds.map((t,i)=>({...t,rangeMinPercent:{toString:()=>String([0,65,80][i])},
+        rangeMaxPercent:{toString:()=>String([65,80,100][i])},includesMin:true,includesMax:i===2}))};
+    db.kpiConfiguration.findMany.mockResolvedValue([{...effectiveRecord,revisions:[revision]}]);
+    const output=(await kpiConfigurationService.effectiveSnapshots({configurationIds:["10"],periodStart:"2026-08-01",periodEnd:"2026-08-31"})).data[0];
+    expect(output).toMatchObject({periodScope:reference,comparisonMode:reference,comparisonDirection:"INCREASE",targetKind:"CHANGE_TARGET",goal:"10",
+      historicalCapabilityVersion:"HISTORICAL_COMPARISON_V1",inputFrequency:{code:"MONTHLY",monthsPerPeriod:1},
+      goalUnit:{symbol:"%"},measurementUnit:{symbol:"kms"},executability:{executable:true},kpiDefinitionId:"50",kpiConfigurationRevisionId:"100"});
+  });
   it("fails instead of choosing a revision when coverage is missing or ambiguous", async () => {
     db.kpiConfiguration.findMany.mockResolvedValue([{ ...effectiveRecord, revisions: [] }]);
     await expect(kpiConfigurationService.effectiveSnapshots({ configurationIds: ["10"], periodStart: "2026-08-01", periodEnd: "2026-08-31" })).rejects.toMatchObject({ code: "KPI_EFFECTIVE_REVISION_NOT_FOUND" });

@@ -1,9 +1,7 @@
 import { Prisma } from "@prisma/client";
-
-export const CALCULATION_VERSION = "SCORING_V1";
+export const CALCULATION_VERSION = "CHECK_RESULTS_V1";
 const ZERO = new Prisma.Decimal(0);
 const HUNDRED = new Prisma.Decimal(100);
-
 type DecimalInput = Prisma.Decimal | string | number;
 type Band = { compliance: DecimalInput; minResult?: DecimalInput; maxResult?: DecimalInput; maxDistance?: DecimalInput };
 export type ScoringRuleConfig = {
@@ -34,7 +32,8 @@ export type KpiScoringInput = {
   scoringApprovalStatus?: string | null;
 };
 export type KpiScoringResult = {
-  status: "MISSING" | "CALCULATED" | "NOT_CALCULABLE";
+  status: "CALCULATED" | "NOT_CALCULABLE";
+  goalMet: boolean | null;
   errorCode: string | null;
   scoringMethod: string | null;
   rawAchievement: Prisma.Decimal | null;
@@ -44,99 +43,57 @@ export type KpiScoringResult = {
   calculationVersion: string;
 };
 
-const decimal = (value: DecimalInput) => value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
-const normalizeEvaluation = (value: string) => value === "HIGHER_IS_BETTER" ? "GREATER_IS_BETTER" : value;
 
-function bandComplianceByResult(result: Prisma.Decimal, bands: Band[] | undefined) {
-  const matches = bands?.filter((band) => {
-    const aboveMin = band.minResult === undefined || result.greaterThanOrEqualTo(decimal(band.minResult));
-    const belowMax = band.maxResult === undefined || result.lessThanOrEqualTo(decimal(band.maxResult));
-    return aboveMin && belowMax;
-  });
-  return matches?.length === 1 ? decimal(matches[0]!.compliance) : null;
+const decimal = (value: DecimalInput) => new Prisma.Decimal(value);
+export function notCalculable(errorCode: string, method: string | null): KpiScoringResult {
+  return {status:"NOT_CALCULABLE",errorCode,scoringMethod:method,goalMet:null,rawAchievement:null,compliance:null,trafficLight:null,weightedScore:null,calculationVersion:CALCULATION_VERSION};
 }
-
-function bandComplianceByDistance(distance: Prisma.Decimal, bands: Band[] | undefined) {
-  const ordered = bands?.filter((band) => band.maxDistance !== undefined)
-    .sort((a, b) => decimal(a.maxDistance!).comparedTo(decimal(b.maxDistance!)));
-  const match = ordered?.find((band) => distance.lessThanOrEqualTo(decimal(band.maxDistance!)));
-  return match ? decimal(match.compliance) : null;
-}
-
-function trafficLight(compliance: Prisma.Decimal, thresholds: TrafficThreshold[]) {
-  const ordered = [...thresholds].sort((a, b) => a.displayOrder - b.displayOrder);
-  return ordered.find((threshold) => {
-    const min = threshold.min === null ? null : decimal(threshold.min);
-    const max = threshold.max === null ? null : decimal(threshold.max);
-    const aboveMin = min === null || (threshold.includesMin ? compliance.greaterThanOrEqualTo(min) : compliance.greaterThan(min));
-    const belowMax = max === null || (threshold.includesMax ? compliance.lessThanOrEqualTo(max) : compliance.lessThan(max));
-    return aboveMin && belowMax;
-  })?.code ?? null;
-}
-
-function notCalculable(errorCode: string, method: string | null): KpiScoringResult {
-  return { status: "NOT_CALCULABLE", errorCode, scoringMethod: method, rawAchievement: null, compliance: null, trafficLight: null, weightedScore: null, calculationVersion: CALCULATION_VERSION };
-}
+export const persistedDecimal = (value: Prisma.Decimal | null) => value?.toDecimalPlaces(6, Prisma.Decimal.ROUND_HALF_UP) ?? null;
 
 export function calculateKpiScore(input: KpiScoringInput): KpiScoringResult {
-  if (input.result === null) return { status: "MISSING", errorCode: null, scoringMethod: input.scoringMethod ?? null, rawAchievement: null, compliance: null, trafficLight: null, weightedScore: null, calculationVersion: CALCULATION_VERSION };
-  const goal = input.goal === null ? null : decimal(input.goal);
-  const result = decimal(input.result);
-  const evaluation = normalizeEvaluation(input.evaluationType);
-  const method = input.scoringMethod ?? null;
-  let raw: Prisma.Decimal | null = null;
-
-  if (input.scoringApprovalStatus !== "APPROVED") return notCalculable("SCORING_CONFIGURATION_NOT_APPROVED", method);
-  if (!method) return notCalculable("SCORING_METHOD_NOT_CONFIGURED", null);
-  if (result.lessThan(ZERO) && !input.negativeResultPolicy) return notCalculable("NEGATIVE_RESULT_POLICY_NOT_CONFIGURED", method);
-  if (result.lessThan(ZERO) && input.negativeResultPolicy === "DISALLOW") return notCalculable("NEGATIVE_RESULT_NOT_ALLOWED", method);
-  if (result.lessThan(ZERO) && input.negativeResultPolicy === "REVIEW") return notCalculable("NEGATIVE_RESULT_REQUIRES_REVIEW", method);
-  if (method === "PROPORTIONAL") {
-    if (goal === null) return notCalculable("GOAL_REQUIRED", method);
-    if (evaluation === "GREATER_IS_BETTER") {
-      if (goal.lessThanOrEqualTo(ZERO)) return notCalculable("PROPORTIONAL_GOAL_NOT_POSITIVE", method);
-      raw = result.div(goal).mul(HUNDRED);
-    } else if (evaluation === "LOWER_IS_BETTER") {
-      if (goal.lessThanOrEqualTo(ZERO)) return notCalculable("LOWER_PROPORTIONAL_GOAL_NOT_POSITIVE", method);
-      raw = result.isZero() ? HUNDRED : goal.div(result).mul(HUNDRED);
-    } else return notCalculable("PROPORTIONAL_EVALUATION_MISMATCH", method);
-  } else if (method === "ZERO_TARGET" || method === "ZERO_TARGET_BANDS") {
-    if (goal === null || !goal.isZero()) return notCalculable("ZERO_TARGET_REQUIRES_ZERO_GOAL", method);
-    raw = result.isZero() ? HUNDRED : bandComplianceByResult(result, input.scoringRuleConfig?.bands);
-    if (raw === null) return notCalculable("SCORING_RULE_NOT_CONFIGURED", method);
-  } else if (method === "TOLERANCE_BASED" || method === "TOLERANCE") {
-    if (goal === null) return notCalculable("GOAL_REQUIRED", method);
-    const tolerance = input.scoringRuleConfig?.tolerance === undefined ? null : decimal(input.scoringRuleConfig.tolerance);
-    if (tolerance === null || tolerance.lessThan(ZERO)) return notCalculable("TOLERANCE_NOT_CONFIGURED", method);
-    const distance = result.minus(goal).abs();
-    raw = distance.lessThanOrEqualTo(tolerance) ? HUNDRED : bandComplianceByDistance(distance.minus(tolerance), input.scoringRuleConfig?.bands);
-    if (raw === null) return notCalculable("SCORING_RULE_NOT_CONFIGURED", method);
-  } else if (method === "RANGE_BASED") {
-    const min = input.scoringRuleConfig?.rangeMin === undefined ? null : decimal(input.scoringRuleConfig.rangeMin);
-    const max = input.scoringRuleConfig?.rangeMax === undefined ? null : decimal(input.scoringRuleConfig.rangeMax);
-    if (min === null || max === null || min.greaterThan(max)) return notCalculable("RANGE_NOT_CONFIGURED", method);
-    const distance = result.lessThan(min) ? min.minus(result) : result.greaterThan(max) ? result.minus(max) : ZERO;
-    raw = distance.isZero() ? HUNDRED : bandComplianceByDistance(distance, input.scoringRuleConfig?.bands);
-    if (raw === null) return notCalculable("SCORING_RULE_NOT_CONFIGURED", method);
-  } else return notCalculable("UNSUPPORTED_SCORING_METHOD", method);
-
-  const floor = input.scoringRuleConfig?.floorPercent === undefined ? ZERO : decimal(input.scoringRuleConfig.floorPercent);
-  const cap = input.scoringRuleConfig?.capPercent === undefined ? HUNDRED : decimal(input.scoringRuleConfig.capPercent);
-  const compliance = Prisma.Decimal.min(cap, Prisma.Decimal.max(floor, raw));
-  const resolvedTrafficLight = trafficLight(compliance, input.thresholds);
-  if (!resolvedTrafficLight) return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_NOT_CONFIGURED", method);
-  return {
-    status: "CALCULATED",
-    errorCode: null,
-    scoringMethod: method,
-    rawAchievement: raw,
-    compliance,
-    trafficLight: resolvedTrafficLight,
-    weightedScore: compliance.div(HUNDRED).mul(decimal(input.weight)),
-    calculationVersion: CALCULATION_VERSION,
-  };
+  const method=input.scoringMethod??null;
+  if(input.result===null) return notCalculable("RESULT_MISSING",method);
+  try {
+    const result=decimal(input.result), goal=input.goal===null?null:decimal(input.goal), weight=decimal(input.weight);
+    const behavior=input.evaluationType==="HIGHER_IS_BETTER"?"GREATER_IS_BETTER":input.evaluationType;
+    if(!result.isFinite()||goal&&!goal.isFinite()||!weight.isFinite()||weight.lt(0)||weight.gt(100)) return notCalculable("FROZEN_SCORING_CONTRACT_INVALID",method);
+    if(input.scoringApprovalStatus!=="APPROVED") return notCalculable("SCORING_CONFIGURATION_NOT_APPROVED",method);
+    if(!method) return notCalculable("SCORING_METHOD_NOT_CONFIGURED",method);
+    if(result.lt(0)&&input.negativeResultPolicy!=="ALLOW") return notCalculable(input.negativeResultPolicy==="REVIEW"?"NEGATIVE_RESULT_REQUIRES_REVIEW":input.negativeResultPolicy==="DISALLOW"?"NEGATIVE_RESULT_NOT_ALLOWED":"NEGATIVE_RESULT_POLICY_NOT_CONFIGURED",method);
+    let raw:Prisma.Decimal|null=null, compliance:Prisma.Decimal, goalMet:boolean;
+    const config=input.scoringRuleConfig;
+    if(method==="PROPORTIONAL" && ["GREATER_IS_BETTER","LOWER_IS_BETTER"].includes(behavior)) {
+      if(!goal||goal.lte(0))return notCalculable("PROPORTIONAL_GOAL_NOT_POSITIVE",method);
+      // Approved proportional contracts require an explicit floor and cap.
+      if(config?.floorPercent===undefined||config.capPercent===undefined)return notCalculable("COMPLIANCE_LIMITS_MISSING",method);
+      const floor=decimal(config.floorPercent),cap=decimal(config.capPercent);
+      if(!floor.isFinite()||!cap.isFinite()||floor.lt(0)||cap.gt(100)||floor.gt(cap))return notCalculable("COMPLIANCE_LIMITS_INVALID",method);
+      goalMet=behavior==="GREATER_IS_BETTER"?result.gte(goal):result.lte(goal);
+      // Existing lower-zero convention: finite 100 raw; use the approved cap directly.
+      raw=behavior==="GREATER_IS_BETTER"?result.div(goal).mul(100):result.isZero()?HUNDRED:goal.div(result).mul(100);
+      compliance=behavior==="LOWER_IS_BETTER"&&result.isZero()?cap:Prisma.Decimal.min(cap,Prisma.Decimal.max(floor,raw));
+    } else if(method==="ZERO_TARGET_BANDS" && ["ZERO_IS_BETTER","LOWER_IS_BETTER"].includes(behavior)) {
+      if(!goal?.isZero())return notCalculable("ZERO_TARGET_REQUIRES_ZERO_GOAL",method);
+      const bands=config?.bands;
+      if(!Array.isArray(bands)||!bands.length)return notCalculable("SCORING_RULE_NOT_CONFIGURED",method);
+      const parsed=bands.map(b=>({min:b.minResult===undefined?ZERO:decimal(b.minResult),max:b.maxResult===undefined?null:decimal(b.maxResult),value:decimal(b.compliance)})).sort((a,b)=>a.min.comparedTo(b.min));
+      if(parsed.some((b,i)=>!b.min.isFinite()||b.max&&(!b.max.isFinite()||b.max.lt(b.min))||!b.value.isFinite()||b.value.lt(0)||b.value.gt(100)||i>0&&(parsed[i-1]!.max===null||parsed[i-1]!.max!.gte(b.min))))return notCalculable("SCORING_BANDS_INVALID",method);
+      const matches=parsed.filter(b=>result.gte(b.min)&&(!b.max||result.lte(b.max)));
+      if(matches.length!==1)return notCalculable("SCORING_RULE_NOT_CONFIGURED",method);
+      compliance=matches[0]!.value;
+      // Bands define Compliance, not a mathematical achievement ratio for Goal zero.
+      raw=null;goalMet=result.isZero();
+    } else return notCalculable("UNSUPPORTED_SCORING_COMBINATION",method);
+    const thresholds=input.thresholds.map(t=>({...t,min:t.min===null?null:decimal(t.min),max:t.max===null?null:decimal(t.max)})).sort((a,b)=>a.min===null?-1:b.min===null?1:a.min.comparedTo(b.min));
+    if(!thresholds.length)return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_NOT_CONFIGURED",method);
+    if(thresholds.some((t,i)=>!["RED","YELLOW","GREEN"].includes(t.code)||t.min&&!t.min.isFinite()||t.max&&!t.max.isFinite()||t.min&&t.max&&(t.min.gt(t.max)||t.min.eq(t.max)&&!(t.includesMin&&t.includesMax))||i>0&&(()=>{const prev=thresholds[i-1]!;return prev.max===null||t.min===null||prev.max.gt(t.min)||prev.max.eq(t.min)&&prev.includesMax&&t.includesMin;})()))return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_INVALID",method);
+    const matches=thresholds.filter(t=>(t.min===null||(t.includesMin?compliance.gte(t.min):compliance.gt(t.min)))&&(t.max===null||(t.includesMax?compliance.lte(t.max):compliance.lt(t.max))));
+    if(matches.length!==1)return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_NOT_CONFIGURED",method);
+    const weighted=compliance.mul(weight).div(100);
+    if([raw,compliance,weighted].some(v=>v!==null&&(!v.isFinite()||v.abs().gte(1000000))))return notCalculable("SCORING_PRECISION_EXCEEDED",method);
+    return {status:"CALCULATED",errorCode:null,scoringMethod:method,rawAchievement:persistedDecimal(raw),compliance:persistedDecimal(compliance),goalMet,trafficLight:matches[0]!.code,weightedScore:persistedDecimal(weighted),calculationVersion:CALCULATION_VERSION};
+  } catch {return notCalculable("FROZEN_SCORING_CONTRACT_INVALID",method);}
 }
-
 export type ScorecardNode = { id: string; directContributions: Array<DecimalInput | null>; links: Array<{ scorecardId: string; weight: DecimalInput }> };
 export function calculateScorecardScores(nodes: ScorecardNode[]) {
   const byId = new Map(nodes.map((node) => [node.id, node]));

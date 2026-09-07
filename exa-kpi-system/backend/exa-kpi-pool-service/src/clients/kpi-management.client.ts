@@ -1,3 +1,4 @@
+import { historicalFields, historicalContractError } from "../contracts/historical-contract.js";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
@@ -18,8 +19,10 @@ const metaSchema = z.object({ page: z.number(), pageSize: z.number(), totalItems
 const batchResponseSchema = z.object({ data: z.array(configurationSchema), notFoundIds: z.array(z.string()) });
 const catalogResponseSchema = z.object({ data: z.array(catalogConfigurationSchema), meta: metaSchema });
 const effectiveSnapshotSchema = z.object({
-  contractVersion: z.literal("EffectiveKpiSettingsV1"),
+  contractVersion: z.literal("EffectiveKpiSettingsV1"),...historicalFields,
   kpiConfigurationId: z.string(), kpiConfigurationRevisionId: z.string(), revisionNumber: z.number(), configCode: z.string(),
+  kpiDefinitionId: z.string().optional(), evaluationScope: z.enum(["OVERALL","BY_SUBJECT"]).optional(),
+  goalUnit: z.object({id:z.string(),code:z.string(),name:z.string(),symbol:z.string()}).optional(),
   goal: z.string().nullable(), evaluationType: z.object({ id: z.string(), code: z.string(), name: z.string() }),
   goalMode: z.enum(["SINGLE", "RANGE", "BY_SUBJECT"]), rangeMinGoal: z.string().nullable(), rangeMaxGoal: z.string().nullable(), subjectType: z.string().nullable(),
   subjectGoals: z.array(z.object({ subjectExternalId: z.string(), subjectCode: z.string().nullable(), subjectLabel: z.string(), goal: z.string() })),
@@ -57,7 +60,9 @@ export const kpiManagementClient = {
     const payload = await request("/api/v1/internal/kpi-configurations/effective-snapshots", { method: "POST", body: JSON.stringify({ configurationIds: [configurationId], periodStart, periodEnd }) });
     const parsed = z.object({ data: z.array(effectiveSnapshotSchema).length(1) }).safeParse(payload);
     if (!parsed.success) throw new AppError(502, "KPI_MANAGEMENT_INVALID_RESPONSE", "KPI Management returned an invalid effective snapshot");
-    return parsed.data.data[0]!;
+    const snapshot = parsed.data.data[0]!;
+    if (historicalContractError(snapshot)) throw new AppError(502, "HISTORICAL_CONTRACT_INVALID", "Incomplete historical effective contract");
+    return snapshot;
   },
   async batchLookup(ids: string[]) {
     const payload = await request("/api/v1/kpi-configurations/batch-lookup", { method: "POST", body: JSON.stringify({ ids }) });

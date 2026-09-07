@@ -1,0 +1,1 @@
+ALTER TABLE kpi_results ADD COLUMN goal_met BOOLEAN NULL;

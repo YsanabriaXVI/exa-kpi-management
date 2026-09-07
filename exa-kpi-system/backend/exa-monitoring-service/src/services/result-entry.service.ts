@@ -1,8 +1,18 @@
+import { baselineContext } from "./historical-baseline.service.js";
+import { historicalContractError } from "../contracts/historical-contract.js";
+import { clearCurrentScoring, hasCurrentScoring, maskStaleScoring, isCurrentRun } from "./scoring-validity.js";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
-import type { SaveResultEntryBody } from "../schemas/monitoring-period.schema.js";
+import { saveResultEntryBodySchema, type SaveResultEntryBody } from "../schemas/monitoring-period.schema.js";
 import { AppError } from "../utils/app-error.js";
-import { recalculatePeriodScores } from "./scoring.service.js";
+
+function entryBlock(input: any): string | null {
+  if (input.evaluationKindSnapshot === "GROUP") return "GROUP_RESULT_RUNTIME_UNSUPPORTED";
+  const frozen = input.effectiveSettingsSnapshot;
+  if (frozen?.executability?.executable === false) return "KPI_CONFIGURATION_NOT_EXECUTABLE";
+  if (historicalContractError(frozen)) return "HISTORICAL_CONTRACT_INVALID";
+  return null;
+}
 
 const resultEntryInclude = {
   status: true,
@@ -10,13 +20,16 @@ const resultEntryInclude = {
   scorecards: { orderBy: { scorecardCodeSnapshot: "asc" as const } },
   inputs: {
     orderBy: { displayOrder: "asc" as const },
-    include: { result: true, scorecard: true },
+    include: { result: true, scorecard: true, baselineResolutions: { orderBy: { revisionNo: "desc" as const }, take: 1 } },
   },
 };
 
 function serialize(row: any) {
+  maskStaleScoring(row);
   const latestValidationRun = row.validationRuns?.[0] ?? null;
-  const inputs = row.inputs.map((input: any) => ({
+  const checkStatus = !latestValidationRun ? "NOT_CHECKED" : isCurrentRun(latestValidationRun, row) ? "CURRENT" : "STALE";
+  const snapshot = checkStatus === "CURRENT" ? latestValidationRun?.scoringSnapshot : null;
+  const inputs = row.inputs.filter((input: any) => input.evaluationKindSnapshot !== "GROUP").map((input: any) => ({
     id: input.id.toString(),
     scorecardId: input.scorecard.scorecardExternalId.toString(),
     scorecardCode: input.scorecard.scorecardCodeSnapshot,
@@ -25,6 +38,14 @@ function serialize(row: any) {
     configCode: input.evaluationKindSnapshot === "OVERALL" ? input.configCodeSnapshot : `${input.configCodeSnapshot}:${input.subjectCodeSnapshot ?? input.subjectExternalIdSnapshot ?? "GROUP"}`,
     kpiCode: input.evaluationKindSnapshot === "OVERALL" ? input.kpiCodeSnapshot : `${input.kpiCodeSnapshot} · ${input.subjectLabelSnapshot}`,
     kpiName: input.kpiNameSnapshot,
+    parentKpiCode: input.kpiCodeSnapshot,
+    weight: input.weightPercentSnapshot?.toString() ?? null,
+    goalUnit: input.effectiveSettingsSnapshot?.goalUnit?.symbol ?? null,
+    groupGoal: input.effectiveSettingsSnapshot?.groupGoal ?? null,
+    entryBlock: entryBlock(input),
+    periodScope: input.effectiveSettingsSnapshot?.periodScope ?? null,
+    comparisonDirection: input.effectiveSettingsSnapshot?.comparisonDirection ?? null,
+    historical: baselineContext(row,input,input.baselineResolutions?.[0]),
     evaluationKind: input.evaluationKindSnapshot,
     subject: input.subjectLabelSnapshot ? { type: input.subjectTypeSnapshot, id: input.subjectExternalIdSnapshot, code: input.subjectCodeSnapshot, label: input.subjectLabelSnapshot } : null,
     goal: input.goalTextSnapshot ?? input.goalValueSnapshot?.toString() ?? null,
@@ -34,7 +55,8 @@ function serialize(row: any) {
     comment: input.result?.comment ?? null,
     version: input.result?.version ?? null,
     entryStatus: input.result?.resultValue !== null && input.result?.resultValue !== undefined ? "ENTERED" : "PENDING",
-    scoring: input.result ? {
+    scoring: input.result && hasCurrentScoring(row) ? {
+      goalMet: input.result.goalMet,
       status: input.result.calculationStatus,
       errorCode: input.result.calculationErrorCode,
       version: input.result.calculationVersion,
@@ -46,6 +68,8 @@ function serialize(row: any) {
   }));
   const entered = inputs.filter((input: any) => input.entryStatus === "ENTERED").length;
   return {
+    check: { status: checkStatus, runId: latestValidationRun?.id.toString() ?? null, runNo: latestValidationRun?.runNo ?? null, basedOnResultsVersion: latestValidationRun?.basedOnResultsVersion ?? null, basedOnBaselineVersion: latestValidationRun?.basedOnBaselineVersion ?? null,
+      summary: snapshot?.summary ?? null, evaluations: snapshot?.evaluations ?? [], scorecards: snapshot?.scorecards ?? [], findings: snapshot?.findings ?? [] },
     monitoringPeriod: {
       id: row.id.toString(),
       code: `MP-${row.poolCodeSnapshot}-${row.periodKey}`,
@@ -59,14 +83,20 @@ function serialize(row: any) {
       periodEnd: row.periodEnd.toISOString().slice(0, 10),
       status: row.status.code,
       version: row.version,
+      resultsVersion: row.resultsVersion,
+      baselineVersion: row.baselineVersion ?? 0,
+      currentScoring: { basedOnResultsVersion: row.currentScoringResultsVersion ?? null, basedOnBaselineVersion: row.currentScoringBaselineVersion ?? null, status: checkStatus },
+      selectedEntryMethod: row.selectedEntryMethod,
       validationStatus: row.validationStatus,
       validationSummary: row.validationSummary,
       validationRunAt: row.validationRunAt?.toISOString() ?? null,
       validationRun: latestValidationRun ? {
         id: latestValidationRun.id.toString(),
         runNo: latestValidationRun.runNo,
-        resultsVersion: latestValidationRun.resultsVersion,
-        status: latestValidationRun.status,
+        basedOnResultsVersion: latestValidationRun.basedOnResultsVersion ?? null,
+        basedOnBaselineVersion: latestValidationRun.basedOnBaselineVersion ?? 0,
+        scoringSnapshot: latestValidationRun.scoringSnapshot ?? null,
+        status: checkStatus,
         calculationVersion: latestValidationRun.calculationVersion,
         createdAt: latestValidationRun.createdAt.toISOString(),
         invalidatedAt: latestValidationRun.invalidatedAt?.toISOString() ?? null,
@@ -85,7 +115,7 @@ function serialize(row: any) {
     },
     scorecards: row.scorecards.map((item: any) => ({ id: item.id.toString(), code: item.scorecardCodeSnapshot, name: item.scorecardNameSnapshot, departments:item.departmentsSnapshot??[], directScorePercent: item.directScorePercent?.toString() ?? null, linkedScorePercent: item.linkedScorePercent?.toString() ?? null, previewScorePercent: item.previewScorePercent?.toString() ?? null, finalScorePercent: item.finalScorePercent?.toString() ?? null, calculationVersion: item.calculationVersion })),
     inputs,
-    summary: { expected: inputs.length, entered, pending: inputs.length - entered },
+    summary: { expected: inputs.length, entered, pending: inputs.length - entered, completionPercent: inputs.length ? Math.round(entered / inputs.length * 100) : 0 },
   };
 }
 
@@ -99,7 +129,7 @@ function sameDecimal(left: Prisma.Decimal | null, right: Prisma.Decimal | null) 
 
 export const resultEntryService = {
   async listPeriods() {
-    const rows = await prisma.monitoringPeriod.findMany({ orderBy: [{ periodStart: "desc" }, { poolCodeSnapshot: "asc" }], include: { status: true, inputs: { select: { result: { select: { resultValue: true } } } } } });
+    const rows = await prisma.monitoringPeriod.findMany({ orderBy: [{ periodStart: "desc" }, { poolCodeSnapshot: "asc" }], include: { status: true, inputs: { where: { evaluationKindSnapshot: { not: "GROUP" } }, select: { result: { select: { resultValue: true } } } } } });
     return rows.map((row) => {
       const entered = row.inputs.filter((input) => input.result?.resultValue !== null && input.result?.resultValue !== undefined).length;
       return { id: row.id.toString(), code: `MP-${row.poolCodeSnapshot}-${row.periodKey}`, poolId: row.kpiPoolExternalId.toString(), poolInputPeriodId: row.poolInputPeriodExternalId.toString(), poolCode: row.poolCodeSnapshot, poolName: row.poolNameSnapshot, periodKey: row.periodKey, periodLabel: row.periodLabel, periodStart: row.periodStart.toISOString().slice(0, 10), periodEnd: row.periodEnd.toISOString().slice(0, 10), status: row.status.code, frequency: row.inputFrequencyNameSnapshot, expected: row.inputs.length, entered, pending: row.inputs.length - entered };
@@ -112,32 +142,43 @@ export const resultEntryService = {
   },
 
   async save(idValue: string, body: SaveResultEntryBody, actor: bigint, source: "MANUAL" | "EXCEL" = "MANUAL") {
+    if (source !== "MANUAL") throw new AppError(409, "ENTRY_METHOD_NOT_SUPPORTED", "Only Manual Result Entry is available in V1");
+    body = saveResultEntryBodySchema.parse(body);
     const periodId = BigInt(idValue);
     const inputIds = body.changes.map((change) => BigInt(change.monitoringPeriodInputId));
     if (new Set(inputIds.map(String)).size !== inputIds.length) {
       throw new AppError(422, "DUPLICATE_RESULT_CHANGE", "A Monitoring input may only appear once per Save Changes batch");
     }
 
-    await prisma.$transaction(async (tx) => {
+    try { await prisma.$transaction(async (tx) => {
       const period = await tx.monitoringPeriod.findUnique({ where: { id: periodId }, include: { status: true } });
       if (!period) throw new AppError(404, "MONITORING_PERIOD_NOT_FOUND", "Monitoring Period was not found");
       if (period.status.code !== "DRAFT") throw new AppError(409, "MONITORING_PERIOD_NOT_DRAFT", "Results can only be changed while the Monitoring Period is DRAFT");
+      if (period.selectedEntryMethod && period.selectedEntryMethod !== "MANUAL") throw new AppError(409, "ENTRY_METHOD_CONFLICT", "This draft already uses another entry method");
+      if (period.resultsVersion !== body.resultsVersion) throw new AppError(409, "RESULT_VERSION_CONFLICT", "Results changed since this period was loaded", { currentResultsVersion: period.resultsVersion });
+      const legacyExcel = await tx.resultEntryBatch.findFirst({ where: { monitoringPeriodId: periodId, method: { code: "EXCEL" } }, select: { id: true } });
+      if (legacyExcel) throw new AppError(409, "ENTRY_METHOD_CONFLICT", "This existing draft contains Excel batches and cannot switch to Manual");
 
       const inputs = await tx.monitoringPeriodInput.findMany({ where: { id: { in: inputIds }, monitoringPeriodId: periodId }, include: { result: true } });
       if (inputs.length !== inputIds.length) throw new AppError(422, "MONITORING_INPUT_NOT_IN_PERIOD", "Every changed input must belong to the requested Monitoring Period");
       const byId = new Map(inputs.map((input) => [input.id.toString(), input]));
       const normalized = body.changes.map((change) => {
         const input = byId.get(change.monitoringPeriodInputId)!;
+        const blocked = entryBlock(input);
+        if (blocked) throw new AppError(409, blocked, "This frozen evaluation does not support Manual Result Entry V1");
         const nextValue = change.resultValue === null ? null : new Prisma.Decimal(change.resultValue);
-        const nextComment = change.comment?.trim() || null;
+        const nextComment = input.result?.comment ?? null;
+        if (change.comment !== undefined && change.comment !== nextComment) throw new AppError(422, "RESULT_ONLY_EDITABLE", "Only Result can be edited in Manual Entry V1");
         if (input.result ? change.version !== input.result.version : change.version !== null) {
           throw new AppError(409, "RESULT_VERSION_CONFLICT", "A result changed since it was loaded", { monitoringPeriodInputId: change.monitoringPeriodInputId, kpiCode: input.kpiCodeSnapshot, submittedVersion: change.version, currentVersion: input.result?.version ?? null, currentResultValue: input.result?.resultValue?.toString() ?? null, currentComment: input.result?.comment ?? null });
         }
-        if (input.result && sameDecimal(input.result.resultValue, nextValue) && input.result.comment === nextComment) {
-          throw new AppError(422, "RESULT_CHANGE_IS_NOOP", "Save Changes contains a row with no effective change", { monitoringPeriodInputId: change.monitoringPeriodInputId });
-        }
         return { change, input, nextValue, nextComment };
-      });
+      }).filter(item => !sameDecimal(item.input.result?.resultValue ?? null, item.nextValue));
+
+      if (!normalized.length && period.selectedEntryMethod === "MANUAL") return;
+      const claimed = await tx.monitoringPeriod.updateMany({ where: { id: periodId, version: period.version, resultsVersion: body.resultsVersion, statusId: period.statusId }, data: { selectedEntryMethod: "MANUAL", version: { increment: 1 }, resultsVersion: { increment: normalized.length ? 1 : 0 } } });
+      if (claimed.count !== 1) throw new AppError(409, "RESULT_VERSION_CONFLICT", "The period changed while saving; reload and try again");
+      if (!normalized.length) return;
 
       const [method, batchStatus, rowStatus, pendingStatus, enteredStatus] = await Promise.all([
         tx.monitoringInputMethod.findUnique({ where: { code: source } }),
@@ -165,10 +206,13 @@ export const resultEntryService = {
         }
       }
       await tx.resultEntryBatch.update({ where: { id: batch.id }, data: { finishedAt: new Date() } });
-      await recalculatePeriodScores(tx, periodId, period.status.code);
-      const invalidated = await tx.monitoringValidationRun.updateMany({ where: { monitoringPeriodId: periodId, status: "CURRENT" }, data: { status: "STALE", invalidatedAt: new Date(), invalidatedByBatchId: batch.id } });
-      await tx.monitoringPeriod.update({ where: { id: periodId }, data: { validationStatus: invalidated.count ? "STALE" : null, validationSummary: Prisma.JsonNull, validationRunByUserId: null, version: { increment: 1 } } });
+      await clearCurrentScoring(tx, periodId);
+      await tx.monitoringPeriod.update({ where: { id: periodId }, data: { currentScoringResultsVersion: null, currentScoringBaselineVersion: null, validationStatus: period.validationRunAt || period.validationStatus ? "STALE" : null, validationSummary: Prisma.JsonNull, validationRunByUserId: null } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2002", "P2034"].includes(error.code)) throw new AppError(409, "RESULT_VERSION_CONFLICT", "Another save changed this period; reload and try again");
+      throw error;
+    }
 
     const saved = await findPeriod(periodId);
     if (!saved) throw new AppError(404, "MONITORING_PERIOD_NOT_FOUND", "Monitoring Period was not found");

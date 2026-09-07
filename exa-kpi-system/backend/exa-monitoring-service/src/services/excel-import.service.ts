@@ -54,5 +54,5 @@ export const excelImportService = {
     const count = (classification: string) => rows.filter((row) => row.classification === classification).length;
     return { metadata: Object.fromEntries(meta), summary: { expected: entry.summary.expected, newValues: count("NEW_VALUE"), blankPending: count("BLANK_PENDING"), existingSame: count("SAME_VALUE"), existingDifferent: count("DIFFERENT_VALUE"), invalidRows: invalidRows.length }, rows, invalidRows, changes: rows.filter((row) => row.classification === "NEW_VALUE" || row.classification === "DIFFERENT_VALUE").map(({ monitoringPeriodInputId, resultValue, comment, version }) => ({ monitoringPeriodInputId, resultValue, comment, version })) };
   },
-  confirm(periodId: string, changes: any[], actor: bigint) { return resultEntryService.save(periodId, { changes }, actor, "EXCEL"); },
+  confirm(periodId: string, changes: any[], actor: bigint) { return resultEntryService.save(periodId, { resultsVersion: 0, changes }, actor, "EXCEL"); },
 };

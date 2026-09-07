@@ -3,7 +3,7 @@ import { paginationSchema } from "./pagination.schema.js";
 
 const positiveId = z.string().regex(/^[1-9]\d*$/, "Must be a positive integer ID");
 const idArray = z.array(positiveId).min(1).max(50).refine((ids) => new Set(ids).size === ids.length, "IDs must be unique");
-const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must use YYYY-MM-DD").refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)), "Invalid date");
+const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must use YYYY-MM-DD").refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`)) && new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value, "Invalid date");
 const optionalRepeated = <T extends z.ZodTypeAny>(schema: T) => z.preprocess(
   (value) => value === undefined ? undefined : Array.isArray(value) ? value : [value],
   z.array(schema).optional(),

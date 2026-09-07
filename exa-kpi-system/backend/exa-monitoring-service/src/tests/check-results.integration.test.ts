@@ -1,0 +1,99 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+const poolClient=vi.hoisted(()=>({context:vi.fn()}));
+const scorecardsClient=vi.hoisted(()=>({materialization:vi.fn()}));
+vi.mock("../clients/kpi-pool.client.js",()=>({kpiPoolClient:poolClient}));
+vi.mock("../clients/scorecards.client.js",()=>({scorecardsClient}));
+import { prisma } from "../config/prisma.js";
+import { monitoringPeriodService } from "../services/monitoring-period.service.js";
+import { resultEntryService } from "../services/result-entry.service.js";
+import { checkResultsService } from "../services/check-results.service.js";
+import { monitoringWorkflowService } from "../services/monitoring-workflow.service.js";
+import { frozen } from "./fixtures/check-results.js";
+const run=process.env.RUN_MONITORING_INTEGRATION==="true"?describe:describe.skip;
+const external=992200n;
+let id:string;
+async function cleanup(){
+ for(const p of await prisma.monitoringPeriod.findMany({where:{kpiPoolExternalId:external},select:{id:true}})){
+  const scope={input:{monitoringPeriodId:p.id}};
+  await prisma.monitoringPeriodClosure.deleteMany({where:{monitoringPeriodId:p.id}});
+  await prisma.monitoringPeriodWorkflowEvent.deleteMany({where:{monitoringPeriodId:p.id}});
+  await prisma.outboxEvent.deleteMany({where:{aggregateType:"monitoring_period",aggregateId:p.id.toString()}});
+  await prisma.monitoringValidationIssue.deleteMany({where:{monitoringPeriodId:p.id}});
+  await prisma.monitoringValidationRun.deleteMany({where:{monitoringPeriodId:p.id}});
+  await prisma.kpiResultRevision.deleteMany({where:{result:scope}});
+  await prisma.kpiResult.deleteMany({where:scope});
+  await prisma.resultEntryBatchRow.deleteMany({where:scope});
+  await prisma.resultEntryBatch.deleteMany({where:{monitoringPeriodId:p.id}});
+  await prisma.monitoringPeriodInput.deleteMany({where:{monitoringPeriodId:p.id}});
+  await prisma.monitoringPeriodScorecard.deleteMany({where:{monitoringPeriodId:p.id}});
+  await prisma.monitoringPeriod.delete({where:{id:p.id}});
+ }
+}
+const get=()=>resultEntryService.get(id);
+async function save(index:number,value:string|null){const p=await get();return resultEntryService.save(id,{resultsVersion:p.monitoringPeriod.resultsVersion,changes:[{monitoringPeriodInputId:p.inputs[index].id,resultValue:value,version:p.inputs[index].version}]},11n);}
+const check=async()=>checkResultsService.check(id,{expectedResultsVersion:(await get()).monitoringPeriod.resultsVersion},11n);
+run("Check Results MySQL acceptance",()=>{
+ beforeAll(async()=>{
+  await cleanup();
+  poolClient.context.mockResolvedValue({pool:{id:String(external),poolCode:"CHECK-TEST",poolName:"Check",status:"ACTIVE",inputFrequency:{id:"1",code:"MONTHLY"},companies:[]},period:{poolPeriodId:String(external),poolCompositionId:String(external),periodKey:"2097-01",start:"2097-01-01",end:"2097-01-31",workflowStatus:"FINALIZED"}});
+  const overall={...frozen,kpiConfigurationId:"8",configCode:"KPC-8",kpiCode:"KPI-8",kpiName:"Overall",evaluationScope:"OVERALL",subjectGoals:[],subjectType:null,goal:"50000",groupGoal:null};
+  scorecardsClient.materialization.mockResolvedValue({poolId:String(external),poolInputPeriodId:String(external),poolCompositionId:String(external),periodKey:"2097-01",readiness:"READY",reason:null,applicableScorecardCount:1,finalizedScorecardCount:1,scorecards:[{scorecardId:"992201",scorecardCode:"SC-CHECK",scorecardName:"Sales",scorecardPeriodCompositionId:"992202",departments:[],linkedScorecards:[],directKpiAssignments:[frozen,overall].map((f,i)=>({scorecardKpiAssignmentId:String(992203+i),kpiConfigurationId:f.kpiConfigurationId,kpiConfigurationRevisionId:f.kpiConfigurationRevisionId,poolMembershipExternalId:String(992205+i),weightPercent:i?"70":"30",effectiveSettings:f,displayOrder:i+1}))}]});
+  const materialized=await monitoringPeriodService.materialize({poolId:String(external),poolInputPeriodId:String(external)},11n);id=materialized.data.id;
+  await resultEntryService.save(id,{resultsVersion:0,changes:[]},11n);
+ });
+ afterAll(async()=>{await cleanup();await prisma.$disconnect();});
+ it("materializes, selects Manual, reports missing and partial scoring, then persists an authoritative complete Check",async()=>{
+  const blank=await check();expect(blank.summary).toMatchObject({expected:5,entered:0});
+  expect(blank.check.evaluations).toHaveLength(5);expect(blank.check.evaluations.every((e:any)=>e.status==="NOT_CALCULABLE"&&e.compliancePercent===null)).toBe(true);
+  expect(await prisma.kpiResult.count({where:{input:{monitoringPeriodId:BigInt(id)}}})).toBe(0);
+  for(const [i,value] of ["83500","58200","52000"].entries())await save(i,value);
+  const partial=await check();expect(partial.check.summary).toMatchObject({completionPercent:60,readyForSubmit:false});expect(partial.check.scorecards[0]).toMatchObject({scoreStatus:"PARTIAL",score:"24.760000",weightCoverage:"100.000000"});
+  await save(3,"49500");await save(4,"57300");
+  const before=await get();const checked=await check();
+  expect(checked.monitoringPeriod).toMatchObject({status:"DRAFT",resultsVersion:before.monitoringPeriod.resultsVersion});
+  expect(checked.check).toMatchObject({status:"CURRENT",basedOnResultsVersion:before.monitoringPeriod.resultsVersion,summary:{readyForSubmit:true}});
+  expect(checked.check.evaluations.map((e:any)=>e.weightedContribution)).toEqual(["10.000000","7.760000","7.000000","4.950000","70.000000"]);
+  expect(checked.check.evaluations[4]).toMatchObject({rawAchievementPercent:"114.600000",goalMet:true,compliancePercent:"100.000000"});
+  expect(checked.check.scorecards[0]).toMatchObject({score:"99.710000",scoreStatus:"COMPLETE"});
+  expect((await get()).check).toEqual(checked.check);
+  expect(poolClient.context).toHaveBeenCalledTimes(1);expect(scorecardsClient.materialization).toHaveBeenCalledTimes(1);
+ });
+ it("preserves repeated immutable runs, ignores workflow-only versions and no-ops, and clears stale scores",async()=>{
+  const current=await get();const original=await prisma.monitoringValidationRun.findUniqueOrThrow({where:{id:BigInt(current.check.runId)}});
+  await prisma.monitoringPeriod.update({where:{id:BigInt(id)},data:{version:{increment:9}}});
+  expect((await get()).check.status).toBe("CURRENT");
+  const noop=await save(0,"83500.000000");expect(noop.check.status).toBe("CURRENT");expect(noop.monitoringPeriod.resultsVersion).toBe(current.monitoringPeriod.resultsVersion);
+  const repeated=await check();expect(repeated.check.runId).not.toBe(current.check.runId);expect(repeated.check.evaluations).toEqual(current.check.evaluations);
+  const changed=await save(0,"84000");expect(changed.check.status).toBe("STALE");expect(changed.check.evaluations).toEqual([]);expect(changed.inputs[0].scoring).toBeNull();
+  expect(await prisma.kpiResult.findUniqueOrThrow({where:{monitoringPeriodInputId:BigInt(changed.inputs[0].id)}})).toMatchObject({goalMet:null,compliancePercent:null,trafficLightCode:null});
+  expect(await prisma.monitoringValidationRun.findUniqueOrThrow({where:{id:original.id}})).toEqual(original);
+  const rechecked=await check();expect(rechecked.check).toMatchObject({status:"CURRENT",basedOnResultsVersion:changed.monitoringPeriod.resultsVersion});
+  const history=await checkResultsService.history(id);expect(history.latestCurrentRunId).toBe(rechecked.check.runId);expect(history.runs.find(r=>r.id===String(original.id))?.status).toBe("STALE");
+ });
+ it("never publishes a Check for the wrong version when saving and checking concurrently",async()=>{
+  const current=await get();
+  const results=await Promise.allSettled([checkResultsService.check(id,{expectedResultsVersion:current.monitoringPeriod.resultsVersion},11n),resultEntryService.save(id,{resultsVersion:current.monitoringPeriod.resultsVersion,changes:[{monitoringPeriodInputId:current.inputs[0].id,resultValue:"85000",version:current.inputs[0].version}]},11n)]);
+  for(const result of results)if(result.status==="rejected")expect(result.reason.code).toBe("RESULT_VERSION_CONFLICT");
+  const latest=await get();if(latest.check.status==="CURRENT")expect(latest.check.basedOnResultsVersion).toBe(latest.monitoringPeriod.resultsVersion);else expect(latest.check.evaluations).toEqual([]);
+  expect(results.some(r=>r.status==="fulfilled")).toBe(true);
+ });
+ it("completes submit, correction, recheck, approval and immutable closure", async()=>{
+  let current=await check();
+  current=await monitoringWorkflowService.submit(id,{version:current.monitoringPeriod.version},11n);
+  expect(current.monitoringPeriod.status).toBe("SUBMITTED");
+  await expect(save(0,"86000")).rejects.toMatchObject({statusCode:409});
+  current=await monitoringWorkflowService.returnForCorrection(id,{version:current.monitoringPeriod.version,reason:"Please correct the first result"},12n);
+  expect(current.monitoringPeriod.status).toBe("DRAFT");
+  current=await save(0,"86000");
+  await expect(monitoringWorkflowService.submit(id,{version:current.monitoringPeriod.version},11n)).rejects.toMatchObject({code:"VALIDATION_REQUIRED"});
+  current=await check();
+  current=await monitoringWorkflowService.submit(id,{version:current.monitoringPeriod.version},11n);
+  current=await monitoringWorkflowService.approve(id,{version:current.monitoringPeriod.version},12n);
+  expect(current.monitoringPeriod.status).toBe("VALIDATED");
+  current=await monitoringWorkflowService.close(id,{version:current.monitoringPeriod.version,withExceptions:false,justification:null},12n);
+  expect(current.monitoringPeriod.status).toBe("CLOSED");
+  expect(current.scorecards[0].finalScorePercent).toBe(current.scorecards[0].previewScorePercent);
+  await expect(save(0,"87000")).rejects.toMatchObject({statusCode:409});
+  expect(await prisma.monitoringPeriodWorkflowEvent.count({where:{monitoringPeriodId:BigInt(id)}})).toBe(5);
+ });
+});

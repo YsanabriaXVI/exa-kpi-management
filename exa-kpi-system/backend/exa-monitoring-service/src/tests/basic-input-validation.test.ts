@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { saveResultEntryBodySchema } from "../schemas/monitoring-period.schema.js";
 
-const body = (resultValue: string | null) => ({ changes: [{ monitoringPeriodInputId: "1", resultValue, comment: null, version: null }] });
+const body = (resultValue: string | null) => ({ resultsVersion: 0, changes: [{ monitoringPeriodInputId: "1", resultValue, comment: null, version: null }] });
 
 describe("Basic Input Validation V1", () => {
   it("accepts zero and null as distinct valid Draft inputs", () => {

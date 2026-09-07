@@ -14,7 +14,7 @@ export const scorecardPeriodKpiParamsSchema = scorecardPeriodParamsSchema.extend
 export const scorecardPeriodLinkParamsSchema = scorecardPeriodParamsSchema.extend({ linkedScorecardId: externalId });
 const weight = z.coerce.number().nonnegative().max(100).multipleOf(0.0001);
 export const addPeriodKpisBodySchema = z.object({ items: z.array(z.object({ poolMembershipExternalId: externalId, weight })).min(1) });
-export const updatePeriodWeightsBodySchema = z.object({ kpis: z.array(z.object({ kpiConfigurationExternalId: externalId, weight })), linkedScorecards: z.array(z.object({ linkedScorecardId: externalId, weight })) });
+export const updatePeriodWeightsBodySchema = z.object({ kpis: z.array(z.object({ kpiConfigurationExternalId: externalId, weight, entityWeights: z.array(z.object({ subjectExternalId: z.string().min(1), weight: weight.nullable() })).optional() })), linkedScorecards: z.array(z.object({ linkedScorecardId: externalId, weight })) });
 export const updatePeriodScopeBodySchema = z.object({ departments: z.array(z.object({ id: externalId, companyId: externalId, code: z.string().trim().min(1).max(50), name: z.string().trim().min(1).max(150), collaborators: z.array(z.object({ id: externalId, code: z.string().trim().min(1).max(50), name: z.string().trim().min(1).max(220) })) })).min(1) });
 export const addPeriodLinkBodySchema = z.union([
   z.object({ linkedScorecardId: externalId, weight }),

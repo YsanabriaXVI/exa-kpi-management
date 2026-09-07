@@ -17,7 +17,6 @@ export const poolScopes: Record<string, { companies: string[]; departments: type
   "OPS-04-2026 · Pool EXA 3er Cuatrimestre 2026": { companies: ["EXA"], departments: exaDepartments },
   "Pool EXA 3er Cuatrimestre 2026": { companies: ["EXA"], departments: exaDepartments },
 };
-const SCORECARD_SOURCE_EXCLUDED_POOL_CODES = new Set(["OPS-02-2026"]);
 
 export function CreateScorecardInfo() {
   const navigate = useNavigate();
@@ -40,8 +39,7 @@ export function CreateScorecardInfo() {
   const poolsQuery = useQuery({
     queryKey: ["kpi-pools", "scorecard-source", "DRAFT_ACTIVE"],
     queryFn: () => kpiPoolService.listPage({ page: 1, pageSize: 100, status: ["DRAFT", "ACTIVE"], sortBy: "poolName", sortOrder: "asc" }).then((response) => {
-      const today = new Date().toISOString().slice(0, 10);
-      return response.data.filter((pool) => pool.validTo >= today && (pool.kpiCount ?? 0) > 0 && !SCORECARD_SOURCE_EXCLUDED_POOL_CODES.has(pool.code));
+      return response.data.filter((pool) => (pool.kpiCount ?? 0) > 0);
     }),
     staleTime: 0,
     refetchOnMount: "always",

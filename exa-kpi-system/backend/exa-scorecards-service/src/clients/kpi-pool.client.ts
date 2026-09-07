@@ -46,8 +46,7 @@ export const kpiPoolClient = {
   },
   async eligiblePools() {
     const result = await request<{ data: PoolRecord[] }>("/api/v1/kpi-pools?page=1&pageSize=100&status=DRAFT&status=ACTIVE&sortBy=poolName&sortOrder=asc");
-    const today = new Date().toISOString().slice(0, 10);
-    return Promise.all(result.data.filter((pool) => pool.validTo >= today).map(async (pool) => {
+    return Promise.all(result.data.map(async (pool) => {
       const periods = await kpiPoolClient.periods(pool.id);
       return { id: pool.id, poolCode: pool.poolCode, poolName: pool.poolName, companies: pool.companies.map(({ id, code, name }) => ({ id, code, name })), validFrom: pool.validFrom, validTo: pool.validTo, frequency: { id: pool.inputFrequency.id, code: pool.inputFrequency.code, name: formatFrequency(pool.inputFrequency.code) }, inputPeriods: periods.length };
     }));

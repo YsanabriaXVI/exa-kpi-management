@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const tx = vi.hoisted(() => ({
   monitoringPeriod: { findUnique: vi.fn() },
   monitoringPeriodInput: { findMany: vi.fn() },
-  resultEntryBatch: { create: vi.fn() },
+  resultEntryBatch: { create: vi.fn(), findFirst: vi.fn() },
 }));
 const db = vi.hoisted(() => ({ monitoringPeriod: { findUnique: vi.fn() }, $transaction: vi.fn() }));
 vi.mock("../config/prisma.js", () => ({ prisma: db }));
@@ -23,15 +23,15 @@ describe("Result Entry", () => {
   it("counts zero as Entered and null as Pending", async () => {
     db.monitoringPeriod.findUnique.mockResolvedValue(period);
     const result = await resultEntryService.get("1");
-    expect(result.summary).toEqual({ expected: 3, entered: 1, pending: 2 });
+    expect(result.summary).toEqual({ expected: 3, entered: 1, pending: 2, completionPercent: 33 });
     expect(result.inputs[0]).toMatchObject({ entryStatus: "ENTERED", resultValue: "0" });
     expect(result.inputs[1]).toMatchObject({ entryStatus: "PENDING", resultValue: null });
   });
 
   it("rejects a stale version before creating a batch", async () => {
-    tx.monitoringPeriod.findUnique.mockResolvedValue({ id: 1n, status: { code: "DRAFT" } });
+    tx.monitoringPeriod.findUnique.mockResolvedValue({ id: 1n, resultsVersion:0, status: { code: "DRAFT" } });
     tx.monitoringPeriodInput.findMany.mockResolvedValue([input(1n, "80", 2)]);
-    await expect(resultEntryService.save("1", { changes: [{ monitoringPeriodInputId: "1", resultValue: "85", comment: null, version: 1 }] }, 7n)).rejects.toMatchObject({ statusCode: 409, code: "RESULT_VERSION_CONFLICT" });
+    await expect(resultEntryService.save("1", { resultsVersion:0, changes: [{ monitoringPeriodInputId: "1", resultValue: "85", comment: null, version: 1 }] }, 7n)).rejects.toMatchObject({ statusCode: 409, code: "RESULT_VERSION_CONFLICT" });
     expect(tx.resultEntryBatch.create).not.toHaveBeenCalled();
   });
 });

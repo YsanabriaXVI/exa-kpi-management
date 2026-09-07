@@ -1,0 +1,61 @@
+.manual-v1 { padding: 24px; }
+.manual-v1 [hidden] { display: none !important; }
+.monitoring-wizard { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; margin: 24px 0; }
+.monitoring-wizard button { display:flex; align-items:center; gap:10px; min-height:72px; padding:14px; border:1px solid #ced8e4; border-radius:10px; background:#fff; color:#475569; text-align:left; cursor:pointer; }
+.monitoring-wizard button > span { display:grid; place-items:center; flex:0 0 30px; height:30px; border-radius:50%; background:#e8edf4; }
+.monitoring-wizard button[aria-current=step] { border:2px solid #1764a0; background:#eef6ff; color:#134a78; }
+.monitoring-wizard button[aria-current=step] > span { color:white; background:#1764a0; }
+.monitoring-wizard button:disabled { opacity:.5; cursor:not-allowed; }
+.wizard-footer { border-top:1px solid #dce3ec; padding-top:20px; margin-top:24px; flex-wrap:wrap; }
+.wizard-footer > div,.detail-workflow-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.detail-workflow-actions { margin:20px 0; }
+.wizard-scorecards { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:16px; }
+.overview-scoring { padding:12px 20px; border-top:1px solid #dce3ec; }
+.overview-scoring p { margin:8px 0; }
+.monitoring-score-blocked { padding:18px 20px; margin:20px 0; background:#fff7ed; border:1px solid #fdba74; border-radius:10px; color:#85400e; }
+.pool-period-explorer { margin:24px 0 36px; }
+.pool-period-explorer > header,.pool-calendar > header { display:flex; justify-content:space-between; align-items:center; gap:20px; flex-wrap:wrap; }
+.pool-period-explorer h2,.pool-calendar h3 { margin:4px 0 8px; }
+.pool-period-explorer input { display:block; padding:10px 12px; border:1px solid #cbd5e1; border-radius:8px; min-width:260px; margin-top:6px; }
+.pool-calendar { margin:14px 0; padding:20px; border:1px solid #dce3ec; border-radius:12px; background:white; }
+.pool-calendar small,.pool-calendar-periods span { color:#526176; }
+.pool-calendar-periods { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:10px; margin-top:16px; }
+.pool-calendar-periods button { padding:12px; border:1px solid #cbd5e1; border-radius:9px; background:#f8fafc; text-align:left; cursor:pointer; }
+.pool-calendar-periods button > * { display:block; margin:3px 0; }
+.pool-calendar-periods button.initialized { border-color:#68a8ca; background:#eff8ff; }
+.pool-calendar-periods button[aria-pressed=true] { outline:2px solid #1764a0; }
+.pool-calendar-readiness { margin-top:14px; border-top:1px solid #dce3ec; padding-top:14px; }
+.traffic-status { display:inline-flex; align-items:center; gap:7px; padding:5px 9px; border-radius:20px; font-weight:600; white-space:nowrap; }
+.traffic-status i { width:9px; height:9px; border-radius:50%; background:currentColor; }
+.traffic-status.green { background:#e7f6ec; color:#18703b; }
+.traffic-status.yellow { background:#fff3cd; color:#8a5900; }
+.traffic-status.red { background:#fee8e7; color:#b42318; }
+.traffic-unavailable { color:#64748b; }
+@media(max-width:800px) { .monitoring-wizard { grid-template-columns:1fr; } .monitoring-wizard button { min-height:48px; } .pool-period-explorer input { min-width:0; width:100%; } }
+.manual-v1-summary { padding: 16px; background: #f1f5f9; border-radius: 8px; }
+.manual-v1-group { margin: 24px 0; border: 1px solid #dce3ec; border-radius: 10px; overflow: hidden; }
+.manual-v1-group > header { padding: 16px 20px; background: #f8fafc; }
+.manual-v1-group h3 { margin: 0; }
+.manual-v1-group header p { margin: 6px 0 0; color: #526176; }
+.manual-v1-group-goal { padding: 16px 20px; border-top: 1px solid #dce3ec; }
+.manual-v1 footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.manual-v1 input:disabled { background: #f1f5f9; color: #475569; }
+
+.check-results-review { margin-top: 28px; border-top: 1px solid #dce3ec; padding-top: 24px; }
+.check-results-review > header {display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+.check-evaluations { min-width: 1100px; }
+.check-evaluations small {display:block;color:#526176;margin-top:4px;}
+.check-scorecard,.check-findings li {padding:16px;border:1px solid #dce3ec;border-radius:8px;margin:12px 0;}
+.check-findings {list-style:none;padding:0;}
+
+.historical-baseline { margin:16px 0; padding:16px; border:1px solid #d4dce6; border-radius:10px; background:#f8fafc; }
+.historical-baseline button { margin-top:10px; }
+.baseline-dialog { border:1px solid #cbd5e1; border-radius:14px; padding:24px; width:min(700px,90vw); max-height:85vh; overflow:auto; color:#172b4d; box-shadow:0 20px 60px #172b4d40; }
+.baseline-dialog::backdrop { background:#10243a80; }
+.baseline-dialog header { display:flex; justify-content:space-between; gap:16px; align-items:center; }
+.baseline-dialog section { margin:20px 0; }
+.baseline-dialog label { display:block; margin:12px 0; }
+.baseline-dialog label input:not([type=radio]), .baseline-dialog textarea { display:block; width:100%; padding:10px; border:1px solid #b8c5d5; border-radius:6px; box-sizing:border-box; }
+.baseline-dialog .baseline-candidate { display:flex; gap:12px; padding:12px; border:1px solid #d4dce6; border-radius:8px; }
+.baseline-dialog button { padding:8px 14px; cursor:pointer; }
+.baseline-dialog button:disabled { opacity:.5; cursor:default; }

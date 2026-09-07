@@ -28,6 +28,12 @@ model MonitoringPeriodStatus {
 }
 
 model MonitoringPeriod {
+  baselineVersion                 Int                         @default(0) @map("baseline_version")
+  currentScoringBaselineVersion    Int?                        @map("current_scoring_baseline_version")
+  baselineResolutions             HistoricalBaselineResolution[]
+  selectedEntryMethod             String?                     @map("selected_entry_method") @db.VarChar(20)
+  currentScoringResultsVersion     Int?                        @map("current_scoring_results_version")
+  resultsVersion                  Int                         @default(0) @map("results_version")
   id                              BigInt                      @id @default(autoincrement()) @map("monitoring_period_id")
   kpiPoolExternalId               BigInt                      @map("kpi_pool_id")
   poolInputPeriodExternalId       BigInt                      @map("pool_input_period_id")
@@ -161,6 +167,8 @@ model MonitoringPeriodScorecard {
 }
 
 model MonitoringPeriodInput {
+  baselineResolutions                HistoricalBaselineResolution[]
+  effectiveSettingsSnapshot         Json?                            @map("effective_settings_snapshot")
   id                                 BigInt                           @id @default(autoincrement()) @map("monitoring_period_input_id")
   monitoringPeriodId                 BigInt                           @map("monitoring_period_id")
   monitoringPeriodScorecardId        BigInt                           @map("monitoring_period_scorecard_id")
@@ -214,10 +222,13 @@ model MonitoringPeriodInput {
 }
 
 model MonitoringValidationRun {
+  basedOnBaselineVersion  Int                         @default(0) @map("based_on_baseline_version")
   id                      BigInt                      @id @default(autoincrement()) @map("monitoring_validation_run_id")
   monitoringPeriodId      BigInt                      @map("monitoring_period_id")
   runNo                   Int                         @map("run_no")
-  resultsVersion          Int                         @map("results_version")
+  legacyWorkflowVersion   Int?                        @map("results_version")
+  basedOnResultsVersion   Int?                        @map("based_on_results_version")
+  scoringSnapshot         Json?                       @map("scoring_snapshot")
   status                  String                      @db.VarChar(30)
   calculationVersion      String                      @map("calculation_version") @db.VarChar(30)
   summary                 Json
@@ -231,6 +242,41 @@ model MonitoringValidationRun {
   @@unique([monitoringPeriodId, runNo], map: "uq_mvr_period_run")
   @@index([monitoringPeriodId, status, createdAt], map: "ix_mvr_period_status")
   @@map("monitoring_validation_runs")
+}
+
+// Append-only resolution revisions. Latest revisionNo per input is the active context.
+// Source identifiers deliberately have no cross-service (or mutable source) foreign keys.
+model HistoricalBaselineResolution {
+  id                               BigInt @id @default(autoincrement()) @map("historical_baseline_resolution_id")
+  monitoringPeriodId               BigInt @map("monitoring_period_id")
+  monitoringPeriodInputId          BigInt @map("monitoring_period_input_id")
+  revisionNo                       Int @map("revision_no")
+  baselineVersion                  Int @map("baseline_version")
+  referenceType                    String @map("reference_type") @db.VarChar(40)
+  requiredPeriodKey                String @map("required_period_key") @db.VarChar(30)
+  requiredPeriodStart              DateTime @map("required_period_start") @db.Date
+  requiredPeriodEnd                DateTime @map("required_period_end") @db.Date
+  subjectExternalId                String? @map("subject_external_id") @db.VarChar(100)
+  sourceType                       String @map("source_type") @db.VarChar(20)
+  baselineValueSnapshot            Decimal @map("baseline_value_snapshot") @db.Decimal(20,6)
+  baselineUnitSnapshot             Json @map("baseline_unit_snapshot")
+  sourceMonitoringPeriodId         BigInt? @map("source_monitoring_period_id")
+  sourceResultId                   BigInt? @map("source_result_id")
+  sourcePoolExternalId             BigInt? @map("source_pool_external_id")
+  sourceScorecardExternalId        BigInt? @map("source_scorecard_external_id")
+  sourceKpiDefinitionExternalId    BigInt? @map("source_kpi_definition_external_id")
+  sourceKpiConfigurationExternalId BigInt? @map("source_kpi_configuration_external_id")
+  sourceSubjectExternalId          String? @map("source_subject_external_id") @db.VarChar(100)
+  provenance                      Json
+  reason                          String? @db.Text
+  resolvedByUserId                 BigInt @map("resolved_by_user_id")
+  resolvedAt                      DateTime @default(now()) @map("resolved_at") @db.DateTime(3)
+  period                          MonitoringPeriod @relation(fields: [monitoringPeriodId], references: [id], onDelete: Cascade, map: "fk_baseline_period")
+  input                           MonitoringPeriodInput @relation(fields: [monitoringPeriodInputId], references: [id], onDelete: Cascade, map: "fk_baseline_input")
+
+  @@unique([monitoringPeriodInputId, revisionNo], map: "uq_baseline_input_revision")
+  @@index([monitoringPeriodId, baselineVersion], map: "ix_baseline_period_version")
+  @@map("historical_baseline_resolutions")
 }
 
 model MonitoringValidationIssue {
@@ -375,6 +421,7 @@ model KpiResult {
   statusId                BigInt                @map("kpi_result_status_id")
   resultValue             Decimal?              @map("result_value") @db.Decimal(20, 6)
   comment                 String?               @db.Text
+  goalMet                 Boolean?              @map("goal_met")
   rawAchievementPercent   Decimal?              @map("raw_achievement_percent") @db.Decimal(12, 6)
   compliancePercent       Decimal?              @map("compliance_percent") @db.Decimal(12, 6)
   weightedScorePoints     Decimal?              @map("weighted_score_points") @db.Decimal(12, 6)

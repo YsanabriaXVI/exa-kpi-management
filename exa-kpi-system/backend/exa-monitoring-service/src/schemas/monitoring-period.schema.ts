@@ -31,12 +31,13 @@ const decimalValue = z.string().trim()
   .nullable();
 
 export const saveResultEntryBodySchema = z.object({
+  resultsVersion: z.number().int().nonnegative(),
   changes: z.array(z.object({
     monitoringPeriodInputId: id,
     resultValue: decimalValue,
-    comment: z.string().max(10_000).nullable(),
+    comment: z.string().max(10_000).nullable().optional(),
     version: z.number().int().positive().nullable(),
-  }).strict()).min(1),
+  }).strict()),
 }).strict();
 
 export type SaveResultEntryBody = z.infer<typeof saveResultEntryBodySchema>;
@@ -49,3 +50,6 @@ export const closeMonitoringPeriodBodySchema = workflowVersionBodySchema.extend(
 export type WorkflowVersionBody = z.infer<typeof workflowVersionBodySchema>;
 export type ReturnForCorrectionBody = z.infer<typeof returnForCorrectionBodySchema>;
 export type CloseMonitoringPeriodBody = z.infer<typeof closeMonitoringPeriodBodySchema>;
+
+export const checkResultsBodySchema = z.object({ expectedResultsVersion: z.number().int().nonnegative(), expectedBaselineVersion: z.number().int().nonnegative().optional() }).strict();
+export type CheckResultsBody = z.infer<typeof checkResultsBodySchema>;

@@ -1,0 +1,102 @@
+{
+  "contractVersion": "EffectiveKpiSettingsV1",
+  "kpiConfigurationId": "5",
+  "kpiConfigurationRevisionId": "6",
+  "revisionNumber": 1,
+  "kpiDefinitionId": "7",
+  "configCode": "KPC-5",
+  "kpiCode": "KPI-5",
+  "kpiName": "Increase Sales",
+  "objective": null,
+  "goal": "10",
+  "goalMode": "SINGLE",
+  "rangeMinGoal": null,
+  "rangeMaxGoal": null,
+  "evaluationScope": "OVERALL",
+  "subjectType": null,
+  "subjects": [],
+  "subjectGoals": [],
+  "groupGoal": null,
+  "goalUnit": {
+    "id": "2",
+    "code": "PERCENT",
+    "name": "Percent",
+    "symbol": "%"
+  },
+  "measurementUnit": {
+    "id": "1",
+    "code": "USD",
+    "name": "Dollars",
+    "symbol": "USD"
+  },
+  "evaluationType": {
+    "id": "1",
+    "code": "GREATER_IS_BETTER",
+    "name": "Greater"
+  },
+  "resultSemantics": "ABSOLUTE_VALUE",
+  "scoringMethod": "PROPORTIONAL",
+  "scoringRuleConfig": {
+    "floorPercent": 0,
+    "capPercent": 100
+  },
+  "scoringRuleConfigVersion": 1,
+  "negativeResultPolicy": "DISALLOW",
+  "scoringApprovalStatus": "APPROVED",
+  "dataSource": {
+    "id": "1",
+    "code": "MANUAL",
+    "name": "Manual"
+  },
+  "thresholds": [
+    {
+      "id": "1",
+      "trafficLightLevelId": "1",
+      "code": "RED",
+      "name": "RED",
+      "rangeMinPercent": "0",
+      "rangeMaxPercent": "65",
+      "includesMin": true,
+      "includesMax": false,
+      "displayOrder": 1
+    },
+    {
+      "id": "2",
+      "trafficLightLevelId": "2",
+      "code": "YELLOW",
+      "name": "YELLOW",
+      "rangeMinPercent": "65",
+      "rangeMaxPercent": "80",
+      "includesMin": true,
+      "includesMax": false,
+      "displayOrder": 2
+    },
+    {
+      "id": "3",
+      "trafficLightLevelId": "3",
+      "code": "GREEN",
+      "name": "GREEN",
+      "rangeMinPercent": "80",
+      "rangeMaxPercent": "100",
+      "includesMin": true,
+      "includesMax": true,
+      "displayOrder": 3
+    }
+  ],
+  "executability": {
+    "capabilityVersion": "KPI_EXECUTION_V1",
+    "status": "EXECUTABLE",
+    "executable": true,
+    "reasons": []
+  },
+  "periodScope": "PREVIOUS_PERIOD",
+  "comparisonMode": "PREVIOUS_PERIOD",
+  "comparisonDirection": "INCREASE",
+  "targetKind": "CHANGE_TARGET",
+  "historicalCapabilityVersion": "HISTORICAL_COMPARISON_V1",
+  "inputFrequency": {
+    "id": "1",
+    "code": "MONTHLY",
+    "monthsPerPeriod": 1
+  }
+}

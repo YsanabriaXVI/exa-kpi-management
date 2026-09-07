@@ -1,3 +1,5 @@
+import { historicalContractError } from "../contracts/historical-contract.js";
+
 export const KPI_EXECUTION_CAPABILITY_VERSION = "KPI_EXECUTION_V1" as const;
 
 export type KpiExecutabilityReasonCode =
@@ -19,7 +21,7 @@ export type KpiExecutabilityReasonCode =
   | "SUBJECT_ID_REQUIRED"
   | "DUPLICATE_SUBJECT_ID"
   | "SUBJECT_GOAL_REQUIRED"
-  | "HISTORICAL_COMPARISON_RUNTIME_NOT_SUPPORTED"
+  | "HISTORICAL_CONTRACT_INVALID"
   | "GROUP_GOAL_RUNTIME_UNDEFINED"
   | "RESULT_METHOD_RUNTIME_NOT_SUPPORTED"
   | "LEGACY_RANGE_RUNTIME_NOT_SUPPORTED";
@@ -32,6 +34,7 @@ export type KpiExecutability = {
 };
 
 export type ExecutabilityInput = {
+  comparisonDirection?: string | null; targetKind?: string | null; scoringRuleConfig?: unknown; monthsPerPeriod?: number;
   active: boolean;
   evaluationScope: string | null;
   periodScope: string | null;
@@ -63,7 +66,7 @@ const messages: Record<KpiExecutabilityReasonCode, string> = {
   SUBJECT_TYPE_REQUIRED: "BY_ENTITY requires a Subject Type.", SUBJECTS_REQUIRED: "BY_ENTITY requires at least one entity.",
   SUBJECT_ID_REQUIRED: "Every entity must have a stable external ID.", DUPLICATE_SUBJECT_ID: "Duplicate entity external IDs are not allowed.",
   SUBJECT_GOAL_REQUIRED: "Every selected entity must have a Goal / Target.",
-  HISTORICAL_COMPARISON_RUNTIME_NOT_SUPPORTED: "Historical comparison runtime is not implemented yet.",
+  HISTORICAL_CONTRACT_INVALID: "Historical comparison requires a complete HISTORICAL_COMPARISON_V1 contract.",
   GROUP_GOAL_RUNTIME_UNDEFINED: "Group Goal runtime evaluation has not been defined.",
   RESULT_METHOD_RUNTIME_NOT_SUPPORTED: "The configured Result Method is not supported by runtime V1.",
   LEGACY_RANGE_RUNTIME_NOT_SUPPORTED: "Legacy Range runtime is not supported by runtime V1.",
@@ -75,7 +78,7 @@ export function evaluateKpiExecutability(input: ExecutabilityInput): KpiExecutab
   add(!input.active, "KPI_CONFIGURATION_INACTIVE");
   add(!["OVERALL", "BY_SUBJECT"].includes(input.evaluationScope ?? ""), "GOAL_SCOPE_REQUIRED");
   add(!input.periodScope, "EVALUATION_REFERENCE_REQUIRED");
-  add(!!input.periodScope && input.periodScope !== "CURRENT_PERIOD", "HISTORICAL_COMPARISON_RUNTIME_NOT_SUPPORTED");
+  add(!!historicalContractError({...input, comparisonMode: input.periodScope, historicalCapabilityVersion: "HISTORICAL_COMPARISON_V1", inputFrequency: {id: "0", code: input.frequencyCode, monthsPerPeriod: input.monthsPerPeriod}}), "HISTORICAL_CONTRACT_INVALID");
   add(!input.goalUnit?.id && !input.goalUnit?.code && !input.goalUnit?.symbol, "GOAL_MEASUREMENT_UNIT_REQUIRED");
   add(!input.measurementUnit?.id && !input.measurementUnit?.code && !input.measurementUnit?.symbol, "OFFICIAL_RESULT_UNIT_REQUIRED");
   add(!input.dataSource?.id && !input.dataSource?.code, "DATA_SOURCE_REQUIRED");
@@ -83,7 +86,7 @@ export function evaluateKpiExecutability(input: ExecutabilityInput): KpiExecutab
   add(!input.resultSemantics, "RESULT_SEMANTICS_REQUIRED"); add(!input.scoringMethod, "SCORING_METHOD_REQUIRED");
   add(input.scoringApprovalStatus !== "APPROVED", "SCORING_CONFIGURATION_NOT_APPROVED");
   add(input.resultMethod !== "DIRECT", "RESULT_METHOD_RUNTIME_NOT_SUPPORTED"); add(input.goalMode === "RANGE", "LEGACY_RANGE_RUNTIME_NOT_SUPPORTED");
-  add(input.groupGoal != null, "GROUP_GOAL_RUNTIME_UNDEFINED");
+  // Group Goal is informational, without aggregation or weight.
   const levels = new Set((input.thresholds ?? []).filter((item) => item.rangeMinPercent != null && item.rangeMaxPercent != null).map((item) => item.code));
   add(!["RED", "YELLOW", "GREEN"].every((code) => levels.has(code)), "TRAFFIC_LIGHT_STRUCTURE_INVALID");
   if (input.evaluationScope === "OVERALL") add(input.goal == null, "GOAL_REQUIRED");

@@ -1,11 +1,9 @@
 import { prisma } from "../src/config/database/prisma.js";
-import { importKpiDefinitionMocks } from "./import-kpi-definition-mocks.js";
-import { importKpiConfigurationMocks } from "./import-kpi-configuration-mocks.js";
+import { seedReferenceCatalogs } from "./reference-catalogs.js";
 
 try {
-  const definitions = await importKpiDefinitionMocks(prisma);
-  const configurations = await importKpiConfigurationMocks(prisma);
-  console.info("KPI Management seed completed", { definitions, configurations });
+  await seedReferenceCatalogs(prisma);
+  console.info("KPI Management structural catalogs seeded (no demo KPIs)");
 } finally {
   await prisma.$disconnect();
 }

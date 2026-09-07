@@ -537,7 +537,12 @@ export const kpiPoolService = {
       sortBy: "createdAt",
       sortOrder: "desc",
     });
-    return response.data;
+    const records = [...response.data];
+    for (let page = 2; page <= response.meta.totalPages; page++) {
+      const next = await this.listPage({ page, pageSize: 100, sortBy: "createdAt", sortOrder: "desc" });
+      records.push(...next.data);
+    }
+    return records;
   },
   async listPage(params: PoolListParams) {
     const query = new URLSearchParams({

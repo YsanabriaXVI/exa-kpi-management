@@ -14,9 +14,9 @@ describe("Input Period resolver", () => {
     expect(formatDateOnly(period.end)).toBe(expectedEnd);
   });
 
-  it("defaults an ACTIVE monthly Pool change to the next Input Period", () => {
-    const period = defaultTargetPeriod(new Date("2026-01-01T00:00:00.000Z"), new Date("2026-06-30T00:00:00.000Z"), 1, "ACTIVE", new Date("2026-03-15T00:00:00.000Z"));
-    expect(formatDateOnly(period.start)).toBe("2026-04-01");
+  it("defaults historical reads to the first business period", () => {
+    const period = defaultTargetPeriod(new Date("2023-01-01"), new Date("2023-12-31"), 1, "ACTIVE");
+    expect(formatDateOnly(period.start)).toBe("2023-01-01");
   });
 
   it("requires complete aligned periods and supports historical lookup", () => {

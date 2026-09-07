@@ -21,6 +21,7 @@ import "./monitoring-results.css";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
 import { monitoringReadService } from "./monitoring-results.service";
+import { PoolPeriodExplorer } from "./PoolPeriodExplorer";
 
 const statusLabels: Record<MonitoringStatus, string> = {
   ACTIVE: "Active",
@@ -341,7 +342,7 @@ export function MonitoringOverview() {
   const [search, setSearch] = useState("");
   const [companiesSelected, setCompaniesSelected] = useState<string[]>([]);
   const [frequencies, setFrequencies] = useState<string[]>([]);
-  const [periodYear, setPeriodYear] = useState(2026);
+  const [periodYear, setPeriodYear] = useState(new Date().getFullYear());
   const [periodMonths, setPeriodMonths] = useState<number[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -354,7 +355,7 @@ export function MonitoringOverview() {
   const apiStatuses=statuses.flatMap((value)=>value==="ACTIVE"||value==="CONTINUE_ENTRY"?["DRAFT"]:value==="VALIDATED_WITH_WARNINGS"?["VALIDATED"]:[value]);
   const overviewQuery=useQuery({queryKey:["monitoring-overview",page,pageSize,search,companiesSelected,frequencies,periodYear,periodMonths,apiStatuses],queryFn:()=>monitoringReadService.overview({page,pageSize,search:search.trim()||undefined,company:companiesSelected,frequency:frequencies,status:apiStatuses,year:periodYear,month:periodMonths.map((month)=>String(month+1)),sortBy:"periodStart",sortOrder:"desc"}),retry:false});
   const companies=overviewQuery.data?.facets?.companies??[];
-  const paginatedPools:MonitoringPool[]=(overviewQuery.data?.items??[]).map((item)=>({id:Number(item.poolId),monitoringPeriodId:item.id,code:item.poolCode,name:item.poolName,companies:item.companies.map((company)=>company.name),duration:`${item.periodStart} - ${item.periodEnd}`,frequency:item.frequency??"Not available",currentPeriod:item.periodLabel,generatedInputs:1,closedInputs:item.status==="CLOSED"?1:0,kpiLines:item.expected,resultsEntered:item.entered,missing:item.pending,status:item.status==="DRAFT"?(item.entered?"CONTINUE_ENTRY":"ACTIVE"):item.status==="VALIDATED"&&item.validationStatus==="WITH_WARNINGS"?"VALIDATED_WITH_WARNINGS":item.status as MonitoringStatus} as MonitoringPool & {monitoringPeriodId:string}));
+  const paginatedPools:MonitoringPool[]=(overviewQuery.data?.items??[]).map((item)=>({id:Number(item.poolId),monitoringPeriodId:item.id,scorecards:item.scorecards,trafficLights:item.trafficLights,code:item.poolCode,name:item.poolName,companies:item.companies.map((company)=>company.name),duration:`${item.periodStart} - ${item.periodEnd}`,frequency:item.frequency??"Not available",currentPeriod:item.periodLabel,generatedInputs:1,closedInputs:item.status==="CLOSED"?1:0,kpiLines:item.expected,resultsEntered:item.entered,missing:item.pending,status:item.status==="DRAFT"?(item.entered?"CONTINUE_ENTRY":"ACTIVE"):item.status==="VALIDATED"&&item.validationStatus==="WITH_WARNINGS"?"VALIDATED_WITH_WARNINGS":item.status as MonitoringStatus} as MonitoringPool & {monitoringPeriodId:string}));
   const filtered=paginatedPools;
   const totalPages=Math.max(1,overviewQuery.data?.meta.totalPages??1);const currentPage=Math.min(page,totalPages);const firstVisibleIndex=(currentPage-1)*pageSize;
   useEffect(
@@ -380,7 +381,7 @@ export function MonitoringOverview() {
     setCompaniesSelected([]);
     setFrequencies([]);
     setPeriodMonths([]);
-    setPeriodYear(2026);
+    setPeriodYear(new Date().getFullYear());
     setStatuses([]);
     setPage(1);
     setFilterResetVersion((current) => current + 1);
@@ -390,12 +391,7 @@ export function MonitoringOverview() {
     window.localStorage.setItem("monitoring-overview-view", mode);
   };
   const getPoolView = (pool: MonitoringPool) => {
-    const effectivePool: MonitoringPool = isMonitoringPeriodClosed(
-      pool.id,
-      pool.currentPeriod,
-    )
-      ? { ...pool, status: "CLOSED" }
-      : pool;
+    const effectivePool = pool;
     return {
       effectivePool,
       action: primaryAction(effectivePool),
@@ -426,6 +422,9 @@ export function MonitoringOverview() {
         </div>
       </header>
       {navigationError && <p className="result-entry-live-error" role="alert">{navigationError}</p>}
+      <PoolPeriodExplorer/>
+      <h2>Initialized Monitoring Periods</h2>
+      <p>These periods already have frozen Scorecards and can store Results. Use the calendars above to browse the remaining periods.</p>
 
       <section className="monitor-filters" aria-label="Monitoring filters">
         <div className="monitor-filter-heading">
@@ -543,7 +542,7 @@ export function MonitoringOverview() {
           return (
             <article
               className={`monitor-pool-card status-${effectivePool.status.toLowerCase()}`}
-              key={pool.id}
+              key={pool.monitoringPeriodId ?? pool.id}
             >
               <header>
                 <div>
@@ -595,6 +594,7 @@ export function MonitoringOverview() {
                   <strong>{pool.missing}</strong>
                 </div>
               </div>
+              <div className="overview-scoring">{pool.scorecards?.map(card => <p key={card.id}><strong>{card.name}</strong> · Score: {card.score === null ? "Unavailable" : Number(card.score).toFixed(2) + "%"}</p>)}{pool.trafficLights && <p><span className="traffic-status green"><i/>{pool.trafficLights.green} Green</span> <span className="traffic-status yellow"><i/>{pool.trafficLights.yellow} Yellow</span> <span className="traffic-status red"><i/>{pool.trafficLights.red} Red</span> · {pool.trafficLights.unavailable} unavailable</p>}</div>
               <footer>
                 <button
                   disabled={effectivePool.status === "CLOSED" || effectivePool.status === "LOCKED"}
@@ -656,7 +656,7 @@ export function MonitoringOverview() {
                 <th>KPI Lines</th>
                 <th>Results</th>
                 <th>Missing</th>
-                <th>Status</th>
+                <th>Scorecard Scores</th><th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -664,7 +664,7 @@ export function MonitoringOverview() {
               {paginatedPools.map((pool) => {
                 const { effectivePool, action, progress } = getPoolView(pool);
                 return (
-                  <tr key={pool.id}>
+                  <tr key={pool.monitoringPeriodId ?? pool.id}>
                     <td><span className="monitor-table-code">{pool.code}</span><strong>{pool.name}</strong></td>
                     <td>{pool.companies.join(", ")}</td>
                     <td>{pool.currentPeriod}<small>{pool.generatedInputs} inputs</small></td>
@@ -672,6 +672,7 @@ export function MonitoringOverview() {
                     <td>{pool.kpiLines}</td>
                     <td>{pool.resultsEntered}/{pool.kpiLines}</td>
                     <td>{pool.missing}</td>
+                    <td>{pool.scorecards?.map(card=><p key={card.id}>{card.name}: {card.score === null ? "Unavailable" : Number(card.score).toFixed(2) + "%"}</p>)}</td>
                     <td><span className={`monitor-status status-${effectivePool.status.toLowerCase()}`}><i />{statusLabels[effectivePool.status]}</span></td>
                     <td>
                       <div className="monitor-table-actions">
@@ -684,7 +685,7 @@ export function MonitoringOverview() {
                   </tr>
                 );
               })}
-              {!filtered.length && <tr><td colSpan={9} className="monitor-empty">No KPI Pools match the selected filters.</td></tr>}
+              {!filtered.length && <tr><td colSpan={10} className="monitor-empty">No KPI Pools match the selected filters.</td></tr>}
             </tbody>
           </table>
         </section>
@@ -692,7 +693,7 @@ export function MonitoringOverview() {
       <footer className="monitor-pagination">
         <span>
           {filtered.length
-            ? `Showing ${firstVisibleIndex + 1}-${Math.min(firstVisibleIndex + pageSize, filtered.length)} of ${filtered.length} Pools`
+            ? `Showing ${firstVisibleIndex + 1}-${Math.min(firstVisibleIndex + pageSize, overviewQuery.data?.meta.totalItems ?? 0)} of ${overviewQuery.data?.meta.totalItems ?? 0} initialized periods`
             : "Showing 0 Pools"}
         </span>
         <RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} />

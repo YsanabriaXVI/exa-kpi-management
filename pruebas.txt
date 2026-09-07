@@ -998,3 +998,12 @@
   Las mayores incertidumbres se concentran en el motor de evaluación para Behaviors distintos de GREATER, la construcción de targets de reducción, CUSTOM_PERIOD, mappings
   históricos, baselines manuales y el workflow de correcciones. Ninguna de ellas debe resolverse mediante supuestos.
  
+
+
+
+ › pero ya lo está? dame unos ejemplos de KPIs solo 2 que estén en 1 scorecard  Scorecard A y luego otros 2 KPIs Scorecard B, 3 KPIs en Scorecard C para vincular y
+  todos están un mismo Pool digamos Agosto 2026. ingresamos resultados y cuales son los resultados que esperariamos para probar si podemos cerrar periodo y hacer
+  next period del pool... sólo dame los pasos (No me generes sql ni ejecutes logica) yo lo voy a hacer  y para probar los linked scorecards, Goal (individual),
+  luego un KPI que esté compuesto por nombres de vendedores (Este debe de vender tanto en $, y este tanto $, etc) y luego que tenga una meta grupal yh cada quien
+  una meta invidual... tambien las opciones de Current Period, Previous Period, Same Period Last Year (junto con aquellos ajustes en caso de que podramos obtener
+  los resultados deseados, que nos permita buscar y seleccionar. creame fuera de la carpeta exa-kpi-system/ un archivo llamado close-period-test.md

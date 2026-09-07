@@ -32,6 +32,9 @@ export function periodContaining(value: Date, monthsPerPeriod: number): InputPer
 }
 
 export function poolPeriods(validFrom: Date, validTo: Date, monthsPerPeriod: number): InputPeriod[] {
+  if (!Number.isFinite(validFrom.getTime()) || !Number.isFinite(validTo.getTime()) || validFrom > validTo) {
+    throw new AppError(422, "POOL_VALIDITY_INVALID", "Pool validity must contain valid dates with start on or before end");
+  }
   const first = periodContaining(validFrom, monthsPerPeriod);
   const last = periodContaining(validTo, monthsPerPeriod);
   if (first.start.getTime() !== validFrom.getTime() || last.end.getTime() !== validTo.getTime()) {
@@ -53,21 +56,12 @@ export function resolvePoolPeriod(validFrom: Date, validTo: Date, monthsPerPerio
   return period;
 }
 
-export function defaultTargetPeriod(validFrom: Date, validTo: Date, monthsPerPeriod: number, status: string, today = new Date()): InputPeriod {
+// Read-only default. Mutation eligibility is resolved from finalized compositions
+// by targetPeriod in the membership service, never from the system clock.
+export function defaultTargetPeriod(validFrom: Date, validTo: Date, monthsPerPeriod: number, status: string): InputPeriod {
   const periods = poolPeriods(validFrom, validTo, monthsPerPeriod);
   const first = periods[0];
   if (!first) throw new AppError(422, "POOL_OUTSIDE_VALIDITY", "Pool has no valid Input Periods");
-  if (status === "DRAFT") return first;
   if (status === "INACTIVE") throw new AppError(409, "POOL_INACTIVE", "Inactive Pools cannot schedule KPI membership changes");
-  const current = periodContaining(today, monthsPerPeriod);
-  const next = periods.find((period) => period.start > current.start);
-  if (!next) throw new AppError(409, "NO_FUTURE_EDITABLE_PERIOD", "The Pool has no future Input Period available for membership changes");
-  return next;
-}
-
-export function assertPeriodEditable(status: string, period: InputPeriod, monthsPerPeriod: number, today = new Date()): void {
-  if (status === "INACTIVE") throw new AppError(409, "POOL_INACTIVE", "Inactive Pools cannot change KPI membership");
-  if (status === "ACTIVE" && period.start <= periodContaining(today, monthsPerPeriod).start) {
-    throw new AppError(409, "POOL_PERIOD_LOCKED", "Without Monitoring integration, only future Input Periods can be modified");
-  }
+  return first;
 }

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { historicalContractError } from "../contracts/historical-contract.js";
 import { prisma } from "../config/prisma.js";
 import { kpiManagementClient, type EffectiveKpiSettingsV1 } from "../clients/kpi-management.client.js";
 import { AppError } from "../utils/app-error.js";
@@ -48,6 +49,7 @@ export const kpiPoolOverrideService = {
       if (override.fieldCode === "TRAFFIC_LIGHT_THRESHOLDS") effective.thresholds = override.overrideValue as unknown as EffectiveKpiSettingsV1["thresholds"];
       sources[override.fieldCode] = "POOL_OVERRIDE";
     }
+    if (historicalContractError(effective)) throw new AppError(422,"HISTORICAL_CONTRACT_INVALID","Pool overrides produce an invalid historical execution contract");
     const usage = includeEditability ? await scorecardsClient.frozenUsage(poolId.toString(), period.periodKey, configurationId.toString()) : null;
     const frozen = usage?.frozen === true || !selected.editable;
     return { global, effective, sources, poolMembershipId: membership.id.toString(), contextVersion: [global.kpiConfigurationRevisionId, ...activeOverrides.map((item) => `${item.id}:${item.version}`)].join(":"), pool: { id: selected.pool.id.toString(), code: selected.pool.poolCode, name: selected.pool.poolName, status: selected.pool.statusCode }, period: { id: period.id.toString(), key: period.periodKey, start: period.periodStart.toISOString().slice(0,10), end: period.periodEnd.toISOString().slice(0,10), status: selected.status }, editability: includeEditability ? { editable: selected.editable && !usage?.frozen, frozen, reason: selected.editable ? usage?.frozen ? "FINALIZED_SCORECARD" : null : selected.status, scorecardId: usage?.scorecardId ?? null, scorecardPeriodCompositionId: usage?.scorecardPeriodCompositionId ?? null } : undefined };

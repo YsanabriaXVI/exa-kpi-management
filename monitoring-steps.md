@@ -3,17 +3,280 @@
 3. Analyzer + AutoClassifier backend ✅✅
 4. Frontend Definition Assist  -- now ✅✅✅
 5. Result Setup / preguntas    ✅✅
-6. Executable KPI Configuration ⚠️⚠️
-7. Pool Effective Settings    ⚠️⚠️
-8. FINALIZED Snapshot         ⚠️⚠️
-9. Monitoring hardening        ⚠️⚠️
-10. Manual Result Entry
-11. Check Results
-12. Workflow completo
+6. Executable KPI Configuration ✅✅
+7. Pool Effective Settings    ✅✅
+8. FINALIZED Snapshot         ✅✅
+9. Monitoring hardening       ✅✅
+10. Manual Result Entry       ✅✅
+11. Check Results           !! Aquí vamos  (pensar en los baselines de otros periodos) ✅✅☠️☠️☠️☠️
+12. Workflow completo  
 13. Next Period
 14. Excel
 15. Historical Comparison
 16. Reports
+
+
+
+--- terminar con esto: 
+ 
+y tambien tener para modificar las Measurement Units, Data Sources tambien  ✅
+
+
+
+Sí. Esta pantalla ya se volvió **muy importante**, porque `BY_ENTITY` depende completamente de que exista un catálogo confiable de: ✅
+
+```text
+Subject Type
+        ↓
+Subject Values
+```
+
+Yo la pondría en **KPI Management**, porque ahí se configura la estructura reutilizable que después consumen KPI Config, Pool y finalmente Scorecards.
+
+Podría llamarse:
+
+```text
+Subject Catalog
+```
+
+Y tendría dos niveles.
+
+### 1. Subject Types
+
+```text
+Subject Catalog
+──────────────────────────────────────────
+
+Code        Name            Status     Values
+EMPLOYEE    Employee        Active       35
+CUSTOMER    Customer        Active       18
+FLEET       Fleet           Active        7
+LOCATION    Location        Active        5
+ASSET       Asset           Active        9
+OPERATION   Operation       Active        6
+
+[ + Add Subject Type ]
+```
+
+Acciones:
+
+```text
+View Values
+Edit
+Activate / Deactivate
+```
+
+Yo **no permitiría Delete físico**.
+
+---
+
+### 2. Values de un Subject Type
+
+Entras por ejemplo a:
+
+```text
+CUSTOMER — Customer
+```
+
+y ves:
+
+```text
+Subject Values
+──────────────────────────────────────────
+
+Code        Name             Status
+CUS-001     Cliente A        Active
+CUS-002     Cliente B        Active
+CUS-003     Cliente C        Active
+CUS-004     Cliente D        Inactive
+
+[ + Add Customer ]
+```
+
+Lo mismo para:
+
+```text
+FLEET
+→ Flota Nueva
+→ TRANEXPA
+→ IPH
+
+LOCATION
+→ Puerto Cortés
+→ San Lorenzo
+→ Predio
+
+ASSET
+→ Cabezales
+→ Gensets
+→ Contenedores
+→ Equipos
+```
+
+Y entonces el `Set KPI Config` deja de tener valores improvisados. Hace:
+
+```text
+Subject Type
+[ Customer ▼ ]
+
+          ↓
+
+GET active values for CUSTOMER
+
+          ↓
+
+Entities
+[ Cliente A × ][ Cliente B × ][ Cliente C × ]
+```
+
+## Lo más importante: históricos
+
+Aquí pondría una regla fuerte:
+
+> **Subject Types y Subject Values utilizados históricamente nunca se eliminan físicamente.**
+
+Si alguien “borra” Cliente B:
+
+```text
+CUS-002 Cliente B
+Active → Inactive
+```
+
+Entonces:
+
+* ya no aparece para nuevas configuraciones;
+* configuraciones existentes siguen pudiendo mostrarlo;
+* Scorecards FINALIZED siguen teniendo su snapshot;
+* Monitoring histórico sigue mostrando `Cliente B`;
+* Reports históricos siguen funcionando.
+
+Y si cambian el nombre:
+
+```text
+Cliente B
+→ Cliente Corporativo B
+```
+
+el `id/code` permanece igual.
+
+Por ejemplo:
+
+```text
+id = 27
+code = CUS-002
+```
+
+nunca cambia.
+
+Las composiciones futuras pueden ver:
+
+```text
+Cliente Corporativo B
+```
+
+pero un Scorecard que fue FINALIZED antes puede seguir mostrando el label congelado:
+
+```text
+Cliente B
+```
+
+porque FINALIZED ya guarda:
+
+```text
+subjectExternalId
+subjectCode
+subjectLabelSnapshot
+```
+
+Eso protege la historia.
+
+---
+
+### Modelo mínimo
+
+Yo empezaría con algo sencillo:
+
+```text
+subject_types
+──────────────
+id
+code
+name
+is_active
+created_at
+updated_at
+deleted_at
+
+
+subject_values
+──────────────
+id
+subject_type_id
+code
+name
+is_active
+created_at
+updated_at
+deleted_at
+```
+
+Y quizá auditoría si ya tienen un patrón existente.
+
+No metería todavía:
+
+```text
+dynamic JSON metadata
+nested hierarchies
+parent/children
+custom columns
+external integrations
+```
+
+Eso después.
+
+## Otra regla importante
+
+Si un `Subject Value` está usado por una KPI Configuration activa, yo no impediría necesariamente desactivarlo, pero sí mostraría una advertencia:
+
+```text
+Deactivate "Cliente B"?
+
+This value is currently referenced by:
+3 KPI Configurations
+2 active Pools
+
+Existing and historical references will remain unchanged.
+It will no longer be available for new selections.
+```
+
+Eso está muy bien para administración.
+
+Y conceptualmente el flujo queda precioso:
+
+```text
+SUBJECT CATALOG
+Define qué entidades existen
+        ↓
+KPI CONFIG
+Selecciona cuáles participan
+y establece sus Goals
+        ↓
+POOL
+Contextualiza
+        ↓
+FINALIZED
+Congela IDs + labels + Goals
+        ↓
+MONITORING
+Captura un Result por entidad congelada
+```
+
+Sí: yo consideraría esta pantalla casi **obligatoria** si `BY_ENTITY` va a ser una capability importante del sistema. Así evitas hardcodes y, sobre todo, proteges el histórico correctamente.
+
+
+
+
+
 
 
 

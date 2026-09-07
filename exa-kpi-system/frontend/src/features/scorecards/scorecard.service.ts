@@ -318,7 +318,7 @@ export const scorecardService = {
     id: number,
     periodKey: string,
     body: {
-      kpis: Array<{ kpiConfigurationExternalId: string; weight: number }>;
+      kpis: Array<{ kpiConfigurationExternalId: string; weight: number; entityWeights?: Array<{subjectExternalId:string;weight:number|null}> }>;
       linkedScorecards: Array<{ linkedScorecardId: string; weight: number }>;
     },
   ) {

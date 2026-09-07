@@ -24,8 +24,8 @@ describe("KPI scoring engine", () => {
   });
 
   it("treats null as missing and zero as a real result", () => {
-    expect(score({ result: null })).toMatchObject({ status: "MISSING", compliance: null, trafficLight: null, weightedScore: null });
-    expect(score({ evaluationType: "LOWER_IS_BETTER", scoringMethod: "ZERO_TARGET_BANDS", goal: "0", result: "0" })).toMatchObject({ status: "CALCULATED", trafficLight: "GREEN" });
+    expect(score({ result: null })).toMatchObject({ status: "NOT_CALCULABLE", errorCode: "RESULT_MISSING", compliance: null, trafficLight: null, weightedScore: null });
+    expect(score({ evaluationType: "LOWER_IS_BETTER", scoringMethod: "ZERO_TARGET_BANDS", goal: "0", result: "0", scoringRuleConfig:{bands:[{minResult:0,maxResult:0,compliance:100}]} })).toMatchObject({ status: "CALCULATED", trafficLight: "GREEN" });
   });
 
   it("requires an explicit zero-target degradation rule for incidents above zero", () => {
@@ -37,17 +37,32 @@ describe("KPI scoring engine", () => {
     expect(configured.compliance?.toString()).toBe("40");
   });
 
-  it("scores equality by tolerance and range by distance bands", () => {
-    expect(score({ evaluationType: "EQUAL_IS_BETTER", scoringMethod: "TOLERANCE_BASED", result: "5.4", goal: "5", scoringRuleConfig: { tolerance: ".5", bands: [{ maxDistance: ".5", compliance: "70" }, { maxDistance: "1", compliance: "40" }] } }).compliance?.toString()).toBe("100");
-    expect(score({ evaluationType: "EQUAL_IS_BETTER", scoringMethod: "TOLERANCE_BASED", result: "5.8", goal: "5", scoringRuleConfig: { tolerance: ".5", bands: [{ maxDistance: ".5", compliance: "70" }] } }).compliance?.toString()).toBe("70");
-    expect(score({ evaluationType: "RANGE", scoringMethod: "RANGE_BASED", result: "8", scoringRuleConfig: { rangeMin: "2", rangeMax: "8", bands: [{ maxDistance: "2", compliance: "70" }] } }).compliance?.toString()).toBe("100");
-    expect(score({ evaluationType: "RANGE", scoringMethod: "RANGE_BASED", result: "9", scoringRuleConfig: { rangeMin: "2", rangeMax: "8", bands: [{ maxDistance: "2", compliance: "70" }] } }).compliance?.toString()).toBe("70");
+  it.each(["TOLERANCE", "TOLERANCE_BASED", "RANGE_BASED", "BINARY", "MILESTONE"])("rejects unsupported %s",scoringMethod=>{
+    expect(score({scoringMethod})).toMatchObject({status:"NOT_CALCULABLE",compliance:null,goalMet:null});
+  });
+  it("uses explicit frozen zero bands even for zero",()=>{
+    const config={bands:[{minResult:0,maxResult:0,compliance:100},{minResult:1,maxResult:1,compliance:70},{minResult:2,compliance:0}]};
+    for(const [result,compliance,goalMet] of [["0","100",true],["1","70",false],["2","0",false]] as const){
+      const calculated=score({evaluationType:"ZERO_IS_BETTER",scoringMethod:"ZERO_TARGET_BANDS",goal:0,result,scoringRuleConfig:config});
+      expect(calculated.compliance?.toString()).toBe(compliance);expect(calculated.goalMet).toBe(goalMet);expect(calculated.rawAchievement).toBeNull();
+    }
+  });
+  it("handles lower zero at frozen cap and keeps Goal Met separate from Traffic",()=>{
+    const zero=score({evaluationType:"LOWER_IS_BETTER",goal:5,result:0,scoringRuleConfig:{floorPercent:0,capPercent:90}});
+    expect(zero.compliance?.toString()).toBe("90");expect(zero.rawAchievement?.isFinite()).toBe(true);expect(zero.goalMet).toBe(true);
+    expect(score({evaluationType:"LOWER_IS_BETTER",goal:5,result:6})).toMatchObject({goalMet:false,trafficLight:"GREEN"});
+    expect(score({goal:4500,result:4782}).rawAchievement?.toFixed(6)).toBe("106.266667");
+  });
+  it("rejects overlapping thresholds, gaps at the computed value and missing caps",()=>{
+    expect(score({thresholds:[thresholds[0],thresholds[0]]})).toMatchObject({status:"NOT_CALCULABLE"});
+    expect(score({thresholds:[thresholds[0]]})).toMatchObject({status:"NOT_CALCULABLE"});
+    expect(score({scoringRuleConfig:{}})).toMatchObject({errorCode:"COMPLIANCE_LIMITS_MISSING"});
   });
 
   it("does not infer missing or unapproved scoring configuration", () => {
     expect(score({ scoringMethod: null })).toMatchObject({ status: "NOT_CALCULABLE", errorCode: "SCORING_METHOD_NOT_CONFIGURED" });
-    expect(score({ scoringApprovalStatus: "BLOCKED" })).toMatchObject({ status: "NOT_CALCULABLE", errorCode: "SCORING_CONFIGURATION_NOT_APPROVED", calculationVersion:"SCORING_V1" });
-    expect(score({ scoringMethod: "BINARY" })).toMatchObject({ status: "NOT_CALCULABLE", errorCode: "UNSUPPORTED_SCORING_METHOD" });
+    expect(score({ scoringApprovalStatus: "BLOCKED" })).toMatchObject({ status: "NOT_CALCULABLE", errorCode: "SCORING_CONFIGURATION_NOT_APPROVED", calculationVersion:"CHECK_RESULTS_V1" });
+    expect(score({ scoringMethod: "BINARY" })).toMatchObject({ status: "NOT_CALCULABLE", errorCode: "UNSUPPORTED_SCORING_COMBINATION" });
     expect(score({ thresholds: [] })).toMatchObject({ status: "NOT_CALCULABLE", errorCode: "TRAFFIC_LIGHT_THRESHOLDS_NOT_CONFIGURED" });
   });
 });

@@ -46,8 +46,6 @@ async function scorecardSourcePool(id: string) {
   const pool = await kpiPoolClient.getPool(id);
   if (pool.status === "INACTIVE") throw new AppError(409, "KPI_POOL_INACTIVE", "The selected KPI Pool is INACTIVE and cannot be used to create a Scorecard");
   if (!["DRAFT", "ACTIVE"].includes(pool.status)) throw new AppError(409, "KPI_POOL_STATUS_NOT_ELIGIBLE", "The selected KPI Pool must be DRAFT or ACTIVE");
-  const today = new Date().toISOString().slice(0, 10);
-  if (pool.validTo < today) throw new AppError(409, "KPI_POOL_EXPIRED", "The selected KPI Pool is expired and cannot be used to create a Scorecard");
   return pool;
 }
 function scopeRows(input: Pick<CreateScorecardBody, "departments" | "collaborators">, actor: bigint) {

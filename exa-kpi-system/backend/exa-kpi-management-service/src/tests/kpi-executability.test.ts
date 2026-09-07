@@ -8,7 +8,7 @@ describe("KPI executability V1",()=>{
   it("accepts one stable Goal for every BY_ENTITY subject",()=>expect(evaluateKpiExecutability({...valid,evaluationScope:"BY_SUBJECT",subjectType:"EMPLOYEE",subjects:[{subjectExternalId:"A"},{subjectExternalId:"B"}],subjectGoals:[{subjectExternalId:"A",goal:"10"},{subjectExternalId:"B",goal:"20"}]}).executable).toBe(true));
   it("blocks incomplete, historical, and duplicate BY_ENTITY cohorts",()=>{
     const result=evaluateKpiExecutability({...valid,evaluationScope:"BY_SUBJECT",periodScope:"PREVIOUS_PERIOD",subjectType:"EMPLOYEE",subjects:[{subjectExternalId:"A"},{subjectExternalId:"A"}],subjectGoals:[{subjectExternalId:"A",goal:null}]});
-    expect(result.reasons.map((reason)=>reason.code)).toEqual(expect.arrayContaining(["HISTORICAL_COMPARISON_RUNTIME_NOT_SUPPORTED","DUPLICATE_SUBJECT_ID","SUBJECT_GOAL_REQUIRED"]));
+    expect(result.reasons.map((reason)=>reason.code)).toEqual(expect.arrayContaining(["HISTORICAL_CONTRACT_INVALID","DUPLICATE_SUBJECT_ID","SUBJECT_GOAL_REQUIRED"]));
   });
-  it("blocks Group Goal without inventing Group Result semantics",()=>expect(evaluateKpiExecutability({...valid,groupGoal:{value:"2500"}}).reasons).toContainEqual(expect.objectContaining({code:"GROUP_GOAL_RUNTIME_UNDEFINED"})));
+  it("keeps Group Goal informational without blocking individual scoring",()=>expect(evaluateKpiExecutability({...valid,groupGoal:{value:"2500"}}).executable).toBe(true));
 });
