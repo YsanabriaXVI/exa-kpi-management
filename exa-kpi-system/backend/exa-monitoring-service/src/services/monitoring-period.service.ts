@@ -228,7 +228,7 @@ export const monitoringPeriodService = {
           for (const { scorecard, assignment } of assignments) {
             const snapshot = byConfiguration.get(assignment.kpiConfigurationId)!;
             const entityEvaluations = snapshot.evaluationScope === "BY_SUBJECT"
-              ? snapshot.subjectGoals.map((subject) => ({ kind: "ENTITY" as const, goal: subject.goal, subject, unit: snapshot.measurementUnit }))
+              ? snapshot.subjectGoals.map((subject) => ({ kind: "ENTITY" as const, goal: subject.goal, subject, unit: subject.resultUnit ?? snapshot.measurementUnit }))
               : [];
             const evaluations = entityEvaluations.length
               ? entityEvaluations

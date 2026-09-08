@@ -12,6 +12,7 @@ const tx = vi.hoisted(() => ({
   kpiConfigurationRevision: { create: vi.fn() },
   kpiConfigurationRevisionThreshold: { createMany: vi.fn() },
   kpiConfigurationRevisionSubjectGoal: { createMany: vi.fn() },
+  kpiConfigurationRevisionSubject: { createMany: vi.fn() },
   kpiConfigurationRevisionMeasurementInput: { createMany: vi.fn() },
 }));
 const db = vi.hoisted(() => ({
@@ -57,6 +58,17 @@ beforeEach(() => {
 });
 
 describe("kpiConfigurationService.create", () => {
+  it("persists catalog units per entity and derives current Result Unit from each Goal Unit",async()=>{
+    const units=[{id:1n,symbol:"USD"},{id:2n,symbol:"MXN"}];
+    tx.measurementUnit.findFirst.mockImplementation(async({where}:any)=>units.find(unit=>unit.symbol===where.symbol));
+    tx.measurementUnit.findMany.mockResolvedValue([units[1]]);
+    const subjects=[{subjectExternalId:"A",subjectCode:null,subjectLabel:"Jacky"},{subjectExternalId:"B",subjectCode:null,subjectLabel:"Nancy"}];
+    await kpiConfigurationService.create({...input,measurementUnit:"",goalUnit:undefined,evaluationScope:"BY_SUBJECT",goalMode:"BY_SUBJECT",goalAssignment:"DIFFERENT_GOAL_PER_SUBJECT",subjectType:"EMPLOYEE",subjects,subjectGoals:subjects.map((row,i)=>({...row,goal:100,goalUnit:units[i]!.symbol}))},99n);
+    expect(tx.kpiConfigurationRevisionSubjectGoal.createMany.mock.calls[0]![0].data).toEqual([
+      expect.objectContaining({subjectExternalId:"A",goalUnitId:1n,resultUnitId:1n}),
+      expect.objectContaining({subjectExternalId:"B",goalUnitId:2n,resultUnitId:2n}),
+    ]);
+  });
   it("atomically preserves the real FK and creates configuration, initial revision and three thresholds", async () => {
     const created = await kpiConfigurationService.create(input, 99n);
     expect(db.$transaction).toHaveBeenCalledTimes(1);

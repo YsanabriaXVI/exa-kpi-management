@@ -8,7 +8,7 @@ export type CheckEvaluation = {
 export type CheckReport = {
   basedOnBaselineVersion?:number|null;
   status:"NOT_CHECKED"|"CURRENT"|"STALE";runId:string|null;runNo:number|null;basedOnResultsVersion:number|null;
-  summary:null|{expected:number;entered:number;pending:number;completionPercent:number;errorCount:number;errors:number;critical:number;warnings:number;blocking:number;runStatus:string;weightCoverageComplete:boolean;allRequiredScoringCalculable:boolean;readyForSubmit:boolean};
+  summary:null|{expected:number;entered:number;pending:number;completionPercent:number;errorCount:number;errors:number;critical:number;warnings:number;blocking:number;runStatus:string;weightCoverageComplete:boolean;allRequiredScoringCalculable:boolean;readyForSubmit:boolean;readyForSubmitWithExceptions?:boolean};
   evaluations:CheckEvaluation[];
   scorecards:Array<{id:string;code:string;name:string;score:string|null;scoreStatus:string;weightCoverage:string|null;calculableWeight:string|null;pendingWeight:string|null}>;
   findings:Array<{code:string;message:string;severity:string;scope:string;kpiCode:string|null;entityLabel:string|null;scorecardId:string;blocking:boolean}>;

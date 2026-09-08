@@ -4,6 +4,16 @@ import { evaluateCheck } from "../services/check-results-evaluation.js";
 import { checkInputs, checkCards, frozen } from "./fixtures/check-results.js";
 
 describe("Check Results frozen evaluations",()=>{
+ it("offers exceptions only for missing Results with valid coverage and calculable entered Results",()=>{
+  const inputs:any[]=checkInputs();
+  inputs.push({...inputs[0],id:10n,evaluationKindSnapshot:"OVERALL",subjectExternalIdSnapshot:null,subjectLabelSnapshot:null,goalValueSnapshot:"100",weightPercentSnapshot:"70",effectiveSettingsSnapshot:{...frozen,evaluationScope:"OVERALL",subjectGoals:[],goal:"100",groupGoal:null},result:null});
+  expect(evaluateCheck(inputs,checkCards(),"MANUAL").summary).toMatchObject({readyForSubmit:false,readyForSubmitWithExceptions:true});
+  inputs[0].result.resultValue="-1";
+  expect(evaluateCheck(inputs,checkCards(),"MANUAL").summary.readyForSubmitWithExceptions).toBe(false);
+  inputs[0].result.resultValue="80";
+  inputs[4].weightPercentSnapshot="60";
+  expect(evaluateCheck(inputs,checkCards(),"MANUAL").summary.readyForSubmitWithExceptions).toBe(false);
+ });
  it("scores entities independently, excludes Group and reports 30% coverage without normalizing",()=>{
   const result=evaluateCheck(checkInputs(),checkCards(),"MANUAL");
   expect(result.evaluations.map(r=>r.weightedContribution)).toEqual(["10.000000","7.760000","7.000000","4.950000"]);

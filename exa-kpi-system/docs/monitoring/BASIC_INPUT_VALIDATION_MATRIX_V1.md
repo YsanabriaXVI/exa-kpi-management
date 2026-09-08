@@ -5,7 +5,7 @@ Scope: Monitoring `Check Results`. Business scoring remains governed by the appr
 
 | Code | Condition | Severity | Blocks Submit | Blocks Approval | Exception allowed | Behavior |
 |---|---|---|---:|---:|---:|---|
-| `RESULT_MISSING` | Required Expected Result has `result_value = NULL` | WARNING | Yes | Yes | No in this workflow | `MISSING`; scoring fields remain `NULL` |
+| `RESULT_MISSING` | Required Expected Result has `result_value = NULL` | ERROR | Yes by default | Yes by default | Yes, with explicit justification at Submit, Approval and Close | Scoring fields remain `NULL`; affected final Scorecards remain unavailable |
 | `OPTIONAL_RESULT_MISSING` | Optional Expected Result has `result_value = NULL` | PENDING | No | No | Yes | `MISSING`; scoring fields remain `NULL` |
 | `RESULT_NOT_NUMERIC` | API/Excel raw Result is not a decimal | ERROR | Yes | Yes | No | Reject before persistence; never coerce to zero |
 | `RESULT_PRECISION_EXCEEDED` | Result exceeds `DECIMAL(20,6)` | ERROR | Yes | Yes | No | Reject before persistence; never truncate |

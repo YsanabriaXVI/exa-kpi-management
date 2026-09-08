@@ -4,6 +4,21 @@ import { kpiConfigurationBodySchema } from "../schemas/kpi-configuration.schema.
 const base = { definitionId: "1", goal: 10, measurementUnit: "USD", dataSource: "Manual Entry", ranges: { redFrom: 0, redTo: 64, yellowFrom: 65, yellowTo: 79, greenFrom: 80, greenTo: 100 }, isActive: true };
 
 describe("KPI Configuration Step 5 contract", () => {
+  const entities = [{subjectExternalId:"A",subjectLabel:"Jacky"},{subjectExternalId:"B",subjectLabel:"Nancy"}];
+  const perEntity = {...base,measurementUnit:undefined,goalUnit:undefined,evaluationScope:"BY_SUBJECT",goalMode:"BY_SUBJECT",goalAssignment:"DIFFERENT_GOAL_PER_SUBJECT",subjectType:"EMPLOYEE",subjects:entities,subjectGoals:entities.map((row,i)=>({...row,goal:100,goalUnit:i?"MXN":"USD"}))};
+  it("accepts per-entity units without a global Goal or Result Unit",()=>{
+    expect(kpiConfigurationBodySchema.parse(perEntity).subjectGoals.map(row=>row.goalUnit)).toEqual(["USD","MXN"]);
+  });
+  it("rejects missing row units, mismatched current units and duplicate entity goals",()=>{
+    expect(()=>kpiConfigurationBodySchema.parse({...perEntity,subjectGoals:[perEntity.subjectGoals[0],{...perEntity.subjectGoals[1],goalUnit:undefined}]})).toThrow(/Goal Unit/);
+    expect(()=>kpiConfigurationBodySchema.parse({...perEntity,subjectGoals:perEntity.subjectGoals.map(row=>({...row,resultUnit:"kms"}))})).toThrow(/must match/);
+    expect(()=>kpiConfigurationBodySchema.parse({...perEntity,subjectGoals:[perEntity.subjectGoals[0],perEntity.subjectGoals[0]]})).toThrow(/match the selected entities/);
+  });
+  it("keeps historical percent targets separate from each actual Result Unit",()=>{
+    const historical={...perEntity,periodScope:"PREVIOUS_PERIOD",targetKind:"CHANGE_TARGET",subjectGoals:perEntity.subjectGoals.map(row=>({...row,resultUnit:row.goalUnit,goalUnit:"%"}))};
+    expect(kpiConfigurationBodySchema.parse(historical).subjectGoals.map(row=>row.resultUnit)).toEqual(["USD","MXN"]);
+    expect(()=>kpiConfigurationBodySchema.parse({...historical,subjectGoals:historical.subjectGoals.map(row=>({...row,resultUnit:"%"}))})).toThrow(/actual Result Unit/);
+  });
   it("defaults a legacy request to current-period single goal", () => {
     const value = kpiConfigurationBodySchema.parse(base);
     expect(value).toMatchObject({ periodScope: "CURRENT_PERIOD", goalMode: "SINGLE", evaluationScope: "OVERALL", goalType: "SINGLE_VALUE", resultMethod: "DIRECT", inputFrequencyCode: "MONTHLY" });

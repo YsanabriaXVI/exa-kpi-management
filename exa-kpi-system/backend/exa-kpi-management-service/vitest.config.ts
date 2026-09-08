@@ -6,7 +6,7 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "prisma/**/*.test.ts"],
     env: {
       NODE_ENV: "test",
-      DATABASE_URL: "mysql://test:test@localhost:3306/exa_kpi_management_test",
+      DATABASE_URL: process.env.RUN_ENTITY_UNIT_INTEGRATION === "true" ? process.env.DATABASE_URL! : "mysql://test:test@localhost:3306/exa_kpi_management_test",
       LOG_LEVEL: "silent",
     },
   },

@@ -188,14 +188,22 @@ The three concepts are distinct: preview score, validated score, and final score
 
 ## 8. Missing results and close with exceptions
 
-Proposed V1 policy:
+Implemented workflow (September 2026):
+
+- A current Check containing only `RESULT_MISSING` findings may proceed through Submit and Approval with explicit `withExceptions: true` and a justification of at least 10 characters at each transition. The actor, Check identity and justification are audited.
+- Other findings, including invalid weight coverage, configuration errors and historical baseline errors, remain blocking. Existing Checks must be rerun to acquire exception eligibility.
+- Close still requires `VALIDATED`, a current Check and a separate documented exception while Results are missing.
+- Missing Results remain `NULL`. Affected Scorecards retain an unavailable final score; complete Scorecards retain their checked score. No weights are redistributed and no Result rows are fabricated.
+- The next scheduled period is initialized independently with empty Results and finalized configuration snapshots. Closed periods remain read-only.
+
+Deferred alternative (not implemented):
 
 - During draft/validation: missing KPI → compliance and weighted score remain `NULL`.
 - Normal close is blocked while any required KPI is missing/not calculable.
 - Approved `CLOSE_WITH_EXCEPTIONS`: result remains `NULL`, exception reason/evidence is retained, and official contribution becomes zero.
 - Weight is not redistributed because doing so rewards missing data.
 
-This section requires explicit business approval before implementation.
+Treating a missing Result as an official zero contribution requires explicit business approval before implementation.
 
 ## 9. Acceptance examples
 

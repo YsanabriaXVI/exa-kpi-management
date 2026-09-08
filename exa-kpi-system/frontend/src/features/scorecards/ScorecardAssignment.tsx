@@ -103,9 +103,10 @@ export function ScorecardAssignment() {
   const storedScorecardId = Number(window.localStorage.getItem("exa:scorecard-assignment:selected-scorecard"));
   const selectorMode = !requestedScorecardId || searchParams.get("selector") === "1";
   const scorecardId = requestedScorecardId || (selectorMode ? storedScorecardId : 0) || 0;
-  const scorecardQuery = useQuery({ queryKey: ["scorecard", scorecardId], queryFn: () => scorecardService.getById(scorecardId), enabled: scorecardId > 0 });
-  const scorecardsQuery = useQuery({ queryKey: ["scorecards"], queryFn: scorecardService.list, staleTime: 60 * 1000 });
-  const periodsQuery = useQuery({ queryKey: ["scorecard-periods", scorecardId], queryFn: () => scorecardService.periods(scorecardId), enabled: scorecardId > 0 });
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const scorecardQuery = useQuery({ queryKey: ["scorecard", scorecardId], queryFn: () => scorecardService.getById(scorecardId), enabled: scorecardId > 0, retry: false });
+  const scorecardsQuery = useQuery({ queryKey: ["scorecards"], queryFn: scorecardService.list, enabled: selectorOpen, staleTime: 60 * 1000 });
+  const periodsQuery = useQuery({ queryKey: ["scorecard-periods", scorecardId], queryFn: () => scorecardService.periods(scorecardId), enabled: scorecardQuery.isSuccess && scorecardId > 0 });
   const [periodKey, setPeriodKey] = useState(searchParams.get("period") ?? "");
   const selectedPeriod = periodsQuery.data?.find((period) => period.periodKey === periodKey);
   const poolCompositionUnavailable = selectedPeriod?.scorecardCompositionStatus === "UNAVAILABLE";
@@ -114,15 +115,15 @@ export function ScorecardAssignment() {
     .map((period) => period.periodKey)
     .sort()
     .slice(-1)[0];
-  const compositionQuery = useQuery({ queryKey: ["scorecard-composition", scorecardId, periodKey], queryFn: () => scorecardService.composition(scorecardId, periodKey), enabled: scorecardId > 0 && Boolean(periodKey) && selectedPeriod?.scorecardCompositionStatus !== "UNAVAILABLE", retry: false });
-  const previousCompositionQuery = useQuery({ queryKey: ["scorecard-composition", scorecardId, previousPeriodKey], queryFn: () => scorecardService.composition(scorecardId, previousPeriodKey!), enabled: scorecardId > 0 && Boolean(previousPeriodKey), retry: false });
+  const compositionQuery = useQuery({ queryKey: ["scorecard-composition", scorecardId, periodKey], queryFn: () => scorecardService.composition(scorecardId, periodKey), enabled: scorecardId > 0 && Boolean(periodKey) && Boolean(selectedPeriod) && selectedPeriod?.scorecardCompositionStatus !== "UNAVAILABLE", retry: false });
+  const previousCompositionQuery = useQuery({ queryKey: ["scorecard-composition", scorecardId, previousPeriodKey], queryFn: () => scorecardService.composition(scorecardId, previousPeriodKey!), enabled: scorecardId > 0 && Boolean(previousPeriodKey) && !!compositionQuery.data && (compositionQuery.data.kpis.length > 0 || compositionQuery.data.linkedScorecards.length > 0), retry: false });
   const [kpis, setKpis] = useState<AssignmentKpi[]>([]);
   const [linked, setLinked] = useState<AssignmentLinkedScorecard[]>([]);
   const [kpiSort, setKpiSort] = useState<{ key: keyof AssignmentKpi; direction: "asc" | "desc" }>({ key: "configCode", direction: "asc" });
   const [linkedSort, setLinkedSort] = useState<{ key: keyof AssignmentLinkedScorecard; direction: "asc" | "desc" }>({ key: "code", direction: "asc" });
   const [saved, setSaved] = useState(false);
   const [selectorSearch, setSelectorSearch] = useState("");
-  const [selectorOpen, setSelectorOpen] = useState(false);
+
   const [scopeDetailsOpen, setScopeDetailsOpen] = useState(false);
   const [scopeEditOpen, setScopeEditOpen] = useState(false);
   const [scopeEditStep, setScopeEditStep] = useState<0 | 1 | 2>(0);
@@ -153,7 +154,7 @@ export function ScorecardAssignment() {
     return (scorecardsQuery.data ?? []).filter((item) => { const candidate = normalizeSelectorText(`${item.code} ${item.name} ${item.poolSource}`); return terms.every((term) => candidate.includes(term)); });
   }, [scorecardQuery.data, scorecardsQuery.data, selectorSearch]);
   useEffect(() => { if (!periodKey && periodsQuery.data?.length) setPeriodKey(periodsQuery.data.find((period) => period.scorecardCompositionStatus !== "UNAVAILABLE")?.periodKey ?? periodsQuery.data[0].periodKey); }, [periodKey, periodsQuery.data]);
-  useEffect(() => { if (!compositionQuery.data) return; setKpis(compositionQuery.data.kpis.map((item) => ({ id: item.kpiConfigurationExternalId, configCode: item.configurationCode, code: item.definitionCode, name: item.definitionName, category: item.categoryName ?? "Not specified", goal: item.goal ?? "Not specified", measurementUnit: item.measurementUnit ?? "Not specified", source: item.dataSource ?? "Not specified", weight: Number(item.weight), evaluationScope: item.evaluationScope, goalUnit: item.goalUnit, resultUnit: item.resultUnit, evaluations: item.evaluations?.map(entity => ({...entity, weight: entity.weight === null ? null : Number(entity.weight)})) }))); setLinked(compositionQuery.data.linkedScorecards.map((item) => ({ id: item.linkedScorecardId, code: item.code, name: item.name, company: item.companies.join(", ") || "Not specified", department: item.departments.join(", ") || "Not specified", frequency: scorecardQuery.data?.inputFrequency ?? "Not available", weight: Number(item.weight) }))); setSaved(true); }, [compositionQuery.data, scorecardQuery.data?.inputFrequency]);
+  useEffect(() => { if (!compositionQuery.data) { setKpis([]); setLinked([]); setSaved(false); return; } setKpis(compositionQuery.data.kpis.map((item) => ({ id: item.kpiConfigurationExternalId, configCode: item.configurationCode, code: item.definitionCode, name: item.definitionName, category: item.categoryName ?? "Not specified", goal: item.goal ?? "Not specified", measurementUnit: item.measurementUnit ?? "Not specified", source: item.dataSource ?? "Not specified", weight: Number(item.weight), evaluationScope: item.evaluationScope, goalUnit: item.goalUnit, resultUnit: item.resultUnit, evaluations: item.evaluations?.map(entity => ({...entity, weight: entity.weight === null ? null : Number(entity.weight)})) }))); setLinked(compositionQuery.data.linkedScorecards.map((item) => ({ id: item.linkedScorecardId, code: item.code, name: item.name, company: item.companies.join(", ") || "Not specified", department: item.departments.join(", ") || "Not specified", frequency: scorecardQuery.data?.inputFrequency ?? "Not available", weight: Number(item.weight) }))); setSaved(true); }, [compositionQuery.data, scorecardQuery.data?.inputFrequency]);
   useEffect(() => {
     if (!scorecardQuery.data || selectorUserEditedRef.current) return;
     setSelectorSearch(`${scorecardQuery.data.code} · ${scorecardQuery.data.name}`);
@@ -266,10 +267,10 @@ export function ScorecardAssignment() {
   if (selectorMode && !scorecardId) return <main className="scorecard-page assignment-page">
     <nav className="kpi-breadcrumb"><Link to="/app/scorecards/overview">ScoreCards</Link><span>/</span><span>ScoreCard Assignment</span></nav>
     <header className="assignment-hero assignment-selector-hero"><div><h1>ScoreCard Assignment</h1><p>Search and select a ScoreCard to configure its final composition.</p>{scorecardSelector}</div><button type="button" className="assignment-back" onClick={() => navigate("/app/scorecards/overview")}><ChevronLeft size={16} /> Back</button></header>
-    <section className="assignment-no-data"><span><Search size={38}/></span><h2>No Information Found</h2><p>Type a valid ScoreCard code or name, then select one of the suggestions to continue.</p></section>
+    <section className="assignment-no-data"><span><Search size={38}/></span><h2>No information available</h2></section>
   </main>;
   if (scorecardQuery.isLoading) return <main className="scorecard-page"><div className="scorecard-detail-loading">Loading assignment...</div></main>;
-  if (!scorecardQuery.data) return null;
+  if (!scorecardQuery.data) return <main className="scorecard-page assignment-page"><h1>ScoreCard Assignment</h1>{scorecardSelector}<section className="assignment-no-data"><h2>No information available</h2></section></main>;
   const scorecard = scorecardQuery.data;
   const selectorHasNoMatch = selectorUserEditedRef.current && !scorecardsQuery.isLoading && selectorResults.length === 0;
   if (selectorHasNoMatch) return <main className="scorecard-page assignment-page">
@@ -277,7 +278,13 @@ export function ScorecardAssignment() {
     <div className="assignment-back-row assignment-back-top"><button type="button" className="assignment-back" onClick={() => navigate("/app/scorecards/overview")}><ChevronLeft size={16}/> Back</button></div>
     <header className="assignment-hero assignment-context-hero"><div><h1>ScoreCard Assignment</h1><p>Search and select a valid ScoreCard to configure its composition.</p></div></header>
     <section className="assignment-scorecard-search" aria-labelledby="assignment-scorecard-search-title"><div><h2 id="assignment-scorecard-search-title">Select ScoreCard</h2><p>Search by ScoreCard code, name or KPI Pool.</p></div>{scorecardSelector}</section>
-    <section className="assignment-no-data assignment-scorecard-not-found"><span><Search size={38}/></span><h2>Selected ScoreCard Not Found</h2><p>The ScoreCard does not exist or the code or name may be misspelled. Review your search and select a valid suggestion.</p></section>
+    <section className="assignment-no-data assignment-scorecard-not-found"><span><Search size={38}/></span><h2>No information available</h2></section>
+  </main>;
+  if (!compositionQuery.data || (!compositionQuery.data.kpis.length && !compositionQuery.data.linkedScorecards.length)) return <main className="scorecard-page assignment-page">
+    <h1>ScoreCard Assignment</h1>{scorecardSelector}
+    {!!periodsQuery.data?.length && <label>Input Period<select aria-label="Input Period" value={periodKey} onChange={event => setPeriodKey(event.target.value)}>{periodsQuery.data.map(period => <option key={period.periodKey} value={period.periodKey}>{formatPeriodKey(period.periodKey)}</option>)}</select></label>}
+    <section className="assignment-no-data"><h2>{periodsQuery.isLoading || compositionQuery.isLoading ? "Loading assignment..." : "No information available"}</h2></section>
+    {compositionQuery.data?.status === "PREPARING" && <div className="assignment-empty-actions"><button type="button" onClick={() => navigate(`/app/scorecards/assignment/select-kpis-from-pool?scorecardId=${scorecardId}&period=${periodKey}`)}>Select KPIs from Pool</button><button type="button" onClick={() => navigate(`/app/scorecards/assignment/select-linked-scorecards?scorecardId=${scorecardId}&period=${periodKey}`)}>Select Linked Scorecards</button></div>}
   </main>;
   const compositionReadOnly = compositionQuery.data?.status === "FINALIZED";
   const selectionQuery = `?scorecardId=${scorecardId}&period=${periodKey}`;
@@ -362,7 +369,7 @@ export function ScorecardAssignment() {
     <section className="assignment-section">
       <header><div><span><Target size={19} /></span><div><h2>KPIs from Pool</h2><p>{kpis.length} selected from {scorecard.poolSource}</p></div></div>{!compositionReadOnly && <button type="button" disabled={poolCompositionUnavailable} title={poolCompositionUnavailable ? "Finalize this Input Period's Pool Composition before selecting KPIs." : undefined} onClick={() => navigate(`/app/scorecards/assignment/select-kpis-from-pool${selectionQuery}`)}><ListPlus size={14} />Select KPIs from Pool</button>}</header>
       <div className="assignment-table-wrap"><table className="assignment-table"><thead><tr>{([...[{ key: "configCode", label: "KPI Config" }, { key: "name", label: "KPI" }, { key: "category", label: "KPI Category" }, { key: "goal", label: "Goal" }, { key: "measurementUnit", label: "Measurement Unit" }, { key: "source", label: "Data Source" }, { key: "weight", label: "Weight" }]] as Array<{ key: keyof AssignmentKpi; label: string }>).map((column) => <th key={column.key} aria-sort={kpiSort.key === column.key ? (kpiSort.direction === "asc" ? "ascending" : "descending") : "none"}><button type="button" className={kpiSort.key === column.key ? "assignment-sort-header active" : "assignment-sort-header"} onClick={() => toggleKpiSort(column.key)}>{column.label}<ArrowUpDown size={14}/></button></th>)}</tr></thead><tbody>
-        {sortedKpis.map((kpi) => <Fragment key={kpi.id}><tr><td><span className="code-pill">{kpi.configCode}</span></td><td><strong>{kpi.name}</strong><small>{kpi.code}</small></td><td>{kpi.category}</td><td>{kpi.goal}</td><td>{kpi.resultUnit ?? kpi.measurementUnit}</td><td>{kpi.source}</td><td>{kpi.evaluationScope === "BY_SUBJECT" && kpi.evaluations?.length ? "—" : <AssignmentWeightInput value={kpi.weight} disabled={compositionReadOnly} onChange={(weight) => updateKpiWeight(kpi.id, weight)} />}</td></tr>{kpi.evaluations?.map(entity => <tr key={entity.subjectExternalId}><td/><td><strong>{entity.subjectLabel}</strong></td><td>Entity evaluation</td><td>{entity.goal ?? "—"} {kpi.goalUnit}</td><td>{kpi.resultUnit}</td><td/><td><input aria-label={`Weight for ${entity.subjectLabel}`} type="number" min="0" max="100" step="0.0001" placeholder="Required" value={entity.weight ?? ""} disabled={compositionReadOnly} onChange={event => { const weight = event.target.value === "" ? null : Number(event.target.value); setSaved(false); setKpis(items => items.map(item => item.id === kpi.id ? {...item, evaluations: item.evaluations?.map(value => value.subjectExternalId === entity.subjectExternalId ? {...value, weight} : value)} : item)); }} /> %</td></tr>)}</Fragment>)}
+        {sortedKpis.map((kpi) => <Fragment key={kpi.id}><tr><td><span className="code-pill">{kpi.configCode}</span></td><td><strong>{kpi.name}</strong><small>{kpi.code}</small></td><td>{kpi.category}</td><td>{kpi.goal}</td><td>{kpi.resultUnit ?? kpi.measurementUnit}</td><td>{kpi.source}</td><td>{kpi.evaluationScope === "BY_SUBJECT" && kpi.evaluations?.length ? "—" : <AssignmentWeightInput value={kpi.weight} disabled={compositionReadOnly} onChange={(weight) => updateKpiWeight(kpi.id, weight)} />}</td></tr>{kpi.evaluations?.map(entity => <tr key={entity.subjectExternalId}><td/><td><strong>{entity.subjectLabel}</strong></td><td>Entity evaluation</td><td>{entity.goal ?? "—"} {entity.goalUnit?.symbol ?? kpi.goalUnit}</td><td>{entity.resultUnit?.symbol ?? kpi.resultUnit}</td><td/><td><input aria-label={`Weight for ${entity.subjectLabel}`} type="number" min="0" max="100" step="0.0001" placeholder="Required" value={entity.weight ?? ""} disabled={compositionReadOnly} onChange={event => { const weight = event.target.value === "" ? null : Number(event.target.value); setSaved(false); setKpis(items => items.map(item => item.id === kpi.id ? {...item, evaluations: item.evaluations?.map(value => value.subjectExternalId === entity.subjectExternalId ? {...value, weight} : value)} : item)); }} /> %</td></tr>)}</Fragment>)}
       </tbody></table></div>
       <div className="assignment-table-total"><span>Total KPI Weight:</span><strong>{kpiWeightTotal}%</strong></div>
     </section>

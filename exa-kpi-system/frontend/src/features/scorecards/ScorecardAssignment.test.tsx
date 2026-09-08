@@ -18,6 +18,23 @@ beforeEach(() => {
 });
 function open() {return render(<QueryClientProvider client={new QueryClient({defaultOptions:{queries:{retry:false,gcTime:0}}})}><MemoryRouter initialEntries={["/app/scorecards/assignment?scorecardId=1&period=2026-09"]}><ScorecardAssignment/></MemoryRouter></QueryClientProvider>);}
 describe("Entity assignment weights",()=>{
+  it("shows only the empty state when the period is unavailable and does not request compositions",async()=>{
+    vi.mocked(scorecardService.periods).mockResolvedValue([{periodKey:"2026-08",scorecardCompositionStatus:"FINALIZED"},{periodKey:"2026-09",scorecardCompositionStatus:"UNAVAILABLE"}] as any);
+    open();
+    expect(await screen.findByText("No information available")).toBeInTheDocument();
+    expect(scorecardService.composition).not.toHaveBeenCalled();
+    expect(screen.queryByText("Composition Weight")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:/Save Assignment/})).not.toBeInTheDocument();
+  });
+  it("does not load previous composition or weight panels for an empty assignment",async()=>{
+    composition.kpis=[];
+    vi.mocked(scorecardService.periods).mockResolvedValue([{periodKey:"2026-08",scorecardCompositionStatus:"FINALIZED"},{periodKey:"2026-09",scorecardCompositionStatus:"PREPARING"}] as any);
+    open();
+    expect(await screen.findByText("No information available")).toBeInTheDocument();
+    await waitFor(()=>expect(scorecardService.composition).toHaveBeenCalledTimes(1));
+    expect(scorecardService.composition).toHaveBeenCalledWith(1,"2026-09");
+    expect(screen.queryByText("Composition Weight")).not.toBeInTheDocument();
+  });
   it("renders independent weights without a parent input and saves explicit entity identities",async()=>{
     open();
     const jacky=await screen.findByRole("spinbutton",{name:"Weight for Jacky"});

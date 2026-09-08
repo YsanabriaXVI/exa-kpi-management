@@ -54,6 +54,21 @@ async function cleanup() {
   }
 }
 run("Historical baseline MySQL acceptance",()=>{
+  it("uses each entity's Result Unit for historical matching, baseline provenance and scoring",async()=>{
+    const usd={id:"1",code:"USD",name:"Dollars",symbol:"USD"},mxn={id:"3",code:"MXN",name:"Pesos",symbol:"MXN"};
+    const settings=(historical:boolean)=>({...f(historical,"991188"),evaluationScope:"BY_SUBJECT",subjectType:"EMPLOYEE",evaluationWeightsVersion:"EXPLICIT_ENTITY_V1",
+      subjectGoals:[usd,mxn].map((unit,i)=>({subjectExternalId:`UNIT-${i}`,subjectCode:null,subjectLabel:`Entity ${i}`,goal:historical?"10":"100000",weight:"50",goalUnit:historical?{id:"2",code:"PERCENT",name:"Percent",symbol:"%"}:unit,resultUnit:unit}))});
+    const prior=await make("2096-03",settings(false),"100000",true);
+    const next=await make("2096-04",settings(true),"110000");
+    const checked=await check(next);
+    expect(checked.inputs.map((row:any)=>[row.goalUnit,row.unit])).toEqual([["%","USD"],["%","MXN"]]);
+    expect(checked.check.evaluations.map((row:any)=>[row.goalUnit,row.unit,row.compliancePercent])).toEqual([["%","USD","100.000000"],["%","MXN","100.000000"]]);
+    const resolutions=await prisma.historicalBaselineResolution.findMany({where:{monitoringPeriodId:BigInt(next)},orderBy:{monitoringPeriodInputId:"asc"}});
+    expect(resolutions.map(row=>(row.baselineUnitSnapshot as any).code)).toEqual(["USD","MXN"]);
+    expect(resolutions.every(row=>String(row.sourceMonitoringPeriodId)===prior)).toBe(true);
+    const candidates=await historicalBaselineService.candidates(next,checked.inputs[1].id,{page:1,query:""});
+    expect(candidates.unit.symbol).toBe("MXN");
+  });
   beforeAll(async()=>{source=await make("2096-07",f(false),"100000",true);sourceResult=await resultId(source);current=await make("2096-08",f(true),"115000");currentInput=(await get()).inputs[0].id;});
   afterAll(async()=>{await cleanup();await prisma.$disconnect();});
   it("materializes historical metadata, permits current entry and auto-matches a CLOSED source with audited provenance",async()=>{

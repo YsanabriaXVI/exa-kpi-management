@@ -1,3 +1,4 @@
+import { validResultBands } from "../contracts/result-bands.js";
 import { z } from "zod";
 import { paginationSchema } from "./pagination.schema.js";
 
@@ -26,7 +27,7 @@ export const internalKpiConfigurationCatalogQuerySchema = paginationSchema.exten
 }).strict();
 const resultSemantics = z.enum(["ABSOLUTE_VALUE","UNIT_COST","COUNT","CHANGE_PERCENT","COMPLIANCE_PERCENT","RATIO","DURATION","BINARY","DERIVED_PERCENTAGE"]);
 const evaluationTypeCode = z.enum(["GREATER_IS_BETTER","HIGHER_IS_BETTER","LOWER_IS_BETTER","ZERO_IS_BETTER","EQUAL_IS_BETTER","RANGE"]);
-const scoringMethod = z.enum(["PROPORTIONAL","ZERO_TARGET_BANDS","TOLERANCE","RANGE_BASED","BINARY","MILESTONE"]);
+const scoringMethod = z.enum(["PROPORTIONAL","ZERO_TARGET_BANDS","RESULT_BANDS","TOLERANCE","RANGE_BASED","BINARY","MILESTONE"]);
 const scoringApprovalStatus = z.enum(["PROPOSED","BLOCKED","APPROVED","NEEDS_REDEFINITION"]);
 const negativeResultPolicy = z.enum(["ALLOW","DISALLOW","REVIEW"]);
 const scoringRuleConfig = z.record(z.string(), z.unknown()).nullable();
@@ -43,13 +44,15 @@ const subjectGoal = z.object({
   subjectCode: z.string().trim().max(100).nullable().optional().default(null),
   subjectLabel: z.string().trim().min(1).max(200),
   goal: z.number().finite(),
+  goalUnit: z.string().trim().min(1).max(50).optional(),
+  resultUnit: z.string().trim().min(1).max(50).optional(),
 }).strict();
 const measurementInput = z.object({
   name: z.string().trim().min(1).max(160),
   unit: z.string().trim().min(1).max(50),
   description: z.string().trim().max(500).optional().default(""),
 }).strict();
-const subjectSelection = subjectGoal.omit({ goal: true });
+const subjectSelection = subjectGoal.omit({ goal: true, goalUnit: true, resultUnit: true });
 const calculationTemplate = z.enum(["DIVIDE", "PERCENT_RATIO", "SUM", "AVERAGE", "DIFFERENCE"]);
 const groupGoal = z.object({
   value: z.number().finite(),
@@ -58,7 +61,7 @@ const groupGoal = z.object({
 }).strict();
 export const kpiConfigurationBodySchema = z.object({
   definitionId: z.union([id, z.number().int().positive().transform(String)]), goal: z.number().finite(),
-  measurementUnit: z.string().trim().min(1).max(50), dataSource: z.string().trim().min(1).max(120), ranges: kpiConfigurationRangesSchema,
+  measurementUnit: z.string().trim().max(50).default(""), dataSource: z.string().trim().min(1).max(120), ranges: kpiConfigurationRangesSchema,
   isActive: z.boolean().default(true),
   inputFrequencyCode: z.string().trim().min(1).max(50).default("MONTHLY"),
   periodScope: periodScope.default("CURRENT_PERIOD"), goalMode: goalMode.default("SINGLE"),
@@ -89,8 +92,18 @@ export const kpiConfigurationBodySchema = z.object({
     if (!value.subjects.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjects"], message: "Select at least one entity" });
     if (new Set(value.subjects.map((item) => item.subjectExternalId)).size !== value.subjects.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjects"], message: "Each subject can only appear once" });
     if (value.goalAssignment === "DIFFERENT_GOAL_PER_SUBJECT" && value.subjectGoals.length !== value.subjects.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals"], message: "Every selected subject requires a Goal" });
-    if (value.goalAssignment === "SAME_GOAL_FOR_ALL" && value.subjectGoals.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals"], message: "A common Goal must not persist duplicated subject Goals" });
+    const rowIds = value.subjectGoals.map(item => item.subjectExternalId);
+    if (new Set(rowIds).size !== rowIds.length || rowIds.some(id => !value.subjects.some(s => s.subjectExternalId === id))) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals"], message: "Entity Goals must match the selected entities exactly" });
+    const perEntityUnits = value.subjectGoals.some(item => item.goalUnit !== undefined || item.resultUnit !== undefined) || !value.measurementUnit;
+    if (perEntityUnits && value.subjectGoals.length !== value.subjects.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals"], message: "Every entity requires its own units" });
+    value.subjectGoals.forEach((item, index) => {
+      if (perEntityUnits && !item.goalUnit) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals", index, "goalUnit"], message: "Select a Goal Unit for this entity" });
+      if (value.periodScope === "CURRENT_PERIOD" && item.resultUnit && item.resultUnit !== (item.goalUnit ?? value.goalUnit ?? value.measurementUnit)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals", index, "resultUnit"], message: "Current Result Unit must match this entity's Goal Unit" });
+      if (value.periodScope !== "CURRENT_PERIOD" && ((item.goalUnit ?? value.goalUnit ?? "%") !== "%" || !(item.resultUnit ?? value.measurementUnit) || (item.resultUnit ?? value.measurementUnit) === "%")) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals", index, "resultUnit"], message: "Historical entities require a % target and an actual Result Unit" });
+      if (value.goalAssignment === "SAME_GOAL_FOR_ALL" && item.goal !== value.goal) context.addIssue({ code: z.ZodIssueCode.custom, path: ["subjectGoals", index, "goal"], message: "The common Goal must match every entity Goal" });
+    });
   }
+  if (effectiveScope === "OVERALL" && !value.measurementUnit) context.addIssue({ code: z.ZodIssueCode.custom, path: ["measurementUnit"], message: "Select the Result Unit" });
   if (effectiveScope !== "BY_SUBJECT" && value.groupGoal) context.addIssue({ code: z.ZodIssueCode.custom, path: ["groupGoal"], message: "Group Goal is available with By Entity only" });
   if (value.evaluationScope === "BY_SUBJECT" && value.goalMode !== "BY_SUBJECT" && !value.goalAssignment) context.addIssue({ code: z.ZodIssueCode.custom, path: ["goalAssignment"], message: "Goal Assignment is required for By Subject evaluation" });
   if (value.resultMethod === "DIRECT" && value.measurementInputs.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["measurementInputs"], message: "Direct Result cannot define Measurement Inputs" });
@@ -101,33 +114,43 @@ export const kpiConfigurationBodySchema = z.object({
   if (value.calculationTemplate === "DIVIDE" && value.measurementInputs.length !== 2) context.addIssue({ code: z.ZodIssueCode.custom, path: ["measurementInputs"], message: "DIVIDE requires exactly two inputs" });
   if (value.calculationTemplate === "DIFFERENCE" && value.measurementInputs.length !== 2) context.addIssue({ code: z.ZodIssueCode.custom, path: ["measurementInputs"], message: "DIFFERENCE requires exactly two inputs" });
   if (value.periodScope === "CURRENT_PERIOD" && value.targetKind === "CHANGE_TARGET") context.addIssue({ code: z.ZodIssueCode.custom, path: ["periodScope"], message: "A percentage change requires Previous Period or Same Period Previous Year" });
-  if (value.periodScope !== "CURRENT_PERIOD" && value.targetKind === "CHANGE_TARGET" && (value.goalUnit ?? "%") === "%" && value.measurementUnit === "%") context.addIssue({ code: z.ZodIssueCode.custom, path: ["measurementUnit"], message: "Select the unit of the actual measured Result; % represents the historical target change" });
+  if (effectiveScope === "OVERALL" && value.periodScope !== "CURRENT_PERIOD" && value.targetKind === "CHANGE_TARGET" && (value.goalUnit ?? "%") === "%" && value.measurementUnit === "%") context.addIssue({ code: z.ZodIssueCode.custom, path: ["measurementUnit"], message: "Select the unit of the actual measured Result; % represents the historical target change" });
   if (value.scoringApprovalStatus !== "APPROVED") return;
+  if (!value.targetKind) context.addIssue({ code: z.ZodIssueCode.custom, path: ["targetKind"], message: "Confirm the target kind before approving this configuration" });
+  if (value.resultMethod !== "DIRECT" && !(value.calculationTemplate === "DIVIDE" && value.measurementInputs.length === 2)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["resultMethod"], message: "Monitoring currently requires the actual Result to be entered directly" });
+  if (!["PROPORTIONAL", "ZERO_TARGET_BANDS", "RESULT_BANDS", "BINARY"].includes(value.scoringMethod ?? "")) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringMethod"], message: "This evaluation method is not executable by Monitoring yet" });
+  if (value.periodScope !== "CURRENT_PERIOD" && (value.targetKind !== "CHANGE_TARGET" || !value.comparisonDirection || !["PROPORTIONAL", "RESULT_BANDS"].includes(value.scoringMethod ?? ""))) context.addIssue({ code: z.ZodIssueCode.custom, path: ["comparisonDirection"], message: "Historical evaluation requires a change target, direction and proportional scoring" });
   for (const [field, configured] of [["resultSemantics", value.resultSemantics], ["evaluationTypeCode", value.evaluationTypeCode], ["scoringMethod", value.scoringMethod], ["negativeResultPolicy", value.negativeResultPolicy], ["scoringRuleConfigVersion", value.scoringRuleConfigVersion]] as const) {
     if (configured === null) context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: `${field} is required before scoring can be APPROVED` });
   }
   const config = value.scoringRuleConfig as Record<string, unknown> | null;
+  const evaluatedGoals = effectiveScope === "BY_SUBJECT" && value.goalAssignment === "DIFFERENT_GOAL_PER_SUBJECT" ? value.subjectGoals.map(row => row.goal) : [value.goal];
   if (!config) { context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig"], message: "scoringRuleConfig is required before scoring can be APPROVED" }); return; }
   if (value.scoringMethod === "PROPORTIONAL") {
     if (value.evaluationTypeCode !== "GREATER_IS_BETTER" && value.evaluationTypeCode !== "HIGHER_IS_BETTER" && value.evaluationTypeCode !== "LOWER_IS_BETTER") context.addIssue({ code: z.ZodIssueCode.custom, path: ["evaluationTypeCode"], message: "PROPORTIONAL requires Greater or Lower evaluation" });
     if (typeof config.floorPercent !== "number" || typeof config.capPercent !== "number" || config.floorPercent < 0 || config.capPercent > 100 || config.floorPercent > config.capPercent) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig"], message: "PROPORTIONAL requires valid floorPercent and capPercent" });
-    if (value.goal <= 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ["goal"], message: "PROPORTIONAL requires Goal > 0" });
+    if (evaluatedGoals.some(goal => goal <= 0)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["goal"], message: "PROPORTIONAL requires Goal > 0 for every evaluation" });
   } else if (value.scoringMethod === "ZERO_TARGET_BANDS") {
-    if (value.evaluationTypeCode !== "LOWER_IS_BETTER") context.addIssue({ code: z.ZodIssueCode.custom, path: ["evaluationTypeCode"], message: "ZERO_TARGET_BANDS requires LOWER_IS_BETTER" });
+    if (!["LOWER_IS_BETTER", "ZERO_IS_BETTER"].includes(value.evaluationTypeCode ?? "")) context.addIssue({ code: z.ZodIssueCode.custom, path: ["evaluationTypeCode"], message: "Zero bands require Less is better or Zero is best" });
     const bands = Array.isArray(config.bands) ? config.bands as Array<Record<string, unknown>> : [];
-    if (value.goal !== 0) context.addIssue({ code: z.ZodIssueCode.custom, path: ["goal"], message: "ZERO_TARGET_BANDS requires Goal = 0" });
+    if (evaluatedGoals.some(goal => goal !== 0)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["goal"], message: "ZERO_TARGET_BANDS requires Goal = 0 for every evaluation" });
     const malformed = !bands.length || bands.some((band) => typeof band.minResult !== "number" || typeof band.compliance !== "number" || Number(band.compliance) < 0 || Number(band.compliance) > 100 || band.maxResult !== undefined && (typeof band.maxResult !== "number" || Number(band.maxResult) < Number(band.minResult)));
     const ordered = malformed ? [] : [...bands].sort((left, right) => Number(left.minResult) - Number(right.minResult));
     const overlaps = ordered.some((band, index) => index > 0 && Number(ordered[index - 1]!.maxResult ?? Number.POSITIVE_INFINITY) >= Number(band.minResult));
     const coversZero = ordered.some((band) => Number(band.minResult) <= 0 && Number(band.maxResult ?? Number.POSITIVE_INFINITY) >= 0);
     if (malformed || overlaps || !coversZero) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig", "bands"], message: "ZERO_TARGET_BANDS requires non-overlapping explicit bands including Result = 0" });
+  } else if (value.scoringMethod === "RESULT_BANDS") {
+    if (!validResultBands(config.bands)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig", "bands"], message: "Define valid non-overlapping result bands with Compliance between 0 and 100" });
+    if (!["HIGHER_IS_BETTER","GREATER_IS_BETTER","LOWER_IS_BETTER","ZERO_IS_BETTER"].includes(value.evaluationTypeCode ?? "")) context.addIssue({code:z.ZodIssueCode.custom,path:["evaluationTypeCode"],message:"Select a supported behavior for result bands"});
+  } else if (value.scoringMethod === "BINARY") {
+    if (value.resultSemantics !== "BINARY" || value.periodScope !== "CURRENT_PERIOD" || value.resultMethod !== "DIRECT") context.addIssue({code:z.ZodIssueCode.custom,path:["scoringMethod"],message:"Yes/No scoring requires a direct current-period binary result"});
   } else if (value.scoringMethod === "TOLERANCE") {
     if (value.evaluationTypeCode !== "EQUAL_IS_BETTER") context.addIssue({ code: z.ZodIssueCode.custom, path: ["evaluationTypeCode"], message: "TOLERANCE requires EQUAL_IS_BETTER" });
     if (typeof config.tolerance !== "number" || config.tolerance < 0 || !Array.isArray(config.bands) || !config.bands.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig"], message: "TOLERANCE requires a non-negative tolerance and outside-tolerance bands" });
   } else if (value.scoringMethod === "RANGE_BASED") {
     if (value.evaluationTypeCode !== "RANGE") context.addIssue({ code: z.ZodIssueCode.custom, path: ["evaluationTypeCode"], message: "RANGE_BASED requires RANGE evaluation" });
     if (typeof config.rangeMin !== "number" || typeof config.rangeMax !== "number" || config.rangeMin > config.rangeMax || !Array.isArray(config.bands) || !config.bands.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig"], message: "RANGE_BASED requires rangeMin, rangeMax and outside-range bands" });
-  } else if (value.scoringMethod === "BINARY" || value.scoringMethod === "MILESTONE") context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringMethod"], message: `${value.scoringMethod} is not approved for Scoring V1` });
+  } else if (value.scoringMethod === "MILESTONE") context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringMethod"], message: `${value.scoringMethod} is not approved for Scoring V1` });
 });
 export type KpiConfigurationBody = z.infer<typeof kpiConfigurationBodySchema>;
 export type BatchLookupKpiConfigurationsBody = z.infer<typeof batchLookupKpiConfigurationsBodySchema>;

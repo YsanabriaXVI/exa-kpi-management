@@ -1,5 +1,7 @@
 import { historicalContractError, isHistorical } from "../contracts/historical-contract.js";
+import { evaluationUnits } from "../contracts/evaluation-units.js";
 import { historicalComparison } from "./historical-comparison.js";
+import { calculateDivision, divisionDefinition } from "./result-calculation.js";
 import { Prisma } from "@prisma/client";
 import { parseFrozenEffectiveKpiSettings } from "../contracts/frozen-effective-kpi-settings.js";
 import { calculateKpiScore, notCalculable, persistedDecimal } from "./scoring-engine.js";
@@ -15,6 +17,8 @@ export type CheckFinding = {
   scorecardId: string; blocking: boolean;
 };
 const messages: Record<string,string> = {
+  RESULT_DENOMINATOR_ZERO: "The denominator is zero. The official Result cannot be calculated.",
+  RESULT_INPUT_MISSING: "Enter both numerator and denominator. The official Result is pending.",
   RESULT_MISSING: "Enter a Result for this evaluation. Zero is a valid Result.",
   FROZEN_KPI_SETTINGS_INVALID: "The frozen execution contract is incomplete. This evaluation cannot be checked.",
   FROZEN_SCORING_CONTRACT_INVALID: "The frozen scoring metadata is invalid or inconsistent.",
@@ -38,7 +42,10 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
   const evaluations=expectedInputs.map(input=>{
     let failure: string | null=null;
     let frozen: ReturnType<typeof parseFrozenEffectiveKpiSettings> | null=null;
-    const saved=input.result?.resultValue??null;
+    let saved=input.result?.resultValue??null;
+    const division = divisionDefinition(input.effectiveSettingsSnapshot);
+    const derived = division ? calculateDivision(input.result?.inputValues) : null;
+    if (derived) saved = derived.value;
     try {
       const candidate=input.effectiveSettingsSnapshot;
       if(historicalContractError(candidate)) failure="HISTORICAL_CONTRACT_INVALID";
@@ -49,29 +56,31 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
         if(frozen.kpiConfigurationId!==String(input.kpiConfigurationExternalId)||frozen.kpiConfigurationRevisionId!==String(input.kpiConfigurationRevisionExternalId)
           ||frozen.evaluationType.code!==input.evaluationTypeCodeSnapshot||frozen.scoringMethod!==input.scoringMethodCodeSnapshot
           ||goal==null||input.goalValueSnapshot==null||!decimal(goal).eq(input.goalValueSnapshot)
-          ||frozen.measurementUnit.code!==input.measurementUnitCodeSnapshot
+          ||evaluationUnits(frozen,input.subjectExternalIdSnapshot).resultUnit.code!==input.measurementUnitCodeSnapshot
           ||input.evaluationKindSnapshot==="ENTITY"&&(frozen.evaluationScope!=="BY_SUBJECT"||!subject||!decimal(subject.weight!).eq(input.weightPercentSnapshot))
           ||input.evaluationKindSnapshot==="OVERALL"&&frozen.evaluationScope!=="OVERALL") failure="FROZEN_SCORING_CONTRACT_INVALID";
       }
     } catch(error) {failure=typeof (error as any)?.code==="string"?(error as any).code:"FROZEN_KPI_SETTINGS_INVALID";}
+    if (!failure && input.effectiveSettingsSnapshot?.resultMethod === "CALCULATED_FROM_INPUTS" && !division) failure = "RESULT_METHOD_NOT_SUPPORTED";
+    if (!failure && derived?.errorCode) failure = derived.errorCode;
     const historical = isHistorical(input.effectiveSettingsSnapshot);
     const context = contexts.get(String(input.id));
     const comparison = historical && !failure ? historicalComparison(saved, {...context,comparisonDirection:input.effectiveSettingsSnapshot.comparisonDirection}) : null;
     if (comparison?.errorCode && !failure) failure=comparison.errorCode;
     if(historical && frozen && saved !== null && decimal(saved).lt(0) && frozen.negativeResultPolicy !== "ALLOW")
       failure = frozen.negativeResultPolicy === "REVIEW" ? "NEGATIVE_RESULT_REQUIRES_REVIEW" : frozen.negativeResultPolicy === "DISALLOW" ? "NEGATIVE_RESULT_NOT_ALLOWED" : "NEGATIVE_RESULT_POLICY_NOT_CONFIGURED";
-    const scored = saved===null ? notCalculable("RESULT_MISSING",frozen?.scoringMethod??input.scoringMethodCodeSnapshot)
+    const scored = derived?.errorCode ? notCalculable(failure ?? derived.errorCode, frozen?.scoringMethod??input.scoringMethodCodeSnapshot) : saved===null ? notCalculable("RESULT_MISSING",frozen?.scoringMethod??input.scoringMethodCodeSnapshot)
       : failure ? notCalculable(failure,input.scoringMethodCodeSnapshot)
       : calculateKpiScore({result:historical?comparison!.achievedChangePercent:saved,goal:input.goalValueSnapshot,weight:input.weightPercentSnapshot,
           evaluationType:historical?"GREATER_IS_BETTER":frozen!.evaluationType.code,scoringMethod:frozen!.scoringMethod,
-          scoringRuleConfig:frozen!.scoringRuleConfig,scoringApprovalStatus:frozen!.scoringApprovalStatus,
+          resultSemantics:frozen!.resultSemantics,scoringRuleConfig:frozen!.scoringRuleConfig,scoringApprovalStatus:frozen!.scoringApprovalStatus,
           negativeResultPolicy:historical?"ALLOW":frozen!.negativeResultPolicy,
           thresholds:frozen!.thresholds.map(t=>({code:t.code,min:t.rangeMinPercent,max:t.rangeMaxPercent,includesMin:t.includesMin,includesMax:t.includesMax,displayOrder:t.displayOrder}))});
     const row={id:String(input.id),scorecardId:String(input.monitoringPeriodScorecardId),kpiConfigurationId:String(input.kpiConfigurationExternalId),
       revisionId:String(input.kpiConfigurationRevisionExternalId),kpiCode:input.kpiCodeSnapshot,kpiName:input.kpiNameSnapshot,
       evaluationKind:input.evaluationKindSnapshot,entityId:input.subjectExternalIdSnapshot??null,entityLabel:input.subjectLabelSnapshot??null,
       historical:historical?{...context,referenceType:input.effectiveSettingsSnapshot.periodScope,comparisonDirection:input.effectiveSettingsSnapshot.comparisonDirection,targetKind:input.effectiveSettingsSnapshot.targetKind,...comparison}:null,
-      goalUnit:input.effectiveSettingsSnapshot?.goalUnit?.symbol??null,resultValue:text(saved),goal:text(input.goalValueSnapshot),unit:input.measurementUnitSymbolSnapshot??input.measurementUnitNameSnapshot,
+      goalUnit:evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).goalUnit?.symbol??null,resultValue:text(saved),goal:text(input.goalValueSnapshot),unit:input.measurementUnitSymbolSnapshot??input.measurementUnitNameSnapshot,
       weight:text(input.weightPercentSnapshot),behavior:input.evaluationTypeCodeSnapshot,scoringMethod:frozen?.scoringMethod??input.scoringMethodCodeSnapshot,
       status:scored.status,errorCode:scored.errorCode,rawAchievementPercent:scored.rawAchievement?.toFixed(6)??null,
       compliancePercent:scored.compliance?.toFixed(6)??null,goalMet:scored.goalMet,trafficLight:scored.trafficLight,
@@ -124,5 +133,6 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
     historicalBaselines:{required:historicalEvaluations.length,resolved:resolvedBaselines,unresolved:historicalEvaluations.length-resolvedBaselines},
     allRequiredHistoricalBaselinesResolved:resolvedBaselines===historicalEvaluations.length,
     scoring:{calculated,missing:expected-entered,notCalculable:expected-calculated},weightCoverageComplete,allRequiredScoringCalculable:calculated===expected&&expected>0,
+    readyForSubmitWithExceptions:selectedEntryMethod==="MANUAL"&&expected>0&&entered<expected&&weightCoverageComplete&&calculated===entered&&findings.length>0&&findings.every(f=>f.code==="RESULT_MISSING"),
     runStatus:blocking?"BLOCKED":"PASSED",readyForSubmit:selectedEntryMethod==="MANUAL"&&expected>0&&entered===expected&&weightCoverageComplete&&blocking===0&&calculated===expected}};
 }

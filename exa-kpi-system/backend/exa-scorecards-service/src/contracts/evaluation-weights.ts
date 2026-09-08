@@ -5,11 +5,11 @@ import { freezeEffectiveKpiSettings, type EffectiveKpiSettingsV1 } from "./froze
 export type EntityWeight = { subjectExternalId: string; weight: string | number | null };
 export function freezeWeightedSettings(settings: EffectiveKpiSettingsV1, entries: EntityWeight[]) {
   const frozen = structuredClone(freezeEffectiveKpiSettings(settings));
-  if (settings.evaluationScope === "BY_SUBJECT") Object.assign(frozen, {
-    evaluationWeightsVersion: "EXPLICIT_ENTITY_V1",
-    subjectGoals: entityWeights(settings, entries),
-  });
-  return frozen;
+  return {
+    ...frozen,
+    ...(settings.evaluationScope === "BY_SUBJECT" ? { evaluationWeightsVersion: "EXPLICIT_ENTITY_V1" } : {}),
+    subjectGoals: settings.evaluationScope === "BY_SUBJECT" ? structuredClone(entityWeights(settings, entries)) : [],
+  };
 }
 export function entityWeights(settings: EffectiveKpiSettingsV1, entries: EntityWeight[], requireComplete = true) {
   const ids = settings.subjectGoals.map(subject => subject.subjectExternalId);
@@ -21,11 +21,11 @@ export function entityWeights(settings: EffectiveKpiSettingsV1, entries: EntityW
     const entry = entries.find(item => item.subjectExternalId === subject.subjectExternalId);
     if (entry?.weight === null || entry?.weight === undefined) {
       if (requireComplete) throw new AppError(422, "SCORECARD_ENTITY_WEIGHT_MISSING", `Enter an explicit weight for ${subject.subjectLabel}`);
-      return { ...subject, weight: null };
+      return { ...subject, goalUnit: subject.goalUnit ?? settings.goalUnit, resultUnit: subject.resultUnit ?? settings.measurementUnit, weight: null };
     }
     const weight = new Prisma.Decimal(entry.weight);
     if (!weight.isFinite() || weight.lt(0) || weight.gt(100) || weight.decimalPlaces() > 4)
       throw new AppError(422, "SCORECARD_ENTITY_WEIGHT_INVALID", "Entity weights must be between 0 and 100 with at most four decimal places");
-    return { ...subject, weight: weight.toFixed(4) };
+    return { ...subject, goalUnit: subject.goalUnit ?? settings.goalUnit, resultUnit: subject.resultUnit ?? settings.measurementUnit, weight: weight.toFixed(4) };
   });
 }

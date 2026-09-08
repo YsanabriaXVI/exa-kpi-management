@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { initializeMonitoringPeriod, monitoringRequest } from "./monitoring-results.service";
+import { monitoringRequest } from "./monitoring-results.service";
 
 type NextPeriodResponse = { availability: string; reason: string | null; poolId: string; inputPeriod: { poolPeriodId: string | null; periodKey: string } | null; monitoringPeriod: { id: string } | null };
 export function NextPeriod({ periodId }: { periodId: string }) {
@@ -14,10 +14,10 @@ export function NextPeriod({ periodId }: { periodId: string }) {
     {query.isLoading && <p>Loading next Input Period…</p>}
     {query.isError && <p role="alert">{query.error.message}</p>}
     {target && <><p>{target.inputPeriod?.periodKey}</p><p>{target.reason}</p>
-      {target.monitoringPeriod ? <Link className="entry-primary" to={`/app/monitoring-results/result-entry?monitoringPeriodId=${target.monitoringPeriod.id}`}>Open Next Period</Link> : target.availability === "READY_TO_MATERIALIZE" && <><p>Initialize this period from its finalized Scorecards. Results start empty.</p><button className="entry-primary" disabled={busy} onClick={async () => {
+      {target.monitoringPeriod ? <Link className="entry-primary" to={`/app/monitoring-results/result-entry?monitoringPeriodId=${target.monitoringPeriod.id}`}>Open Next Period</Link> : target.inputPeriod?.poolPeriodId && <><p>Inherit Scorecards, KPI selections and weights, resolve the next period settings and start with empty Results.</p><button className="entry-primary" disabled={busy} onClick={async () => {
         if (!target.inputPeriod?.poolPeriodId) return;
         setBusy(true); setError("");
-        try { const created = await initializeMonitoringPeriod(target.poolId, target.inputPeriod.poolPeriodId); navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${created.id}`); }
+        try { const created = await monitoringRequest<{id: string}>(`/v1/monitoring-periods/${periodId}/next-period`, { method: "POST" }); navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${created.id}`); }
         catch (cause) { setError(cause instanceof Error ? cause.message : "Next Period could not be initialized."); }
         finally { setBusy(false); }
       }}>{busy ? "Initializing…" : "Initialize Next Period"}</button></>}

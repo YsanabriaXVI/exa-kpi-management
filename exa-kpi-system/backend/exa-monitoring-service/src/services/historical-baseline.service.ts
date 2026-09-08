@@ -1,3 +1,4 @@
+import { evaluationUnits } from "../contracts/evaluation-units.js";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
@@ -97,7 +98,7 @@ async function record(db:Tx, period:any, input:any, req:RequiredPeriod, sourceTy
   if(previous && previous.sourceType===sourceType && previous.sourceResultId===(source?.id??null)
     && previous.baselineValueSnapshot.eq(value) && previous.reason===reason
     && previous.requiredPeriodKey===req.key
-    && ["id","code","name","symbol"].every(key=>(previous.baselineUnitSnapshot as any)?.[key]===input.effectiveSettingsSnapshot.measurementUnit[key])) return previous;
+    && ["id","code","name","symbol"].every(key=>(previous.baselineUnitSnapshot as any)?.[key]===evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).resultUnit[key])) return previous;
   period.baselineVersion=(period.baselineVersion??0)+1;
   const i=source?.input;
   const row=await db.historicalBaselineResolution.create({data:{
@@ -105,11 +106,11 @@ async function record(db:Tx, period:any, input:any, req:RequiredPeriod, sourceTy
     baselineVersion:period.baselineVersion,referenceType:input.effectiveSettingsSnapshot.periodScope,
     requiredPeriodKey:req.key,requiredPeriodStart:date(req.start),requiredPeriodEnd:date(req.end),
     subjectExternalId:input.subjectExternalIdSnapshot,sourceType,baselineValueSnapshot:value,
-    baselineUnitSnapshot:asJson(input.effectiveSettingsSnapshot.measurementUnit),sourceResultId:source?.id??null,
+    baselineUnitSnapshot:asJson(evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).resultUnit),sourceResultId:source?.id??null,
     sourceMonitoringPeriodId:i?.monitoringPeriodId??null,sourcePoolExternalId:i?.period.kpiPoolExternalId??null,
     sourceScorecardExternalId:i?.scorecard.scorecardExternalId??null,sourceKpiDefinitionExternalId:i?.kpiDefinitionExternalId??null,
     sourceKpiConfigurationExternalId:i?.kpiConfigurationExternalId??null,sourceSubjectExternalId:i?.subjectExternalIdSnapshot??null,
-    provenance:asJson(source?candidateDto(source,input):{requiredPeriod:req,unit:input.effectiveSettingsSnapshot.measurementUnit,description:reason}),
+    provenance:asJson(source?candidateDto(source,input):{requiredPeriod:req,unit:evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).resultUnit,description:reason}),
     reason,resolvedByUserId:actor }});
   await clearCurrentScoring(db,period.id);
   await db.monitoringPeriod.update({where:{id:period.id},data:{baselineVersion:period.baselineVersion,currentScoringResultsVersion:null,
@@ -147,7 +148,7 @@ export const historicalBaselineService = {
       const {period,input,requiredPeriod}=await target(db,BigInt(periodId),BigInt(inputId));
       const all=await sources(db,period,input,requiredPeriod,query);
       const current=await latest(db,input.id);
-      return {baselineVersion:period.baselineVersion,requiredPeriod,unit:(input.effectiveSettingsSnapshot as any).measurementUnit,
+      return {baselineVersion:period.baselineVersion,requiredPeriod,unit:evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).resultUnit,
         resolution:current?resolutionDto(current):null,page:query.page,total:all.length,
         candidates:all.slice((query.page-1)*25,query.page*25).map(r=>candidateDto(r,input))};
     });

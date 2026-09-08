@@ -4,5 +4,5 @@
     "rootDir": "src", "outDir": "dist", "strict": true, "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true, "skipLibCheck": true, "noUncheckedIndexedAccess": true
   },
-  "include": ["src/**/*.ts"], "exclude": ["dist", "node_modules"]
+  "include": ["src/**/*.ts"], "exclude": ["dist", "node_modules", "src/tests", "src/**/*.test.ts"]
 }

@@ -59,3 +59,5 @@
 .baseline-dialog .baseline-candidate { display:flex; gap:12px; padding:12px; border:1px solid #d4dce6; border-radius:8px; }
 .baseline-dialog button { padding:8px 14px; cursor:pointer; }
 .baseline-dialog button:disabled { opacity:.5; cursor:default; }
+
+.division-result-input{display:grid;gap:10px;min-width:260px;padding:8px 0}.division-result-input label{display:grid;gap:5px}.division-result-input label span,.division-result-input small{font-size:12px;color:var(--ems-muted)}.division-result-input output{font-size:14px;font-weight:650;color:var(--ems-text)}

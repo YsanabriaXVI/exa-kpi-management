@@ -1,7 +1,15 @@
 import { Router } from "express";
+import { z } from "zod";
+import { scorecardCompositionService } from "../services/scorecard-composition.service.js";
 import { createScorecard, deactivateScorecard, eligiblePools, getScorecard, listScorecards, updateScorecard } from "../controllers/scorecard.controller.js";
 import { addKpis, addLink, availableKpis, availableLinks, finalizeComposition, frozenKpiUsage, getComposition, listPeriods, monitoringMaterialization, poolUsage, poolUsageBatch, poolWorkflow, removeKpi, removeLink, updateScope, updateWeights } from "../controllers/scorecard-composition.controller.js";
 export const scorecardRouter = Router();
+scorecardRouter.post("/internal/prepare-next-period", async (request, response, next) => {
+  try {
+    const body = z.object({ poolId: z.string().regex(/^\d+$/), sourcePeriodKey: z.string().min(1).max(50), targetPeriodKey: z.string().min(1).max(50) }).strict().parse(request.body);
+    response.json(await scorecardCompositionService.prepareNextPeriod(BigInt(body.poolId), body.sourcePeriodKey, body.targetPeriodKey, request.identity.actorUserId));
+  } catch (error) { next(error); }
+});
 scorecardRouter.get("/eligible-pools", eligiblePools);
 scorecardRouter.get("/pool-workflow", poolWorkflow);
 scorecardRouter.post("/pool-workflow/batch", poolUsageBatch);

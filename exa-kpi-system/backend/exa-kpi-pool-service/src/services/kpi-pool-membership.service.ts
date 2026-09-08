@@ -390,7 +390,10 @@ export const kpiPoolMembershipService = {
       const definitions = new Set(memberships.map((value) => value.kpiDefinitionExternalId.toString()));
       if (definitions.size !== memberships.length) throw new AppError(422, "KPI_DEFINITION_ALREADY_EFFECTIVE", "The period contains overlapping KPI Definitions");
       const lookup = await kpiManagementClient.batchLookup(memberships.map((value) => value.kpiConfigurationExternalId.toString()));
-      const eligible = lookup.notFoundIds.length === 0 && lookup.data.length === memberships.length && lookup.data.every((configuration) => !eligibilityReason(configuration, initial.inputFrequencyExternalId));
+      const effective = await Promise.all(memberships.map(membership => kpiManagementClient.effectiveSnapshot(membership.kpiConfigurationExternalId.toString(), formatDateOnly(period.start), formatDateOnly(period.end))));
+      const blocked = effective.filter(configuration => !configuration.executability.executable);
+      if (blocked.length) throw new AppError(422, "POOL_PERIOD_COMPOSITION_INVALID", "Complete the effective KPI Configurations for this Input Period before finalizing", { configurations: blocked.map(configuration => ({ id: configuration.kpiConfigurationId, code: configuration.configCode, reasons: configuration.executability.reasons })) });
+      const eligible = lookup.notFoundIds.length === 0 && lookup.data.length === memberships.length && lookup.data.every(configuration => configuration.isActive && configuration.definitionIsActive && configuration.inputFrequencyIsActive && configuration.inputFrequencyId === initial.inputFrequencyExternalId.toString());
       if (!eligible) throw new AppError(422, "POOL_PERIOD_COMPOSITION_INVALID", "One or more KPI Configurations are no longer eligible");
       const inputPeriod = await tx.kpiPoolInputPeriod.findUnique({ where: { kpiPoolId_periodStart: { kpiPoolId: poolId, periodStart: period.start } } });
       if (!inputPeriod) throw new AppError(409, "POOL_INPUT_PERIOD_NOT_FOUND", "The persisted Pool Input Period was not found");

@@ -103,4 +103,29 @@ run("Manual Result Entry MySQL",()=>{
   expect(rechecked.monitoringPeriod.validationRun).toMatchObject({basedOnResultsVersion:changed.monitoringPeriod.resultsVersion,status:"CURRENT"});
   expect(await prisma.monitoringValidationRun.findUniqueOrThrow({where:{id:runId}})).toEqual(original);
  });
+ it("persists ordered operands, derives the official result and versions equal quotients",async()=>{
+  let current=await resultEntryService.get(overallPeriod);
+  const input=current.inputs[0];
+  const stored=await prisma.monitoringPeriodInput.findUniqueOrThrow({where:{id:BigInt(input.id)}});
+  const snapshot=stored.effectiveSettingsSnapshot as any;
+  await prisma.monitoringPeriodInput.update({where:{id:stored.id},data:{effectiveSettingsSnapshot:{...snapshot,resultMethod:"CALCULATED_FROM_INPUTS",calculationTemplate:"DIVIDE",measurementInputs:[{name:"Cost",unit:"USD"},{name:"Containers",unit:"unit"}]}}});
+  const write=async(numerator:string|null,denominator:string|null)=>{
+    const latest=await resultEntryService.get(overallPeriod);
+    return resultEntryService.save(overallPeriod,{resultsVersion:latest.monitoringPeriod.resultsVersion,changes:[{monitoringPeriodInputId:input.id,resultValue:"999",inputValues:{numerator,denominator},version:latest.inputs[0].version}]},11n);
+  };
+  current=await write("50000","2000");
+  expect(current.inputs[0]).toMatchObject({resultValue:"25",inputValues:{numerator:"50000",denominator:"2000"}});
+  expect((await resultEntryService.get(overallPeriod)).inputs[0].inputValues).toEqual({numerator:"50000",denominator:"2000"});
+  const version=current.monitoringPeriod.resultsVersion;
+  expect((await write("50000","2000")).monitoringPeriod.resultsVersion).toBe(version);
+  current=await write("100000","4000");
+  expect(current.inputs[0].resultValue).toBe("25");
+  expect(current.monitoringPeriod.resultsVersion).toBe(version+1);
+  current=await write("50000","0");
+  expect(current.inputs[0]).toMatchObject({resultValue:null,resultCalculation:{errorCode:"RESULT_DENOMINATOR_ZERO"}});
+  current=await write(null,"2000");
+  expect(current.inputs[0]).toMatchObject({resultValue:null,inputValues:{numerator:null,denominator:"2000"},resultCalculation:{errorCode:"RESULT_INPUT_MISSING"}});
+  const batches=await prisma.resultEntryBatchRow.findMany({where:{monitoringPeriodInputId:stored.id},orderBy:{id:"desc"},take:4});
+  expect(batches.map(row=>row.inputValues)).toEqual([{numerator:null,denominator:"2000"},{numerator:"50000",denominator:"0"},{numerator:"100000",denominator:"4000"},{numerator:"50000",denominator:"2000"}]);
+ });
 });

@@ -1,0 +1,40 @@
+.explained-select{position:relative;display:grid;gap:7px;margin:14px 0;min-width:0;font-size:13px}
+.explained-select-label{font-weight:650;color:var(--ems-text,#172033)}
+.explained-select .explained-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:42px;padding:10px 12px;border:1px solid var(--ems-border,#cbd5e1);border-radius:8px;background:var(--ems-surface,#fff);color:var(--ems-text,#172033);font:inherit;text-align:left;cursor:pointer}
+.explained-select-trigger[aria-expanded=true]{border-color:#247c9e}
+.explained-select-options{position:absolute;z-index:30;top:100%;left:0;width:min(640px,calc(100vw - 48px));margin-top:5px;overflow:hidden;border:1px solid var(--ems-border,#cbd5e1);border-radius:10px;background:var(--ems-surface,#fff);box-shadow:0 10px 28px rgb(15 23 42 / 15%)}
+.monitoring-profile-select-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.monitoring-profile-select-row>.explained-select:last-child .explained-select-options{left:auto;right:0}
+.explained-select-body{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr)}
+.explained-select-list{max-height:380px;overflow-y:auto;border-right:1px solid var(--ems-border,#e2e8f0)}
+.explained-select .explained-select-hint{margin:0;padding:10px 12px;color:var(--ems-muted,#64748b);font-size:12px;border-bottom:1px solid var(--ems-border,#e2e8f0)}
+.explained-select-row{display:flex;align-items:stretch;min-height:44px}
+.explained-select .explained-select-choice{display:flex;flex:1;align-items:center;gap:9px;margin:0;padding:11px 12px;cursor:pointer;font-size:13px}
+.explained-select .explained-select-choice input{width:16px;height:16px;margin:0;flex:none;accent-color:#247c9e}
+.explained-select-option+.explained-select-option{border-top:1px solid var(--ems-border,#e2e8f0)}
+.explained-select-row:has(input:checked){background:var(--ems-surface-muted,#eef6fb)}
+.explained-select .explained-select-info{display:grid;place-items:center;align-self:center;width:36px;height:36px;margin-right:6px;border:0;border-radius:50%;background:transparent;color:var(--ems-muted,#64748b);cursor:pointer;transition:color 160ms ease}
+.explained-select .explained-select-info:hover,
+.explained-select .explained-select-info[aria-expanded=true]{background:transparent;color:#247c9e}
+.explained-select-info svg{width:16px;height:16px;stroke-width:1.5;transition:transform 160ms ease}
+.explained-select-info[aria-expanded=true] svg{transform:translateX(2px)}
+@media(prefers-reduced-motion:reduce){.explained-select .explained-select-info,.explained-select-info svg{transition:none}}
+.explained-select .explained-select-help{min-height:210px;max-height:380px;overflow-y:auto;padding:20px;background:var(--ems-surface-muted,#f1f7fa);color:var(--ems-text,#172033)}
+.explained-select .explained-select-help h3{margin:0 0 18px;font-size:15px;line-height:1.4}
+.explained-select-help-empty{display:grid;justify-items:start;align-content:center;min-height:170px;gap:8px;color:var(--ems-muted,#64748b)}
+.explained-select-help dl{display:grid;grid-template-columns:1fr;gap:20px;margin:0}
+.explained-select-help dt{font-size:11px;font-weight:750;color:#247c9e;margin-bottom:5px}
+.explained-select-help dd{margin:0;font-size:12px;line-height:1.6}
+.explained-select .explained-select-help p{margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--ems-muted,#64748b)}
+.explained-select button:focus-visible,.explained-select input:focus-visible{outline:2px solid #247c9e;outline-offset:2px}
+@media(max-width:700px){.monitoring-profile-select-row{grid-template-columns:minmax(0,1fr);gap:0}.explained-select-options{width:100%;max-height:65vh;overflow-y:auto}.explained-select-body{grid-template-columns:1fr}.explained-select-list{max-height:220px;border-right:0;border-bottom:1px solid var(--ems-border,#e2e8f0)}.explained-select .explained-select-help{max-height:none;min-height:0;padding:16px}.explained-select-help dl{gap:12px}.explained-select-help-empty{min-height:0}}
+.explained-select-option.is-previewed .explained-select-row { background: color-mix(in srgb, #1680a5 13%, var(--ems-surface, #fff)); color: var(--ems-text, #172033); box-shadow: inset 3px 0 #1680a5; }
+.explained-select-option.is-previewed .explained-select-choice { color: inherit; }
+.explained-select-option.is-previewed .explained-select-info { color: #1680a5; }
+.explained-select .explained-select-help { background: color-mix(in srgb, #1680a5 13%, var(--ems-surface, #fff)); }
+.explained-select .explained-select-help h3 { color: #1680a5; }
+.explained-select-row { transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+.explained-select .explained-select-help { transition: background-color 160ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  .explained-select-row, .explained-select .explained-select-help { transition: none; }
+}

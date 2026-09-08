@@ -6,6 +6,28 @@ function fixture(status: string, current = true) {
   return { monitoringPeriod: { status, poolName: "Sales", periodLabel: "September 2026" }, check: { status: current ? "CURRENT" : "STALE", summary: { readyForSubmit: true } }, summary: { pending: 0 }, scorecards: [] } as unknown as ManualEntryResponse;
 }
 describe("Period workflow", () => {
+  it.each(["DRAFT", "SUBMITTED", "VALIDATED"])("requires a justified exception in %s", async status => {
+    const data = fixture(status);
+    data.summary.pending = 1;
+    data.check!.summary!.readyForSubmit = false;
+    data.check!.summary!.readyForSubmitWithExceptions = true;
+    const onAction = vi.fn().mockResolvedValue(undefined);
+    const label = status === "DRAFT" ? "Submit with Exceptions" : status === "SUBMITTED" ? "Approve with Exceptions" : "Close with Exceptions";
+    render(<PeriodWorkflow data={data} disabled={false} onAction={onAction}/>);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    expect(screen.getByRole("button", { name: `Confirm ${label}` })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Workflow reason"), { target: { value: "Source did not deliver the Result" } });
+    fireEvent.click(screen.getByRole("button", { name: `Confirm ${label}` }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith(status === "DRAFT" ? "submit" : status === "SUBMITTED" ? "approve" : "close", { withExceptions: true, justification: "Source did not deliver the Result" }));
+  });
+  it("blocks exceptions when Check includes non-waivable errors", () => {
+    const data = fixture("DRAFT");
+    data.summary.pending = 1;
+    data.check!.summary!.readyForSubmit = false;
+    data.check!.summary!.readyForSubmitWithExceptions = false;
+    render(<PeriodWorkflow data={data} disabled={false} onAction={vi.fn()}/>);
+    expect(screen.getByRole("button", { name: "Submit Results" })).toBeDisabled();
+  });
   it("blocks submission for stale Check or unsaved changes", () => {
     const props = { onAction: vi.fn(), disabled: false };
     const view = render(<PeriodWorkflow {...props} data={fixture("DRAFT", false)}/>);

@@ -35,6 +35,7 @@ export const saveResultEntryBodySchema = z.object({
   changes: z.array(z.object({
     monitoringPeriodInputId: id,
     resultValue: decimalValue,
+    inputValues: z.object({ numerator: decimalValue, denominator: decimalValue }).strict().optional(),
     comment: z.string().max(10_000).nullable().optional(),
     version: z.number().int().positive().nullable(),
   }).strict()),
@@ -48,6 +49,14 @@ export const closeMonitoringPeriodBodySchema = workflowVersionBodySchema.extend(
   if (value.withExceptions && (!value.justification || value.justification.length < 10)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["justification"], message: "Close with Exceptions requires a justification of at least 10 characters" });
 });
 export type WorkflowVersionBody = z.infer<typeof workflowVersionBodySchema>;
+export const exceptionWorkflowBodySchema = workflowVersionBodySchema.extend({
+  withExceptions: z.boolean().optional(),
+  justification: z.string().trim().max(10_000).nullable().optional(),
+}).strict().superRefine((value, context) => {
+  if (value.withExceptions && (!value.justification || value.justification.length < 10))
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["justification"], message: "Exceptions require a justification of at least 10 characters" });
+});
+export type ExceptionWorkflowBody = z.infer<typeof exceptionWorkflowBodySchema>;
 export type ReturnForCorrectionBody = z.infer<typeof returnForCorrectionBodySchema>;
 export type CloseMonitoringPeriodBody = z.infer<typeof closeMonitoringPeriodBodySchema>;
 

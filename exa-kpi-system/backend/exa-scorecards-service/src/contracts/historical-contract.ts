@@ -1,3 +1,4 @@
+import { validResultBands } from "./result-bands.js";
 import { z } from "zod";
 
 // Canonical fields are explicit; optional only to read legacy CURRENT_PERIOD snapshots.
@@ -23,6 +24,7 @@ export function historicalContractError(value: any): string | null {
     && thresholds.every((t:any,i:number)=>!Number.isNaN(t.min)&&!Number.isNaN(t.max)&&t.min<t.max
       && (i===0 || thresholds[i-1].max<t.min || thresholds[i-1].max===t.min && !(thresholds[i-1].includesMax&&t.includesMin)));
   const subjects = Array.isArray(value.subjectGoals) ? value.subjectGoals : [];
+  const units = value.evaluationScope === "BY_SUBJECT" ? subjects.map((s: any) => ({goal: s?.goalUnit ?? value.goalUnit, result: s?.resultUnit ?? value.measurementUnit})) : [{goal: value.goalUnit, result: value.measurementUnit}];
   const goals = value.evaluationScope === "BY_SUBJECT" ? subjects.map((s: any) => s?.goal) : [value.goal];
   if (!z.object(historicalFields).safeParse(value).success
     || !["PREVIOUS_PERIOD","SAME_PERIOD_PREVIOUS_YEAR"].includes(value.periodScope)
@@ -31,12 +33,12 @@ export function historicalContractError(value: any): string | null {
     || value.historicalCapabilityVersion !== "HISTORICAL_COMPARISON_V1"
     || !trafficValid || !["GREATER_IS_BETTER","HIGHER_IS_BETTER","LOWER_IS_BETTER"].includes(value.evaluationType?.code)
     || !value.inputFrequency || !goals.length || !goals.every(positive)
-    || value.goalUnit?.symbol !== "%" || !value.measurementUnit?.code
-    || value.measurementUnit?.symbol === "%" || !value.resultSemantics
-    || value.scoringMethod !== "PROPORTIONAL" || value.scoringApprovalStatus !== "APPROVED"
-    || !rule || rule.floorPercent == null || rule.capPercent == null
+    || units.some((u: any) => u.goal?.symbol !== "%" || !u.result?.code || u.result?.symbol === "%") || !value.resultSemantics
+    || !["PROPORTIONAL", "RESULT_BANDS"].includes(value.scoringMethod) || value.scoringApprovalStatus !== "APPROVED"
+    || !rule || value.scoringMethod === "RESULT_BANDS" && !validResultBands(rule.bands)
+    || value.scoringMethod === "PROPORTIONAL" && (rule.floorPercent == null || rule.capPercent == null
     || !Number.isFinite(Number(rule.floorPercent)) || !Number.isFinite(Number(rule.capPercent))
-    || Number(rule.floorPercent) < 0 || Number(rule.capPercent) > 100 || Number(rule.floorPercent) > Number(rule.capPercent)
+    || Number(rule.floorPercent) < 0 || Number(rule.capPercent) > 100 || Number(rule.floorPercent) > Number(rule.capPercent))
     || value.evaluationScope === "BY_SUBJECT" && (!value.subjectType || subjects.some((s: any) => !s?.subjectExternalId))
   ) return "HISTORICAL_CONTRACT_INVALID";
   return null;

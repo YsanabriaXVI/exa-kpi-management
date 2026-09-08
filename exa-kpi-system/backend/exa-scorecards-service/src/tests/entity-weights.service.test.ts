@@ -27,6 +27,15 @@ beforeEach(() => {
   db.$transaction.mockImplementation(async (callback:any) => callback(db));
 });
 describe("Explicit Scorecard entity weights", () => {
+  it("preserves separate Goal and Result Units when freezing entity weights",()=>{
+    const settings=structuredClone(effective);
+    settings.subjectGoals[0].goalUnit={symbol:"USD"};settings.subjectGoals[0].resultUnit={symbol:"USD"};
+    settings.subjectGoals[1].goalUnit={symbol:"MXN"};settings.subjectGoals[1].resultUnit={symbol:"MXN"};
+    const frozen=freezeWeightedSettings(settings,row.entityWeights);
+    expect(frozen.subjectGoals[1]).toMatchObject({goalUnit:{symbol:"MXN"},resultUnit:{symbol:"MXN"},weight:"34.8750"});
+    settings.subjectGoals[1].goalUnit.symbol="USD";
+    expect(frozen.subjectGoals[1].goalUnit?.symbol).toBe("MXN");
+  });
   it("saves explicit weights and persists only their subtotal on the grouping row", async () => {
     await scorecardCompositionService.updateWeights(9n,"2026-09",{kpis:[{kpiConfigurationExternalId:"3",weight:99,entityWeights:[{subjectExternalId:"A",weight:10},{subjectExternalId:"B",weight:8}]}],linkedScorecards:[]});
     const saved=db.scorecardPeriodKpi.updateMany.mock.calls[0]![0].data;

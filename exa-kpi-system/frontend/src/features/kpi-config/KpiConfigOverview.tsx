@@ -218,10 +218,11 @@ function GoalOverviewCell({ config, onView }: { config: KpiConfigRecord; onView:
     const minimum = values.length ? Math.min(...values) : null;
     const maximum = values.length ? Math.max(...values) : null;
     const historical = Boolean(config.periodScope && config.periodScope !== "CURRENT_PERIOD");
-    const unit = config.goalUnit || config.measurementUnit;
+    const units = [...new Set(goals.map(row => row.goalUnit || config.goalUnit || config.measurementUnit))];
+    const unit = units.length === 1 ? units[0] : "Multiple units";
     return <div className="overview-subject-goal">
       <strong>By {subjectTypeLabel(config.subjectType)} · {goals.length} {goals.length === 1 ? "goal" : "goals"}</strong>
-      <small>{minimum === null ? "No entity goals" : minimum === maximum ? `${formatSignedGoal(minimum, historical)} ${unit}` : `${formatSignedGoal(minimum, historical)}–${formatSignedGoal(maximum!, historical)} ${unit}`}</small>
+      <small>{minimum === null ? "No entity goals" : units.length > 1 ? "Multiple units ? view entity goals" : minimum === maximum ? `${formatSignedGoal(minimum, historical)} ${unit}` : `${formatSignedGoal(minimum, historical)}–${formatSignedGoal(maximum!, historical)} ${unit}`}</small>
       <button type="button" disabled={!goals.length} onClick={(event) => { event.stopPropagation(); onView(); }}>View goals</button>
     </div>;
   }
@@ -235,7 +236,7 @@ function SubjectGoalsModal({ config, onClose }: { config: KpiConfigRecord; onClo
   return <div className="subject-goals-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="subject-goals-modal" role="dialog" aria-modal="true" aria-labelledby="subject-goals-title">
       <header><div><span>{config.code}</span><h2 id="subject-goals-title">Goals by {subjectTypeLabel(config.subjectType)}</h2><p>{config.definitionCode} — {config.definitionName}</p></div><button type="button" aria-label="Close goals" onClick={onClose}><X size={17} /></button></header>
-      <div className="subject-goals-list"><div className="subject-goals-list-head"><span>Entity</span><span>Goal</span></div>{(config.subjectGoals ?? []).map((item) => <div className="subject-goals-list-row" key={item.subjectExternalId}><strong>{item.subjectLabel}</strong><span>{formatSignedGoal(item.goal, Boolean(historical))} {unit}</span></div>)}</div>
+      <div className="subject-goals-list"><div className="subject-goals-list-head"><span>Entity</span><span>Goal</span></div>{(config.subjectGoals ?? []).map((item) => <div className="subject-goals-list-row" key={item.subjectExternalId}><strong>{item.subjectLabel}</strong><span>{formatSignedGoal(item.goal, Boolean(historical))} {item.goalUnit || unit}{historical && <small>Result: {item.resultUnit || config.measurementUnit}</small>}</span></div>)}</div>
       {config.groupGoal && <div className="overview-group-goal"><span>Group Goal</span><strong>{formatGoal(config.groupGoal.value)} {config.groupGoal.unit}</strong></div>}
       <footer><span>{config.subjectGoals?.length ?? 0} configured {(config.subjectGoals?.length ?? 0) === 1 ? "entity" : "entities"}</span><button type="button" className="button secondary" onClick={onClose}>Close</button></footer>
     </section>

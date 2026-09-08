@@ -40,6 +40,8 @@ model MeasurementUnit {
   goalConfigurationRevisions     KpiConfigurationRevision[]                 @relation("RevisionGoalUnit")
   groupGoalConfigurationRevisions KpiConfigurationRevision[]                @relation("RevisionGroupGoalUnit")
   configurationMeasurementInputs KpiConfigurationRevisionMeasurementInput[]
+  entityGoalUnits                KpiConfigurationRevisionSubjectGoal[] @relation("EntityGoalUnit")
+  entityResultUnits              KpiConfigurationRevisionSubjectGoal[] @relation("EntityResultUnit")
 
   @@map("measurement_units")
 }
@@ -327,6 +329,10 @@ model KpiConfigurationRevisionSubjectGoal {
   subjectCodeSnapshot        String?                  @map("subject_code_snapshot") @db.VarChar(100)
   subjectLabelSnapshot       String                   @map("subject_label_snapshot") @db.VarChar(200)
   goalValue                  Decimal                  @map("goal_value") @db.Decimal(20, 6)
+  goalUnitId                 BigInt?                  @map("goal_unit_id")
+  resultUnitId               BigInt?                  @map("result_unit_id")
+  goalUnit                   MeasurementUnit?         @relation("EntityGoalUnit", fields: [goalUnitId], references: [id], onDelete: Restrict)
+  resultUnit                 MeasurementUnit?         @relation("EntityResultUnit", fields: [resultUnitId], references: [id], onDelete: Restrict)
   displayOrder               Int                      @default(1) @map("display_order") @db.SmallInt
   createdAt                  DateTime                 @default(now()) @map("created_at") @db.DateTime(3)
   revision                   KpiConfigurationRevision @relation(fields: [kpiConfigurationRevisionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_kpi_revision_subject_goals_revision")

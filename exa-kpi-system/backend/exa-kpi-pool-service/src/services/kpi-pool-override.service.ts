@@ -8,6 +8,15 @@ import { scorecardsClient } from "../clients/scorecards.client.js";
 const normalize = (value: unknown): unknown => Array.isArray(value) ? value.map(normalize) : value && typeof value === "object" ? Object.fromEntries(Object.entries(value as Record<string,unknown>).sort(([a],[b]) => a.localeCompare(b)).map(([key,item]) => [key, normalize(item)])) : value;
 const canonical = (value: unknown) => JSON.stringify(normalize(value));
 const globalField = (snapshot: EffectiveKpiSettingsV1, field: string) => field === "GOAL" ? snapshot.goal : snapshot.thresholds.map((item) => ({ code: item.code, rangeMinPercent: item.rangeMinPercent, rangeMaxPercent: item.rangeMaxPercent, includesMin: item.includesMin, includesMax: item.includesMax }));
+function comparableField(field: string, value: unknown) {
+  if (field !== "TRAFFIC_LIGHT_THRESHOLDS" || !Array.isArray(value)) return canonical(value);
+  const rows = [...value].sort((a, b) => Number(a.rangeMinPercent) - Number(b.rangeMinPercent));
+  return canonical(rows.map((row, index) => {
+    const next = rows[index + 1];
+    const consecutive = next && Number(row.rangeMaxPercent) + 1 === Number(next.rangeMinPercent);
+    return { code: row.code, rangeMinPercent: Number(row.rangeMinPercent), rangeMaxPercent: Number(consecutive ? next.rangeMinPercent : row.rangeMaxPercent), includesMin: row.includesMin, includesMax: consecutive ? false : row.includesMax };
+  }));
+}
 
 async function context(poolId: bigint, inputPeriodId: bigint, configurationId: bigint) {
   const [period, pool, closure, composition] = await Promise.all([
@@ -40,15 +49,21 @@ export const kpiPoolOverrideService = {
     const activeOverrides: typeof overrides = [];
     for (const override of overrides) {
       const current = globalField(global, override.fieldCode);
-      if (canonical(current) !== canonical(override.baseGlobalValue)) {
+      if (comparableField(override.fieldCode, current) !== comparableField(override.fieldCode, override.baseGlobalValue)) {
         await prisma.kpiPoolPeriodConfigurationOverride.update({ where: { id: override.id }, data: { statusCode: "SUPERSEDED", activeKey: null, supersededAt: new Date(), supersededByGlobalRevisionExternalId: BigInt(global.kpiConfigurationRevisionId) } });
         continue;
       }
       activeOverrides.push(override);
       if (override.fieldCode === "GOAL") effective.goal = String(override.overrideValue);
-      if (override.fieldCode === "TRAFFIC_LIGHT_THRESHOLDS") effective.thresholds = override.overrideValue as unknown as EffectiveKpiSettingsV1["thresholds"];
+      if (override.fieldCode === "TRAFFIC_LIGHT_THRESHOLDS") effective.thresholds = (override.overrideValue as unknown as EffectiveKpiSettingsV1["thresholds"]).map(threshold => ({ ...global.thresholds.find(row => row.code === threshold.code)!, ...threshold }));
       sources[override.fieldCode] = "POOL_OVERRIDE";
     }
+    effective.thresholds = effective.thresholds.map(threshold => {
+      const next = effective.thresholds.find(row => row.displayOrder === threshold.displayOrder + 1);
+      const consecutive = next && Number(threshold.rangeMaxPercent) + 1 === Number(next.rangeMinPercent);
+      return { ...threshold, rangeMinPercent: threshold.rangeMinPercent == null ? null : String(threshold.rangeMinPercent), rangeMaxPercent: consecutive ? String(next.rangeMinPercent) : threshold.rangeMaxPercent == null ? null : String(threshold.rangeMaxPercent), includesMax: consecutive ? false : threshold.includesMax };
+    });
+    if (effective.evaluationScope === "OVERALL" && (effective.scoringMethod === "PROPORTIONAL" && !(Number(effective.goal) > 0) || effective.scoringMethod === "ZERO_TARGET_BANDS" && Number(effective.goal) !== 0)) effective.executability = { ...effective.executability, executable: false, status: "BLOCKED", reasons: [...effective.executability.reasons, { code: "POOL_GOAL_CONTRACT_INVALID", message: "The Pool goal must respect the scoring method confirmed in KPI Configuration" }] };
     if (historicalContractError(effective)) throw new AppError(422,"HISTORICAL_CONTRACT_INVALID","Pool overrides produce an invalid historical execution contract");
     const usage = includeEditability ? await scorecardsClient.frozenUsage(poolId.toString(), period.periodKey, configurationId.toString()) : null;
     const frozen = usage?.frozen === true || !selected.editable;
@@ -71,6 +86,7 @@ export const kpiPoolOverrideService = {
     if (selectedUsage?.frozen) throw new AppError(409, "SCORECARD_EFFECTIVE_SETTINGS_FROZEN", "This KPI Configuration is already consumed by a FINALIZED Scorecard for the selected Input Period", selectedUsage);
     const eligible = usageChecks.filter(({ candidate, usage }) => !usage.frozen && candidate.status !== "FINALIZED" && candidate.status !== "CLOSED" && candidate.status !== "INACTIVE").map(({ candidate }) => candidate);
     const resolvedByPeriod = new Map((await Promise.all(eligible.map(async (candidate) => [candidate.period.id.toString(), await this.resolve(poolId, candidate.period.id, configurationId, false)] as const))));
+    for (const resolved of resolvedByPeriod.values()) if (input.goal !== undefined && (resolved.effective.scoringMethod === "PROPORTIONAL" && input.goal <= 0 || resolved.effective.scoringMethod === "ZERO_TARGET_BANDS" && input.goal !== 0)) throw new AppError(422, "POOL_GOAL_CONTRACT_INVALID", "The goal override is incompatible with the scoring rule of a target period");
     const fields = [{ code: "GOAL", value: input.goal }, { code: "TRAFFIC_LIGHT_THRESHOLDS", value: input.trafficLightThresholds }].filter((item) => item.value !== undefined);
     await prisma.$transaction(async (tx) => {
       for (const candidate of eligible) {

@@ -143,7 +143,7 @@ function dto(value: FullComposition) {
       kpiDefinitionExternalId: row.kpiDefinitionExternalId.toString(), kpiConfigurationExternalId: row.kpiConfigurationExternalId.toString(),
       definitionCode: row.definitionCodeSnapshot, definitionName: row.definitionNameSnapshot,
       evaluationScope: (row.effectiveSettingsSnapshot as any)?.evaluationScope as string | undefined,
-      evaluations: ((row.effectiveSettingsSnapshot as any)?.evaluationWeightsVersion === "EXPLICIT_ENTITY_V1" ? (row.effectiveSettingsSnapshot as any).subjectGoals : []) as Array<{subjectExternalId:string;subjectCode:string|null;subjectLabel:string;goal:string|null;weight:string|null}>,
+      evaluations: ((row.effectiveSettingsSnapshot as any)?.evaluationWeightsVersion === "EXPLICIT_ENTITY_V1" ? (row.effectiveSettingsSnapshot as any).subjectGoals : []) as Array<{subjectExternalId:string;subjectCode:string|null;subjectLabel:string;goal:string|null;goalUnit?:{symbol:string};resultUnit?:{symbol:string};weight:string|null}>,
       goalUnit: (row.effectiveSettingsSnapshot as any)?.goalUnit?.symbol as string | undefined,
       resultUnit: (row.effectiveSettingsSnapshot as any)?.measurementUnit?.symbol as string | undefined,
       configurationCode: row.configurationCodeSnapshot, categoryName: row.categoryNameSnapshot, goal: row.goalSnapshot,
@@ -191,6 +191,56 @@ async function outbox(tx: Prisma.TransactionClient, type: string, owner: { id: b
 }
 
 export const scorecardCompositionService = {
+  async prepareNextPeriod(poolId: bigint, sourcePeriodKey: string, targetPeriodKey: string, actor: bigint) {
+    const schedule = await kpiPoolClient.periods(poolId.toString());
+    const sourcePeriod = schedule.find(period => period.periodKey === sourcePeriodKey);
+    const successor = sourcePeriod && schedule.filter(period => period.start > sourcePeriod.end).sort((a, b) => a.start.localeCompare(b.start))[0];
+    if (!successor || successor.periodKey !== targetPeriodKey) throw new AppError(409, "NEXT_PERIOD_NOT_SUCCESSOR", "Select the immediate next Pool Input Period");
+    const period = await finalizedPeriod(poolId, targetPeriodKey);
+    const previous = await prisma.scorecardPeriodComposition.findMany({ where: { kpiPoolExternalId: poolId, periodKey: sourcePeriodKey, statusCode: "FINALIZED", scorecard: { deletedAt: null, statusCode: { not: "INACTIVE" } } }, include });
+    if (!previous.length) throw new AppError(422, "NEXT_PERIOD_NO_SCORECARDS", "No active Scorecards can be inherited from the closed period");
+    const memberships = new Map(period.memberships.map(row => [row.kpiConfigurationExternalId.toString(), row]));
+    for (const source of previous) {
+      const current = await findComposition(source.scorecardId, targetPeriodKey);
+      // Preserve any composition already prepared by the user or an earlier attempt.
+      if (current && (current.statusCode === "FINALIZED" || current.kpis.length || current.links.length)) continue;
+      const owner = await scorecard(source.scorecardId);
+      const selections = await Promise.all(source.kpis.map(async row => {
+        const membership = memberships.get(row.kpiConfigurationExternalId.toString());
+        if (!membership) throw new AppError(422, "NEXT_PERIOD_CONFIGURATION_UNAVAILABLE", `${row.configurationCodeSnapshot} is not in the next Pool composition; review the selected configurations.`);
+        const resolved = await kpiPoolClient.effectiveSettings(poolId.toString(), period.poolPeriodExternalId!.toString(), row.kpiConfigurationExternalId.toString());
+        const frozen = freezeWeightedSettings(resolved.effective, (row.entityWeights ?? []) as EntityWeight[]);
+        return { row, membership, frozen };
+      }));
+      await prisma.$transaction(async tx => {
+        let target = await tx.scorecardPeriodComposition.findFirst({ where: { scorecardId: owner.id, periodKey: targetPeriodKey }, include });
+        if (target && (target.statusCode !== "PREPARING" || target.kpis.length || target.links.length)) return;
+        if (!target) target = await tx.scorecardPeriodComposition.create({ data: { scorecardId: owner.id, kpiPoolExternalId: poolId, poolPeriodExternalId: period.poolPeriodExternalId, poolCompositionExternalId: period.poolCompositionExternalId, periodKey: targetPeriodKey, periodStart: period.periodStart, periodEnd: period.periodEnd, createdByUserId: actor }, include });
+        await tx.scorecardPeriodComposition.update({ where: { id: target.id }, data: { poolPeriodExternalId: period.poolPeriodExternalId, poolCompositionExternalId: period.poolCompositionExternalId, updatedByUserId: actor } });
+        if (!target.scopeCustomizedAt) {
+          await tx.scorecardPeriodDepartmentScope.deleteMany({ where: { scorecardPeriodCompositionId: target.id } });
+          for (const department of source.scopeDepartments) await tx.scorecardPeriodDepartmentScope.create({ data: { scorecardPeriodCompositionId: target.id, externalDepartmentId: department.externalDepartmentId, externalCompanyId: department.externalCompanyId, departmentCodeSnapshot: department.departmentCodeSnapshot, departmentNameSnapshot: department.departmentNameSnapshot, displayOrder: department.displayOrder, createdByUserId: actor, employees: { create: department.employees.map(employee => ({ externalEmployeeId: employee.externalEmployeeId, employeeCodeSnapshot: employee.employeeCodeSnapshot, employeeNameSnapshot: employee.employeeNameSnapshot, createdByUserId: actor })) } } });
+        }
+        for (const { row, membership, frozen } of selections) await tx.scorecardPeriodKpi.create({ data: { scorecardPeriodCompositionId: target.id, kpiPoolMembershipExternalId: membership.poolMembershipExternalId, kpiDefinitionExternalId: membership.kpiDefinitionExternalId, kpiConfigurationExternalId: membership.kpiConfigurationExternalId, kpiPoolExternalId: poolId, periodKey: targetPeriodKey, definitionCodeSnapshot: membership.definitionCode, definitionNameSnapshot: membership.definitionName, configurationCodeSnapshot: membership.configurationCode, categoryNameSnapshot: membership.categoryName, goalSnapshot: frozen.goal, dataSourceSnapshot: membership.dataSourceSnapshot, measurementUnitSnapshot: membership.measurementUnitSnapshot, weightPercent: row.weightPercent, entityWeights: frozen.evaluationScope === "BY_SUBJECT" ? (frozen.subjectGoals as Array<{ subjectExternalId: string; weight: string }>).map(({ subjectExternalId, weight }) => ({ subjectExternalId, weight })) : Prisma.DbNull, displayOrder: row.displayOrder, createdByUserId: actor } });
+        for (const link of source.links) await tx.scorecardPeriodLink.create({ data: { scorecardPeriodCompositionId: target.id, linkedScorecardId: link.linkedScorecardId, weightPercent: link.weightPercent, displayOrder: link.displayOrder, createdByUserId: actor } });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }
+    const pending = new Set(previous.map(row => row.scorecardId.toString()));
+    const visiting = new Set<string>();
+    const finalize = async (id: string): Promise<void> => {
+      if (!pending.has(id)) return;
+      if (visiting.has(id)) throw new AppError(422, "SCORECARD_DEPENDENCY_INVALID", "Linked Scorecards contain a cycle");
+      visiting.add(id);
+      const target = await findComposition(BigInt(id), targetPeriodKey);
+      if (target?.statusCode !== "FINALIZED") {
+        for (const link of target?.links ?? []) await finalize(link.linkedScorecardId.toString());
+        await this.finalize(BigInt(id), targetPeriodKey, actor);
+      }
+      visiting.delete(id); pending.delete(id);
+    };
+    for (const row of previous) await finalize(row.scorecardId.toString());
+    return this.monitoringMaterialization(poolId, period.poolPeriodExternalId!.toString());
+  },
   async frozenKpiUsage(poolId: bigint, periodKey: string, configurationId: bigint) {
     const row = await prisma.scorecardPeriodKpi.findFirst({ where: { kpiPoolExternalId: poolId, periodKey, kpiConfigurationExternalId: configurationId, composition: { statusCode: "FINALIZED" } }, select: { composition: { select: { id: true, scorecardId: true } } } });
     return { data: { frozen: Boolean(row), scorecardPeriodCompositionId: row?.composition.id.toString() ?? null, scorecardId: row?.composition.scorecardId.toString() ?? null } };

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { useMonitoringProfile } from "./MonitoringProfile";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -400,9 +401,9 @@ export function SetKpiConfigPage() {
         : "SAME_GOAL_FOR_ALL",
     );
     setGoalUnit(config.goalUnit ?? config.measurementUnit);
-    setResultMethod("DIRECT");
-    setMeasurementInputs([]);
-    setCalculationTemplate(null);
+    setResultMethod(config.resultMethod ?? "DIRECT");
+    setMeasurementInputs(config.measurementInputs ?? []);
+    setCalculationTemplate(config.calculationTemplate ?? null);
     setConfirmedCalculationPattern("DIRECT");
     setStructuredGoal(
       config.goalMode === "RANGE" || config.goalMode === "BY_SUBJECT"
@@ -420,6 +421,8 @@ export function SetKpiConfigPage() {
     const configuredSubjects = config.subjects?.length
       ? config.subjects.map((item) => ({
           ...item,
+          goalUnit: config.subjectGoals?.find(row => row.subjectExternalId === item.subjectExternalId)?.goalUnit ?? config.goalUnit ?? config.measurementUnit,
+          resultUnit: config.subjectGoals?.find(row => row.subjectExternalId === item.subjectExternalId)?.resultUnit ?? config.measurementUnit,
           goal:
             config.subjectGoals?.find(
               (subjectGoal) =>
@@ -459,9 +462,9 @@ export function SetKpiConfigPage() {
     if (red && yellow && green)
       setRanges({
         redFrom: Number(red.rangeMinPercent),
-        redTo: Number(red.rangeMaxPercent),
+        redTo: Number(red.rangeMaxPercent) - (red.includesMax ? 0 : 1),
         yellowFrom: Number(yellow.rangeMinPercent),
-        yellowTo: Number(yellow.rangeMaxPercent),
+        yellowTo: Number(yellow.rangeMaxPercent) - (yellow.includesMax ? 0 : 1),
         greenFrom: Number(green.rangeMinPercent),
         greenTo: Number(green.rangeMaxPercent),
       });
@@ -565,9 +568,9 @@ export function SetKpiConfigPage() {
   ).map((item: any) => ({
     code: item.code,
     rangeMinPercent: Number(item.rangeMinPercent),
-    rangeMaxPercent: Number(item.rangeMaxPercent),
+    rangeMaxPercent: Number(item.rangeMaxPercent) - (item.includesMax ? 0 : 1),
     includesMin: item.includesMin,
-    includesMax: item.includesMax,
+    includesMax: true,
   }));
   const poolGoalChanged =
     editMode === "POOL_PERIOD_EDIT" &&
@@ -705,7 +708,7 @@ export function SetKpiConfigPage() {
         goalMode === "BY_SUBJECT"));
 
   useEffect(() => {
-    if (!goalHasValue || measurementUnit) {
+    if (evaluationScope === "BY_SUBJECT" || !goalHasValue || measurementUnit) {
       setMeasurementUnitToastVisible(false);
       if (measurementUnitToastTimerRef.current !== null) {
         window.clearTimeout(measurementUnitToastTimerRef.current);
@@ -739,12 +742,12 @@ export function SetKpiConfigPage() {
         measurementUnitToastTimerRef.current = null;
       }
     };
-  }, [goalHasValue, measurementUnit]);
+  }, [goalHasValue, measurementUnit, evaluationScope]);
 
-  const configPayload = () => ({
+  const baseConfigPayload = () => ({
     definitionId: selected!.id,
     goal: Number(goal || 0),
-    measurementUnit,
+    measurementUnit: evaluationScope === "BY_SUBJECT" ? (periodScope === "CURRENT_PERIOD" ? subjectGoals[0]?.goalUnit : subjectGoals[0]?.resultUnit) ?? "" : measurementUnit,
     dataSource,
     ranges,
     isActive,
@@ -754,38 +757,68 @@ export function SetKpiConfigPage() {
     evaluationScope,
     goalType,
     goalAssignment: evaluationScope === "BY_SUBJECT" ? goalAssignment : null,
-    goalUnit: goalUnit || measurementUnit,
-    resultMethod: "DIRECT" as const,
-    measurementInputs: [],
-    calculationTemplate: null,
+    goalUnit: evaluationScope === "OVERALL" ? goalUnit || measurementUnit : undefined,
+    resultMethod,
+    measurementInputs: resultMethod === "DIRECT" ? [] : measurementInputs,
+    calculationTemplate: resultMethod === "DIRECT" ? null : calculationTemplate,
     targetKind,
     rangeMinGoal: goalMode === "RANGE" ? Number(rangeMinGoal) : null,
     rangeMaxGoal: goalMode === "RANGE" ? Number(rangeMaxGoal) : null,
     subjectType: evaluationScope === "BY_SUBJECT" ? subjectType || null : null,
     subjectGoals:
-      evaluationScope === "BY_SUBJECT" &&
-      goalAssignment === "DIFFERENT_GOAL_PER_SUBJECT"
+      evaluationScope === "BY_SUBJECT"
         ? subjectGoals.map((item) => ({
             ...item,
             goal: Number(item.goal),
+            resultUnit: periodScope === "CURRENT_PERIOD" ? item.goalUnit : item.resultUnit,
           }))
         : [],
     subjects:
       evaluationScope === "BY_SUBJECT"
-        ? subjectGoals.map(({ goal: _goal, ...subject }) => subject)
+        ? subjectGoals.map(({ subjectExternalId, subjectCode, subjectLabel }) => ({ subjectExternalId, subjectCode, subjectLabel }))
         : [],
     groupGoal: evaluationScope === "BY_SUBJECT" ? groupGoal : null,
     resultSemantics: analysis?.resultSemantics?.value ?? null,
     evaluationTypeCode: confirmedEvaluation,
     comparisonDirection: analysis?.comparison?.direction ?? null,
-    calculationPattern: "DIRECT",
+    calculationPattern: resultMethod === "DIRECT" ? "DIRECT" : "DERIVED",
     ...(editMode === "GLOBAL_EDIT" && selectedGlobalEffectiveDate
       ? { effectiveFrom: selectedGlobalEffectiveDate }
       : {}),
   });
 
+  const useDirectPercentage = () => {
+    setResultMethod("DIRECT");
+    setCalculationTemplate(null);
+    setMeasurementInputs([]);
+    setMeasurementUnit("%");
+    setGoalUnit("%");
+    setSubjectGoals(subjectGoals.map(row => ({ ...row, resultUnit: "%", goalUnit: "%" })));
+  };
+  const monitoringProfile = useMonitoringProfile(selected ? baseConfigPayload() : null, editConfigQuery.data, {
+    ranges,
+    evaluationScope,
+    onZeroTarget: () => {
+      setPeriodScope("CURRENT_PERIOD");
+      setGoal("0");
+      setGoalUnit(measurementUnit);
+      setSubjectGoals(subjectGoals.map(row => ({ ...row, goal: 0, goalUnit: row.resultUnit || row.goalUnit })));
+      setSubjectGoalDrafts(Object.fromEntries(subjectGoals.map(row => [row.subjectExternalId, "0"])));
+    },
+    onSemanticsChange: value => {
+      setResultMethod("DIRECT");
+      setCalculationTemplate(null);
+      setMeasurementInputs([]);
+      if (value === "RATIO") useDirectPercentage();
+    },
+    editor: <p>Captura el porcentaje final en Monitoring: por ejemplo, 25 para 25%.
+      {resultMethod === "CALCULATED_FROM_INPUTS" && <><br/><button type="button" onClick={useDirectPercentage}>Usar porcentaje directo</button><br/>Revisa la meta al cambiar de una razón a porcentaje.</>}
+    </p>,
+  });
+  const configPayload = () => ({ ...baseConfigPayload(), ...monitoringProfile.fields });
   const saveMutation = useMutation({
     mutationFn: () => {
+      if (editMode !== "POOL_PERIOD_EDIT" && !monitoringProfile.ready) throw new Error("Completa y confirma las reglas de evaluación para Monitoring antes de guardar.");
       if (editMode === "POOL_PERIOD_EDIT") {
         return kpiPoolService
           .saveConfigurationOverride(
@@ -1010,13 +1043,13 @@ export function SetKpiConfigPage() {
       showValidationToast("Select a KPI Definition before saving.");
       return;
     }
-    if (!inputFrequencyCode || !measurementUnit || !dataSource) {
+    if (!inputFrequencyCode || (evaluationScope === "OVERALL" && !measurementUnit) || !dataSource) {
       showValidationToast(
         "Complete Measurement Frequency, Measurement Unit and Data Source before saving.",
       );
       return;
     }
-    if (goalType === "SINGLE_VALUE" && !isValidGoalNumber(goal)) {
+    if (evaluationScope === "OVERALL" && goalType === "SINGLE_VALUE" && !isValidGoalNumber(goal)) {
       showValidationToast("Enter a valid numeric Goal before saving.");
       return;
     }
@@ -1057,8 +1090,12 @@ export function SetKpiConfigPage() {
       );
       return;
     }
-    if (!goalUnit && periodScope === "CURRENT_PERIOD") {
+    if (evaluationScope === "OVERALL" && !goalUnit && periodScope === "CURRENT_PERIOD") {
       showValidationToast("Select a Goal / Target Unit before saving.");
+      return;
+    }
+    if (evaluationScope === "BY_SUBJECT" && subjectGoals.some(row => !row.goalUnit || (periodScope !== "CURRENT_PERIOD" && (row.goalUnit !== "%" || !row.resultUnit || row.resultUnit === "%")))) {
+      showValidationToast("Select a Goal Unit for every entity and an actual Result Unit for historical targets.");
       return;
     }
     const historicalPercentageTarget = requiresQuantitativeResultUnit(
@@ -1067,7 +1104,7 @@ export function SetKpiConfigPage() {
       goalUnit || measurementUnit,
     );
     if (
-      historicalPercentageTarget &&
+      evaluationScope === "OVERALL" && historicalPercentageTarget &&
       (!measurementUnit || measurementUnit === "%")
     ) {
       setResultUnitErrorVisible(true);
@@ -2188,14 +2225,14 @@ export function SetKpiConfigPage() {
           </>
         )}
 
-        <section className="config-card traffic-light-card">
+        {editMode === "POOL_PERIOD_EDIT" && <section className="config-card traffic-light-card">
           <TrafficLightEditor
             value={ranges}
             onChange={setRanges}
             disabled={poolSettingsFrozen}
-            stepNumber={editMode === "POOL_PERIOD_EDIT" ? 3 : 5}
+            stepNumber={3}
           />
-        </section>
+        </section>}
         {editMode === "GLOBAL_EDIT" && (
           <section className="config-card revision-period-card">
             <div className="config-section-heading">
@@ -2241,7 +2278,7 @@ export function SetKpiConfigPage() {
         <section className="config-card configuration-status-card">
           <div className="config-section-heading">
             <span className="step-number">
-              {editMode === "POOL_PERIOD_EDIT" ? 4 : 6}
+              {editMode === "POOL_PERIOD_EDIT" ? 4 : 5}
             </span>
             <div>
               <h2>Configuration Status</h2>
@@ -2301,6 +2338,7 @@ export function SetKpiConfigPage() {
                 )}
               </div>
             )}
+            {editMode !== "POOL_PERIOD_EDIT" && monitoringProfile.panel}
             <div className="configuration-status-content">
               <label className="configuration-status-toggle">
                 <span>Status</span>
@@ -2330,6 +2368,9 @@ export function SetKpiConfigPage() {
             </div>
           </div>
         </section>
+        {editMode !== "POOL_PERIOD_EDIT" && <section className="config-card traffic-light-card">
+          <TrafficLightEditor value={ranges} onChange={setRanges} disabled={poolSettingsFrozen} stepNumber={6}/>
+        </section>}
         {error && <div className="config-error">{error}</div>}
         <footer className="config-form-actions">
           <button
@@ -2352,7 +2393,7 @@ export function SetKpiConfigPage() {
                 type="submit"
                 className="button primary"
                 disabled={
-                  saveMutation.isPending ||
+                  saveMutation.isPending || (editMode !== "POOL_PERIOD_EDIT" && !monitoringProfile.ready) ||
                   (editMode === "POOL_PERIOD_EDIT" && !poolHasChanges)
                 }
               >

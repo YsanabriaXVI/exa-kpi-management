@@ -132,6 +132,6 @@ export function normalizeMeasurementUnitOptions(
     label:
       unit.name.trim().toLowerCase() === unit.symbol.trim().toLowerCase()
         ? unit.symbol
-        : `${unit.symbol} — ${unit.name}`,
+        : `${unit.symbol} · ${unit.name}`,
   }));
 }

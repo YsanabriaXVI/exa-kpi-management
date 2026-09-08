@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, Search } from "lucide-react";
 import type {
   EvaluationScope,
@@ -9,8 +9,9 @@ import type {
   SubjectType,
 } from "./kpi-config.types";
 import { ConfigMultiSelect } from "./ConfigMultiSelect";
+import type { ReactNode } from "react";
 
-type Unit = { id: string; symbol: string; label: string };
+type Unit = { id: string; symbol: string; name?: string; label: string };
 type Subject = {
   id: string;
   subjectType: SubjectType;
@@ -49,6 +50,7 @@ type Props = {
   frequencies: Array<{ code: string; name: string }>;
   dataSources: Array<{ id: string; name: string }>;
   resultUnitError?: string;
+  resultCalculationSetup?: ReactNode;
 };
 
 const referenceHelp = (scope: PeriodScope, frequency: string) => {
@@ -111,6 +113,7 @@ export function KpiSemanticSetup(props: Props) {
     label: "",
   });
   const historical = props.periodScope !== "CURRENT_PERIOD";
+  const [defaultGoalUnit, setDefaultGoalUnit] = useState(props.goalUnit || (historical ? "%" : props.resultUnit));
   const historicalPercentageTarget = historical && props.goalUnit === "%";
   const availableTypes = [
     ...new Map(
@@ -123,8 +126,9 @@ export function KpiSemanticSetup(props: Props) {
   const entities = props.subjects.filter(
     (item) => item.subjectType === props.subjectType,
   );
+  const unitName = (symbol: string) => symbol === "%" ? "%" : props.units.find(unit => unit.symbol === symbol)?.name || symbol;
   const goalUnit = props.goalUnit || (historical ? "%" : "unit");
-  const applyGoalToAll = (value: string) => {
+  const applyGoalToAll = (value: string, unit = historical ? "%" : defaultGoalUnit) => {
     if (!value.trim() || !Number.isFinite(Number(value))) return;
     props.setSubjectGoalDrafts(
       Object.fromEntries(
@@ -132,7 +136,7 @@ export function KpiSemanticSetup(props: Props) {
       ),
     );
     props.setSubjectGoals(
-      props.subjectGoals.map((item) => ({ ...item, goal: Number(value) })),
+      props.subjectGoals.map((item) => ({ ...item, goal: Number(value), ...(unit ? { goalUnit: unit, ...(!historical ? { resultUnit: unit } : {}) } : {}) })),
     );
   };
   const openGroupGoal = () => {
@@ -152,7 +156,7 @@ export function KpiSemanticSetup(props: Props) {
   }, 0);
   const configuredGoals = props.subjectGoals.filter((item) => {
     const value = props.subjectGoalDrafts[item.subjectExternalId];
-    return Boolean(value?.trim()) && Number.isFinite(Number(value));
+    return Boolean(value?.trim()) && Number.isFinite(Number(value)) && Boolean(item.goalUnit) && (!historical || Boolean(item.resultUnit));
   }).length;
   const missingGoals = props.subjectGoals.filter((item) => {
     const value = props.subjectGoalDrafts[item.subjectExternalId];
@@ -162,21 +166,10 @@ export function KpiSemanticSetup(props: Props) {
     props.evaluationScope === "OVERALL"
       ? Boolean(props.goal.trim() && props.resultUnit)
       : props.subjectGoals.length > 0;
-  useEffect(() => {
-    if (
-      props.evaluationScope === "BY_SUBJECT" &&
-      goalUnit &&
-      !historicalPercentageTarget &&
-      props.resultUnit !== goalUnit
-    )
-      props.setResultUnit(goalUnit);
-  }, [
-    goalUnit,
-    historicalPercentageTarget,
-    props.evaluationScope,
-    props.resultUnit,
-    props.setResultUnit,
-  ]);
+  const setEntityUnit = (id: string, field: "goalUnit" | "resultUnit", value: string) => {
+    props.setSubjectGoals(props.subjectGoals.map(row => row.subjectExternalId === id
+      ? {...row, [field]: value, ...(!historical && field === "goalUnit" ? {resultUnit: value} : {})} : row));
+  };
 
   return (
     <>
@@ -245,9 +238,14 @@ export function KpiSemanticSetup(props: Props) {
             <span>Evaluation Reference</span>
             <select
               value={props.periodScope}
-              onChange={(e) =>
-                props.setPeriodScope(e.target.value as PeriodScope)
-              }
+              onChange={(e) => {
+                const next = e.target.value as PeriodScope;
+                props.setPeriodScope(next);
+                setDefaultGoalUnit(next === "CURRENT_PERIOD" ? props.resultUnit : "%");
+                props.setSubjectGoals(props.subjectGoals.map(row => next === "CURRENT_PERIOD"
+                  ? {...row, goalUnit: row.resultUnit || "", resultUnit: row.resultUnit || ""}
+                  : {...row, goalUnit: "%", resultUnit: row.resultUnit || (row.goalUnit !== "%" ? row.goalUnit : "") || ""}));
+              }}
             >
               <option value="" disabled>
                 Select evaluation reference
@@ -262,7 +260,7 @@ export function KpiSemanticSetup(props: Props) {
               {referenceHelp(props.periodScope, props.inputFrequencyCode)}
             </small>
           </label>
-          <label>
+          {props.evaluationScope === "OVERALL" && <label>
             <span>Goal Measurement Unit</span>
             <select
               value={props.goalUnit}
@@ -282,7 +280,7 @@ export function KpiSemanticSetup(props: Props) {
                 ? "Use % for a relative change or another unit for an absolute change."
                 : "Unit used by the Goal."}
             </small>
-          </label>
+          </label>}
           <label>
             <span>Data Source</span>
             <select
@@ -311,7 +309,7 @@ export function KpiSemanticSetup(props: Props) {
                   onValueChange={props.setGoal}
                   placeholder="Insert a Goal"
                 />
-                <strong>{props.goalUnit || "Unit"}</strong>
+                <strong>{unitName(props.goalUnit) || "Unit"}</strong>
               </div>
             </label>
           </div>
@@ -331,7 +329,7 @@ export function KpiSemanticSetup(props: Props) {
                   <span>Group Goal</span>
                   <strong>
                     <b>{formatNumericText(props.groupGoal.value)}</b>
-                    <em>{props.groupGoal.unit}</em>
+                    <em>{unitName(props.groupGoal.unit)}</em>
                   </strong>
                 </div>
               )}
@@ -477,6 +475,8 @@ export function KpiSemanticSetup(props: Props) {
                               subjectCode: entity.code,
                               subjectLabel: entity.name,
                               goal: 0,
+                              goalUnit: historical ? "%" : defaultGoalUnit,
+                              resultUnit: historical ? (props.resultUnit !== "%" ? props.resultUnit : "") : defaultGoalUnit,
                             }
                           );
                         });
@@ -504,12 +504,14 @@ export function KpiSemanticSetup(props: Props) {
               <div className="by-entity-section-heading">
                 <strong>Entity Goals</strong>
                 <small>
-                  All entity goals are measured in: <b>{goalUnit}</b>
+                  All entity goals are measured in: <b>{unitName(goalUnit)}</b>
                 </small>
               </div>
-              <div className="quick-fill">
+              <div className="quick-fill entity-quick-fill">
                 <span>Quick fill</span>
                 <div>
+                  <label className="quick-fill-field">
+                  <span>Goal</span>
                   <FormattedNumberInput
                     value={props.defaultGoal}
                     onValueChange={(value) => {
@@ -518,7 +520,17 @@ export function KpiSemanticSetup(props: Props) {
                     }}
                     placeholder="Insert a Goal"
                   />
-                  <strong>{goalUnit}</strong>
+                  </label>
+                  <label className="quick-fill-field">
+                    <span>Default Goal Unit</span>
+                    <select value={historical ? "%" : defaultGoalUnit} onChange={event => {
+                      setDefaultGoalUnit(event.target.value);
+                      if (applyToAll) applyGoalToAll(props.defaultGoal, event.target.value);
+                    }}>
+                      <option value="">Select unit</option>
+                      {props.units.filter(unit => !historical || unit.symbol === "%").map(unit => <option key={unit.id} value={unit.symbol}>{unit.label}</option>)}
+                    </select>
+                  </label>
                   <label
                     className={`quick-fill-checkbox ${!props.subjectGoals.length || !props.defaultGoal.trim() || !Number.isFinite(Number(props.defaultGoal)) ? "disabled" : ""}`}
                   >
@@ -540,11 +552,12 @@ export function KpiSemanticSetup(props: Props) {
                   </label>
                 </div>
               </div>
-              <div className="subject-goal-table compact">
+              <div className={`subject-goal-table compact ${historical ? "entity-historical-units" : ""}`}>
                 <div className="subject-goal-row head">
                   <span>Entity</span>
                   <span>{historical ? "Target Change" : "Goal"}</span>
-                  <span>Goal Measurement Unit</span>
+                  <span>{historical ? "Target Unit" : "Goal Unit"}</span>
+                  {historical && <span>Result Unit</span>}
                 </div>
                 {props.subjectGoals.map((subject) => (
                   <div
@@ -574,7 +587,14 @@ export function KpiSemanticSetup(props: Props) {
                         );
                       }}
                     />
-                    <span>{goalUnit}</span>
+                    <select aria-label={`${historical ? "Target" : "Goal"} Unit for ${subject.subjectLabel}`} value={subject.goalUnit ?? ""} onChange={event => setEntityUnit(subject.subjectExternalId, "goalUnit", event.target.value)}>
+                      <option value="">Select unit</option>
+                      {props.units.filter(unit => !historical || unit.symbol === "%").map(unit => <option key={unit.id} value={unit.symbol}>{unit.label}</option>)}
+                    </select>
+                    {historical && <select aria-label={`Result Unit for ${subject.subjectLabel}`} value={subject.resultUnit ?? ""} onChange={event => setEntityUnit(subject.subjectExternalId, "resultUnit", event.target.value)}>
+                      <option value="">Select unit</option>
+                      {props.units.filter(unit => unit.symbol !== "%").map(unit => <option key={unit.id} value={unit.symbol}>{unit.label}</option>)}
+                    </select>}
                   </div>
                 ))}
               </div>
@@ -624,8 +644,8 @@ export function KpiSemanticSetup(props: Props) {
             </p>
           </div>
         </div>
-        {(props.evaluationScope === "OVERALL" ||
-          historicalPercentageTarget) && (
+        {props.resultCalculationSetup}
+        {props.evaluationScope === "OVERALL" && (
           <div className="config-fields-grid official-result-unit-field">
             <label
               className={props.resultUnitError ? "has-field-error" : undefined}
@@ -690,7 +710,7 @@ export function KpiSemanticSetup(props: Props) {
                           <span>Group Goal</span>
                           <strong>
                             {formatNumericText(props.groupGoal.value)}{" "}
-                            <em>{props.groupGoal.unit}</em>
+                            <em>{unitName(props.groupGoal.unit)}</em>
                           </strong>
                         </div>
                       )}
@@ -714,12 +734,12 @@ export function KpiSemanticSetup(props: Props) {
                         <span>Goal / Target</span>
                         <strong>
                           {historical && Number(props.goal) > 0 ? "+" : ""}
-                          {formatNumericText(props.goal) || "—"} {goalUnit}
+                          {formatNumericText(props.goal) || "—"} {unitName(goalUnit)}
                         </strong>
                       </p>
                       <p>
                         <span>Official Result Unit</span>
-                        <strong>{props.resultUnit || "Not selected"}</strong>
+                        <strong>{unitName(props.resultUnit) || "Not selected"}</strong>
                       </p>
                     </div>
                   ) : (
@@ -731,9 +751,7 @@ export function KpiSemanticSetup(props: Props) {
                             <span>Entity</span>
                             <span>Goal / Target</span>
                             <span>
-                              {historicalPercentageTarget
-                                ? "Result Unit"
-                                : "Goal Unit"}
+                              Result Unit
                             </span>
                           </div>
                           {props.subjectGoals.map((subject) => {
@@ -752,41 +770,23 @@ export function KpiSemanticSetup(props: Props) {
                                     ? "+"
                                     : ""}
                                   {formatNumericText(subjectGoal || "") || "—"}
-                                  {` ${goalUnit}`}
+                                  {` ${unitName(subject.goalUnit || "")}`}
                                 </span>
-                                {historicalPercentageTarget ? (
-                                  <select
-                                    aria-label={`Result Unit for ${subject.subjectLabel}`}
-                                    aria-invalid={Boolean(
-                                      props.resultUnitError,
-                                    )}
-                                    value={props.resultUnit}
-                                    onChange={(event) =>
-                                      props.setResultUnit(event.target.value)
-                                    }
-                                  >
-                                    <option value="" disabled>
-                                      Select unit
-                                    </option>
-                                    {props.units.map((unit) => (
-                                      <option key={unit.id} value={unit.symbol}>
-                                        {unit.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <strong>{goalUnit}</strong>
-                                )}
+                                <select
+                                  aria-label={`Individual Result Unit for ${subject.subjectLabel}`}
+                                  value={subject.resultUnit || (!historical ? subject.goalUnit : "") || ""}
+                                  onChange={event => setEntityUnit(subject.subjectExternalId, historical ? "resultUnit" : "goalUnit", event.target.value)}
+                                >
+                                  <option value="">Select unit</option>
+                                  {props.units.filter(unit => !historical || unit.symbol !== "%").map(unit => (
+                                    <option key={unit.id} value={unit.symbol}>{unit.label}</option>
+                                  ))}
+                                </select>
                               </div>
                             );
                           })}
                         </div>
-                        {historicalPercentageTarget && (
-                          <small className="entity-unit-consistency-note">
-                            One Official Result Unit applies to every entity in
-                            this KPI.
-                          </small>
-                        )}
+
                       </div>
                       {missingGoals.length > 0 && (
                         <div className="monitoring-preview-warning">

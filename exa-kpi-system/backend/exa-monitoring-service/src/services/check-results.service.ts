@@ -43,7 +43,7 @@ export const checkResultsService = {
         }
         for(const card of evaluated.scorecards)await tx.monitoringPeriodScorecard.update({where:{id:BigInt(card.id)},data:{previewScorePercent:card.scoreStatus==="COMPLETE"?card.score:null,calculationVersion:CALCULATION_VERSION,calculatedAt:new Date()}});
         if(evaluated.findings.length)await tx.monitoringValidationIssue.createMany({data:evaluated.findings.map(f=>({validationRunId:run.id,monitoringPeriodId:id,monitoringPeriodInputId:f.monitoringPeriodInputId?BigInt(f.monitoringPeriodInputId):null,kpiConfigurationExternalId:f.kpiConfigurationId?BigInt(f.kpiConfigurationId):null,
-          findingCode:f.code,severity:f.severity,message:f.message,details:f,blocksSubmit:f.blocking,blocksApproval:f.blocking,exceptionAllowed:false}))});
+          findingCode:f.code,severity:f.severity,message:f.message,details:f,blocksSubmit:f.blocking,blocksApproval:f.blocking,exceptionAllowed:f.code==="RESULT_MISSING"}))});
         await tx.monitoringPeriod.update({where:{id},data:{currentScoringResultsVersion:period.resultsVersion,currentScoringBaselineVersion:period.baselineVersion??0,validationStatus:evaluated.summary.runStatus,validationSummary:evaluated.summary,validationRunAt:run.createdAt,validationRunByUserId:actor}});
       },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
     } catch(error){

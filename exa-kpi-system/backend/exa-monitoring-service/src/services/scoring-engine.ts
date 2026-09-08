@@ -3,8 +3,9 @@ export const CALCULATION_VERSION = "CHECK_RESULTS_V1";
 const ZERO = new Prisma.Decimal(0);
 const HUNDRED = new Prisma.Decimal(100);
 type DecimalInput = Prisma.Decimal | string | number;
-type Band = { compliance: DecimalInput; minResult?: DecimalInput; maxResult?: DecimalInput; maxDistance?: DecimalInput };
+type Band = { includesMin?: boolean; includesMax?: boolean; compliance: DecimalInput; minResult?: DecimalInput; maxResult?: DecimalInput; maxDistance?: DecimalInput };
 export type ScoringRuleConfig = {
+  bandMode?: "STEP_POINTS" | "LINEAR_POINTS";
   bands?: Band[];
   tolerance?: DecimalInput;
   rangeMin?: DecimalInput;
@@ -24,6 +25,7 @@ export type KpiScoringInput = {
   result: DecimalInput | null;
   goal: DecimalInput | null;
   evaluationType: string;
+  resultSemantics?: string | null;
   scoringMethod?: string | null;
   scoringRuleConfig?: ScoringRuleConfig | null;
   thresholds: TrafficThreshold[];
@@ -72,22 +74,37 @@ export function calculateKpiScore(input: KpiScoringInput): KpiScoringResult {
       // Existing lower-zero convention: finite 100 raw; use the approved cap directly.
       raw=behavior==="GREATER_IS_BETTER"?result.div(goal).mul(100):result.isZero()?HUNDRED:goal.div(result).mul(100);
       compliance=behavior==="LOWER_IS_BETTER"&&result.isZero()?cap:Prisma.Decimal.min(cap,Prisma.Decimal.max(floor,raw));
-    } else if(method==="ZERO_TARGET_BANDS" && ["ZERO_IS_BETTER","LOWER_IS_BETTER"].includes(behavior)) {
-      if(!goal?.isZero())return notCalculable("ZERO_TARGET_REQUIRES_ZERO_GOAL",method);
+    } else if(method === "RESULT_BANDS" && ["GREATER_IS_BETTER","LOWER_IS_BETTER","ZERO_IS_BETTER"].includes(behavior) || method==="ZERO_TARGET_BANDS" && ["ZERO_IS_BETTER","LOWER_IS_BETTER"].includes(behavior)) {
+      if(method === "ZERO_TARGET_BANDS" && !goal?.isZero())return notCalculable("ZERO_TARGET_REQUIRES_ZERO_GOAL",method);
       const bands=config?.bands;
       if(!Array.isArray(bands)||!bands.length)return notCalculable("SCORING_RULE_NOT_CONFIGURED",method);
-      const parsed=bands.map(b=>({min:b.minResult===undefined?ZERO:decimal(b.minResult),max:b.maxResult===undefined?null:decimal(b.maxResult),value:decimal(b.compliance)})).sort((a,b)=>a.min.comparedTo(b.min));
-      if(parsed.some((b,i)=>!b.min.isFinite()||b.max&&(!b.max.isFinite()||b.max.lt(b.min))||!b.value.isFinite()||b.value.lt(0)||b.value.gt(100)||i>0&&(parsed[i-1]!.max===null||parsed[i-1]!.max!.gte(b.min))))return notCalculable("SCORING_BANDS_INVALID",method);
-      const matches=parsed.filter(b=>result.gte(b.min)&&(!b.max||result.lte(b.max)));
+      const parsed=bands.map(b=>({includesMin:b.includesMin !== false,includesMax:b.includesMax !== false,min:b.minResult===undefined?ZERO:decimal(b.minResult),max:b.maxResult===undefined?null:decimal(b.maxResult),value:decimal(b.compliance)})).sort((a,b)=>a.min.comparedTo(b.min));
+      if(parsed.some((b,i)=>!b.min.isFinite()||b.max&&(!b.max.isFinite()||b.max.lt(b.min)||b.max.eq(b.min)&&!(b.includesMin&&b.includesMax))||!b.value.isFinite()||b.value.lt(0)||b.value.gt(100)||i>0&&(parsed[i-1]!.max===null||parsed[i-1]!.max!.gt(b.min)||parsed[i-1]!.max!.eq(b.min)&&parsed[i-1]!.includesMax&&b.includesMin)))return notCalculable("SCORING_BANDS_INVALID",method);
+      const pointMode = config?.bandMode;
+      if (pointMode === "LINEAR_POINTS" || pointMode === "STEP_POINTS") {
+        if (pointMode === "STEP_POINTS" && (!result.isInteger() || result.lt(0) || parsed.some(b => !b.min.isInteger() || b.min.lt(0)))) return notCalculable("COUNT_RESULT_INVALID", method);
+        const left = [...parsed].reverse().find(b => result.gte(b.min)) ?? parsed[0]!;
+        const right = parsed.find(b => b.min.gt(result));
+        compliance = pointMode === "LINEAR_POINTS" && right && result.gte(left.min)
+          ? left.value.add(right.value.sub(left.value).mul(result.sub(left.min)).div(right.min.sub(left.min)))
+          : left.value;
+      } else {
+      const matches=parsed.filter(b=>(b.includesMin?result.gte(b.min):result.gt(b.min))&&(!b.max||(b.includesMax?result.lte(b.max):result.lt(b.max))));
       if(matches.length!==1)return notCalculable("SCORING_RULE_NOT_CONFIGURED",method);
       compliance=matches[0]!.value;
+      }
       // Bands define Compliance, not a mathematical achievement ratio for Goal zero.
-      raw=null;goalMet=result.isZero();
+      raw=null;goalMet=method === "ZERO_TARGET_BANDS" ? result.isZero() : behavior === "ZERO_IS_BETTER" ? result.isZero() : goal !== null && (behavior === "GREATER_IS_BETTER" ? result.gte(goal) : result.lte(goal));
+    } else if (method === "BINARY" && input.resultSemantics === "BINARY") {
+      if (!result.eq(0) && !result.eq(1)) return notCalculable("BINARY_RESULT_INVALID",method);
+      raw=null;compliance=result.eq(1)?HUNDRED:ZERO;goalMet=result.eq(1);
     } else return notCalculable("UNSUPPORTED_SCORING_COMBINATION",method);
     const thresholds=input.thresholds.map(t=>({...t,min:t.min===null?null:decimal(t.min),max:t.max===null?null:decimal(t.max)})).sort((a,b)=>a.min===null?-1:b.min===null?1:a.min.comparedTo(b.min));
     if(!thresholds.length)return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_NOT_CONFIGURED",method);
     if(thresholds.some((t,i)=>!["RED","YELLOW","GREEN"].includes(t.code)||t.min&&!t.min.isFinite()||t.max&&!t.max.isFinite()||t.min&&t.max&&(t.min.gt(t.max)||t.min.eq(t.max)&&!(t.includesMin&&t.includesMax))||i>0&&(()=>{const prev=thresholds[i-1]!;return prev.max===null||t.min===null||prev.max.gt(t.min)||prev.max.eq(t.min)&&prev.includesMax&&t.includesMin;})()))return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_INVALID",method);
-    const matches=thresholds.filter(t=>(t.min===null||(t.includesMin?compliance.gte(t.min):compliance.gt(t.min)))&&(t.max===null||(t.includesMax?compliance.lte(t.max):compliance.lt(t.max))));
+    const consecutiveIntegerRanges = thresholds.every((t, i) => t.min !== null && t.max !== null && t.min.isInteger() && t.max.isInteger() && t.includesMin && t.includesMax && (i === 0 || thresholds[i - 1]!.max!.add(1).eq(t.min)));
+    const colorCompliance = consecutiveIntegerRanges ? compliance.floor() : compliance;
+    const matches=thresholds.filter(t=>(t.min===null||(t.includesMin?colorCompliance.gte(t.min):colorCompliance.gt(t.min)))&&(t.max===null||(t.includesMax?colorCompliance.lte(t.max):colorCompliance.lt(t.max))));
     if(matches.length!==1)return notCalculable("TRAFFIC_LIGHT_THRESHOLDS_NOT_CONFIGURED",method);
     const weighted=compliance.mul(weight).div(100);
     if([raw,compliance,weighted].some(v=>v!==null&&(!v.isFinite()||v.abs().gte(1000000))))return notCalculable("SCORING_PRECISION_EXCEEDED",method);

@@ -9,8 +9,8 @@ export type MeasurementInput = { name: string; unit: string; description: string
 export type CalculationTemplate = "DIVIDE" | "PERCENT_RATIO" | "SUM" | "AVERAGE" | "DIFFERENCE";
 export type TargetKind = "ABSOLUTE_TARGET" | "CHANGE_TARGET" | "UPPER_LIMIT" | "LOWER_LIMIT" | "DEADLINE";
 export type SubjectType = "FLEET" | "EMPLOYEE" | "CUSTOMER" | "LOCATION" | "DEPARTMENT" | "COMPANY" | "OPERATION" | "PROJECT" | "ASSET";
-export type SubjectGoal = { subjectExternalId: string; subjectCode?: string | null; subjectLabel: string; goal: number };
-export type SubjectSelection = Omit<SubjectGoal, "goal">;
+export type SubjectGoal = { subjectExternalId: string; subjectCode?: string | null; subjectLabel: string; goal: number; goalUnit?: string; resultUnit?: string };
+export type SubjectSelection = Omit<SubjectGoal, "goal" | "goalUnit" | "resultUnit">;
 export type GroupGoal = { value: number; unit: string; label: string };
 
 export type TrafficLightRanges = {
@@ -23,6 +23,11 @@ export type TrafficLightRanges = {
 };
 
 export type KpiConfigRecord = {
+  evaluationTypeCode?: string | null;
+  resultSemantics?: string | null;
+  scoringMethod?: string | null;
+  scoringRuleConfig?: { bandMode?: "STEP_POINTS" | "LINEAR_POINTS"; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult: number; maxResult?: number; compliance: number; includesMin?: boolean; includesMax?: boolean }> } | null;
+  negativeResultPolicy?: string | null;
   id: number;
   code: string;
   definitionId: string | number;
@@ -65,6 +70,11 @@ export type KpiConfigRecord = {
 };
 
 export type KpiConfigInput = {
+  scoringMethod?: string;
+  scoringRuleConfig?: Record<string, unknown>;
+  scoringRuleConfigVersion?: number;
+  scoringApprovalStatus?: string;
+  negativeResultPolicy?: string;
   definitionId: string | number;
   goal: number;
   inputFrequencyCode: string;
@@ -73,7 +83,7 @@ export type KpiConfigInput = {
   evaluationScope: EvaluationScope;
   goalType: GoalType;
   goalAssignment?: GoalAssignment | null;
-  goalUnit: string;
+  goalUnit?: string;
   resultMethod: ResultMethod;
   measurementInputs: MeasurementInput[];
   calculationTemplate?: CalculationTemplate | null;

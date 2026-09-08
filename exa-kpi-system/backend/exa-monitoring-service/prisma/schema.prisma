@@ -402,6 +402,7 @@ model ResultEntryBatchRow {
   monitoringPeriodInputId BigInt                @map("monitoring_period_input_id")
   statusId                BigInt                @map("result_entry_row_status_id")
   parsedResultValue       Decimal?              @map("parsed_result_value") @db.Decimal(20, 6)
+  inputValues             Json?                 @map("input_values")
   rawComment              String?               @map("raw_comment") @db.Text
   createdAt               DateTime              @default(now()) @map("created_at") @db.DateTime(3)
   batch                   ResultEntryBatch      @relation(fields: [resultEntryBatchId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_rebr_batch")
@@ -420,6 +421,7 @@ model KpiResult {
   latestBatchRowId        BigInt                @unique(map: "uq_kpi_result_latest_batch_row") @map("latest_batch_row_id")
   statusId                BigInt                @map("kpi_result_status_id")
   resultValue             Decimal?              @map("result_value") @db.Decimal(20, 6)
+  inputValues             Json?                 @map("input_values")
   comment                 String?               @db.Text
   goalMet                 Boolean?              @map("goal_met")
   rawAchievementPercent   Decimal?              @map("raw_achievement_percent") @db.Decimal(12, 6)

@@ -1,4 +1,6 @@
+import { calculateDivision, divisionDefinition } from "./result-calculation.js";
 import { baselineContext } from "./historical-baseline.service.js";
+import { evaluationUnits } from "../contracts/evaluation-units.js";
 import { historicalContractError } from "../contracts/historical-contract.js";
 import { clearCurrentScoring, hasCurrentScoring, maskStaleScoring, isCurrentRun } from "./scoring-validity.js";
 import { Prisma } from "@prisma/client";
@@ -40,7 +42,7 @@ function serialize(row: any) {
     kpiName: input.kpiNameSnapshot,
     parentKpiCode: input.kpiCodeSnapshot,
     weight: input.weightPercentSnapshot?.toString() ?? null,
-    goalUnit: input.effectiveSettingsSnapshot?.goalUnit?.symbol ?? null,
+    goalUnit: evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).goalUnit?.symbol ?? null,
     groupGoal: input.effectiveSettingsSnapshot?.groupGoal ?? null,
     entryBlock: entryBlock(input),
     periodScope: input.effectiveSettingsSnapshot?.periodScope ?? null,
@@ -52,6 +54,11 @@ function serialize(row: any) {
     unit: input.measurementUnitSymbolSnapshot ?? input.measurementUnitNameSnapshot,
     dataSource: input.primaryDataSourceNameSnapshot,
     resultValue: input.result?.resultValue?.toString() ?? null,
+    resultMethod: input.effectiveSettingsSnapshot?.resultMethod ?? "DIRECT",
+    resultSemantics: input.effectiveSettingsSnapshot?.resultSemantics ?? null,
+    measurementInputs: divisionDefinition(input.effectiveSettingsSnapshot),
+    inputValues: input.result?.inputValues ?? null,
+    resultCalculation: divisionDefinition(input.effectiveSettingsSnapshot) ? { errorCode: calculateDivision(input.result?.inputValues).errorCode } : null,
     comment: input.result?.comment ?? null,
     version: input.result?.version ?? null,
     entryStatus: input.result?.resultValue !== null && input.result?.resultValue !== undefined ? "ENTERED" : "PENDING",
@@ -126,6 +133,10 @@ async function findPeriod(id: bigint) {
 function sameDecimal(left: Prisma.Decimal | null, right: Prisma.Decimal | null) {
   return left === null ? right === null : right !== null && left.equals(right);
 }
+function sameInputs(left: unknown, right: unknown) {
+  const pair = (value: any) => value == null ? null : [value.numerator ?? null, value.denominator ?? null];
+  return JSON.stringify(pair(left)) === JSON.stringify(pair(right));
+}
 
 export const resultEntryService = {
   async listPeriods() {
@@ -166,14 +177,21 @@ export const resultEntryService = {
         const input = byId.get(change.monitoringPeriodInputId)!;
         const blocked = entryBlock(input);
         if (blocked) throw new AppError(409, blocked, "This frozen evaluation does not support Manual Result Entry V1");
-        const nextValue = change.resultValue === null ? null : new Prisma.Decimal(change.resultValue);
+        const settings = input.effectiveSettingsSnapshot as any;
+        const division = divisionDefinition(settings);
+        if (settings?.resultMethod === "CALCULATED_FROM_INPUTS" && !division) throw new AppError(422, "RESULT_METHOD_NOT_SUPPORTED", "Only an ordered division of two inputs is supported");
+        if (division && !change.inputValues) throw new AppError(422, "RESULT_INPUTS_REQUIRED", "Enter the numerator and denominator, leaving missing values null");
+        if (!division && change.inputValues) throw new AppError(422, "RESULT_INPUTS_NOT_ALLOWED", "This evaluation requires a direct Result");
+        const nextInputs = division ? change.inputValues! : null;
+        const nextValue = division ? calculateDivision(nextInputs).value : change.resultValue === null ? null : new Prisma.Decimal(change.resultValue);
+        if (!division && settings?.resultSemantics === "BINARY" && nextValue !== null && !nextValue.eq(0) && !nextValue.eq(1)) throw new AppError(422, "BINARY_RESULT_INVALID", "Select Yes (1) or No (0)");
         const nextComment = input.result?.comment ?? null;
         if (change.comment !== undefined && change.comment !== nextComment) throw new AppError(422, "RESULT_ONLY_EDITABLE", "Only Result can be edited in Manual Entry V1");
         if (input.result ? change.version !== input.result.version : change.version !== null) {
           throw new AppError(409, "RESULT_VERSION_CONFLICT", "A result changed since it was loaded", { monitoringPeriodInputId: change.monitoringPeriodInputId, kpiCode: input.kpiCodeSnapshot, submittedVersion: change.version, currentVersion: input.result?.version ?? null, currentResultValue: input.result?.resultValue?.toString() ?? null, currentComment: input.result?.comment ?? null });
         }
-        return { change, input, nextValue, nextComment };
-      }).filter(item => !sameDecimal(item.input.result?.resultValue ?? null, item.nextValue));
+        return { change, input, nextValue, nextComment, nextInputs };
+      }).filter(item => !sameDecimal(item.input.result?.resultValue ?? null, item.nextValue) || !sameInputs(item.input.result?.inputValues, item.nextInputs));
 
       if (!normalized.length && period.selectedEntryMethod === "MANUAL") return;
       const claimed = await tx.monitoringPeriod.updateMany({ where: { id: periodId, version: period.version, resultsVersion: body.resultsVersion, statusId: period.statusId }, data: { selectedEntryMethod: "MANUAL", version: { increment: 1 }, resultsVersion: { increment: normalized.length ? 1 : 0 } } });
@@ -192,16 +210,16 @@ export const resultEntryService = {
       const batch = await tx.resultEntryBatch.create({ data: { monitoringPeriodId: periodId, monitoringInputMethodId: method.id, statusId: batchStatus.id, batchNo: (aggregate._max.batchNo ?? 0) + 1, totalRows: normalized.length, validRows: normalized.length, createdByUserId: actor } });
 
       for (const item of normalized) {
-        const batchRow = await tx.resultEntryBatchRow.create({ data: { resultEntryBatchId: batch.id, monitoringPeriodInputId: item.input.id, statusId: rowStatus.id, parsedResultValue: item.nextValue, rawComment: item.nextComment } });
+        const batchRow = await tx.resultEntryBatchRow.create({ data: { resultEntryBatchId: batch.id, monitoringPeriodInputId: item.input.id, statusId: rowStatus.id, parsedResultValue: item.nextValue, inputValues: item.nextInputs ?? Prisma.JsonNull, rawComment: item.nextComment } });
         const statusId = item.nextValue === null ? pendingStatus.id : enteredStatus.id;
         if (!item.input.result) {
-          const result = await tx.kpiResult.create({ data: { monitoringPeriodInputId: item.input.id, latestBatchRowId: batchRow.id, statusId, resultValue: item.nextValue, comment: item.nextComment, revisionNo: 1, version: 1, createdByUserId: actor } });
+          const result = await tx.kpiResult.create({ data: { monitoringPeriodInputId: item.input.id, latestBatchRowId: batchRow.id, statusId, resultValue: item.nextValue, inputValues: item.nextInputs ?? Prisma.JsonNull, comment: item.nextComment, revisionNo: 1, version: 1, createdByUserId: actor } });
           await tx.kpiResultRevision.create({ data: { kpiResultId: result.id, resultEntryBatchRowId: batchRow.id, revisionNo: 1, previousResultValue: null, newResultValue: item.nextValue, previousComment: null, newComment: item.nextComment, changeType: "CREATE", entrySource: source, changedByUserId: actor } });
         } else {
           const previous = item.input.result;
-          const updated = await tx.kpiResult.updateMany({ where: { id: previous.id, version: previous.version }, data: { latestBatchRowId: batchRow.id, statusId, resultValue: item.nextValue, comment: item.nextComment, revisionNo: { increment: 1 }, version: { increment: 1 }, updatedAt: new Date(), updatedByUserId: actor } });
+          const updated = await tx.kpiResult.updateMany({ where: { id: previous.id, version: previous.version }, data: { latestBatchRowId: batchRow.id, statusId, resultValue: item.nextValue, inputValues: item.nextInputs ?? Prisma.JsonNull, comment: item.nextComment, revisionNo: { increment: 1 }, version: { increment: 1 }, updatedAt: new Date(), updatedByUserId: actor } });
           if (updated.count !== 1) throw new AppError(409, "RESULT_VERSION_CONFLICT", "A result changed while Save Changes was being committed", { monitoringPeriodInputId: item.change.monitoringPeriodInputId });
-          const changeType = previous.resultValue !== null && item.nextValue === null ? "CLEAR" : sameDecimal(previous.resultValue, item.nextValue) ? "COMMENT_ONLY" : "UPDATE";
+          const changeType = previous.resultValue !== null && item.nextValue === null ? "CLEAR" : sameDecimal(previous.resultValue, item.nextValue) ? "INPUTS_UPDATED" : "UPDATE";
           await tx.kpiResultRevision.create({ data: { kpiResultId: previous.id, resultEntryBatchRowId: batchRow.id, revisionNo: previous.revisionNo + 1, previousResultValue: previous.resultValue, newResultValue: item.nextValue, previousComment: previous.comment, newComment: item.nextComment, changeType, entrySource: source, changedByUserId: actor } });
         }
       }

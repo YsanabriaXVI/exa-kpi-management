@@ -25,7 +25,7 @@ const effectiveSnapshotSchema = z.object({
   goalUnit: z.object({id:z.string(),code:z.string(),name:z.string(),symbol:z.string()}).optional(),
   goal: z.string().nullable(), evaluationType: z.object({ id: z.string(), code: z.string(), name: z.string() }),
   goalMode: z.enum(["SINGLE", "RANGE", "BY_SUBJECT"]), rangeMinGoal: z.string().nullable(), rangeMaxGoal: z.string().nullable(), subjectType: z.string().nullable(),
-  subjectGoals: z.array(z.object({ subjectExternalId: z.string(), subjectCode: z.string().nullable(), subjectLabel: z.string(), goal: z.string() })),
+  subjectGoals: z.array(z.object({ subjectExternalId: z.string(), subjectCode: z.string().nullable(), subjectLabel: z.string(), goal: z.string() ,goalUnit:z.object({id:z.string(),code:z.string(),name:z.string(),symbol:z.string()}).optional(),resultUnit:z.object({id:z.string(),code:z.string(),name:z.string(),symbol:z.string()}).optional()})),
   resultSemantics: z.string().nullable(), scoringMethod: z.string().nullable(), scoringRuleConfig: z.record(z.string(), z.unknown()).nullable(),
   scoringRuleConfigVersion: z.number().nullable(), negativeResultPolicy: z.string().nullable(), scoringApprovalStatus: z.string(),
   measurementUnit: z.object({ id: z.string(), code: z.string(), name: z.string(), symbol: z.string() }),

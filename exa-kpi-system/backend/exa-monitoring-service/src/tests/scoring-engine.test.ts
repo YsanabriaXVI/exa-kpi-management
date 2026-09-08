@@ -9,6 +9,25 @@ const thresholds = [
 const score = (overrides: Record<string, unknown>) => calculateKpiScore({ result: "90", goal: "100", evaluationType: "GREATER_IS_BETTER", scoringMethod: "PROPORTIONAL", scoringRuleConfig:{floorPercent:0,capPercent:100}, negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", thresholds, weight: "20", ...overrides });
 
 describe("KPI scoring engine", () => {
+  it("maps duration bands before applying Traffic and weight, including shared boundaries", () => {
+    const bands=[{minResult:0,maxResult:2,compliance:100},{minResult:2,includesMin:false,maxResult:4,compliance:90},{minResult:4,includesMin:false,maxResult:8,compliance:60},{minResult:8,includesMin:false,compliance:0}];
+    for(const [result,compliance] of [[2,100],[2.1,90],[4,90],[5,60],[8,60],[8.1,0]]) {
+      const value=score({result,goal:4,evaluationType:"LOWER_IS_BETTER",scoringMethod:"RESULT_BANDS",scoringRuleConfig:{bands}});
+      expect(value.status).toBe("CALCULATED");
+      expect(value.compliance?.toNumber()).toBe(compliance);
+      expect(value.weightedScore?.toNumber()).toBe(compliance! * .2);
+    }
+    expect(score({result:5,goal:4,evaluationType:"LOWER_IS_BETTER",scoringMethod:"RESULT_BANDS",scoringRuleConfig:{bands}}).trafficLight).toBe("RED");
+    expect(score({result:5,goal:4,evaluationType:"LOWER_IS_BETTER"}).compliance?.toNumber()).toBe(80);
+  });
+  it("uses fixed Yes/No compliance and rejects other binary values", () => {
+    for(const [result,compliance] of [[1,100],[0,0]]) expect(score({result,resultSemantics:"BINARY",scoringMethod:"BINARY"}).compliance?.toNumber()).toBe(compliance);
+    expect(score({result:2,resultSemantics:"BINARY",scoringMethod:"BINARY"})).toMatchObject({status:"NOT_CALCULABLE",errorCode:"BINARY_RESULT_INVALID"});
+  });
+  it("rejects overlapping bands and leaves uncovered results uncalculated", () => {
+    expect(score({result:2,scoringMethod:"RESULT_BANDS",scoringRuleConfig:{bands:[{minResult:0,maxResult:2,compliance:100},{minResult:2,compliance:0}]}})).toMatchObject({errorCode:"SCORING_BANDS_INVALID"});
+    expect(score({result:3,scoringMethod:"RESULT_BANDS",scoringRuleConfig:{bands:[{minResult:0,maxResult:2,compliance:100}]}})).toMatchObject({status:"NOT_CALCULABLE",compliance:null});
+  });
   it("calculates greater-is-better and preserves overachievement while capping compliance", () => {
     expect(score({ result: "90" })).toMatchObject({ status: "CALCULATED", trafficLight: "GREEN" });
     expect(score({ result: "90" }).rawAchievement?.toString()).toBe("90");

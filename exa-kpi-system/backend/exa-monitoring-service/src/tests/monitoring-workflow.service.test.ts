@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const tx = vi.hoisted(() => ({
   monitoringPeriod: { findUnique: vi.fn(), updateMany: vi.fn() },
-  monitoringPeriodScorecard: { findMany: vi.fn().mockResolvedValue([]) },
+  monitoringPeriodScorecard: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn() },
   monitoringPeriodStatus: { findUnique: vi.fn() },
   monitoringPeriodInput: { count: vi.fn(), findMany: vi.fn() },
   monitoringValidationRun: { findFirst: vi.fn(), updateMany: vi.fn(), aggregate: vi.fn(), create: vi.fn() },
@@ -23,6 +23,35 @@ beforeEach(() => {
 });
 
 describe("Monitoring workflow", () => {
+  const justification = "The source has not delivered the missing Result";
+  function checked(status: string, issues = [{ findingCode: "RESULT_MISSING", exceptionAllowed: true }]) {
+    tx.monitoringPeriod.findUnique.mockResolvedValue({ id: 1n, kpiPoolExternalId: 9n, poolInputPeriodExternalId: 10n, periodKey: "2026-08", version: 4, resultsVersion: 1, currentScoringResultsVersion: 1, validationRunAt: new Date(), validationStatus: "BLOCKED", status: { code: status } });
+    tx.monitoringValidationRun.findFirst.mockResolvedValue({ id: 8n, basedOnResultsVersion: 1, status: "CURRENT", issues });
+    tx.monitoringPeriodStatus.findUnique.mockResolvedValue({ id: 3n });
+    tx.monitoringPeriod.updateMany.mockResolvedValue({ count: 1 });
+  }
+  it.each(["submit", "approve"] as const)("requires explicit exceptions and records the justification for %s", async action => {
+    checked(action === "submit" ? "DRAFT" : "SUBMITTED");
+    await expect(monitoringWorkflowService[action]("1", { version: 4 }, 7n)).rejects.toMatchObject({ statusCode: 422 });
+    await expect(monitoringWorkflowService[action]("1", { version: 4, withExceptions: true }, 7n)).rejects.toThrow();
+    expect(tx.monitoringPeriod.updateMany).not.toHaveBeenCalled();
+    await monitoringWorkflowService[action]("1", { version: 4, withExceptions: true, justification }, 7n);
+    expect(tx.monitoringPeriodWorkflowEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ comment: justification, metadata: { withExceptions: true, validationRunId: "8" } }) });
+  });
+  it.each(["submit", "approve", "close"] as const)("never waives scoring errors at %s", async action => {
+    checked(action === "submit" ? "DRAFT" : action === "approve" ? "SUBMITTED" : "VALIDATED", [{ findingCode: "RESULT_MISSING", exceptionAllowed: true }, { findingCode: "SCORING_METHOD_NOT_CONFIGURED", exceptionAllowed: true }]);
+    tx.monitoringPeriodInput.count.mockResolvedValue(1);
+    await expect(monitoringWorkflowService[action]("1", { version: 4, withExceptions: true, justification }, 7n)).rejects.toMatchObject({ statusCode: 422 });
+    expect(tx.monitoringPeriod.updateMany).not.toHaveBeenCalled();
+  });
+  it("closes with documented missing Results while preserving unavailable final scores", async () => {
+    checked("VALIDATED");
+    tx.monitoringPeriodInput.count.mockResolvedValue(1);
+    tx.monitoringPeriodScorecard.findMany.mockResolvedValue([{ id: 9n, previewScorePercent: null }]);
+    await monitoringWorkflowService.close("1", { version: 4, withExceptions: true, justification }, 7n);
+    expect(tx.monitoringPeriodScorecard.update).toHaveBeenCalledWith({ where: { id: 9n }, data: { finalScorePercent: null } });
+    expect(tx.monitoringPeriodClosure.create).toHaveBeenCalledWith({ data: expect.objectContaining({ closureType: "WITH_EXCEPTIONS", missingResultCount: 1, justification }) });
+  });
   it("rejects a Check based on older Results even if its stored status says CURRENT", async () => {
     tx.monitoringPeriod.findUnique.mockResolvedValue({id:1n,version:4,resultsVersion:5,currentScoringResultsVersion:5,validationRunAt:new Date(),validationStatus:"PASSED",status:{code:"DRAFT"}});
     tx.monitoringValidationRun.findFirst.mockResolvedValue({id:8n,basedOnResultsVersion:4,status:"CURRENT",issues:[]});
