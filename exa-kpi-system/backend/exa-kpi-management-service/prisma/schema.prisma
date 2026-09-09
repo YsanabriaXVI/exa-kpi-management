@@ -245,6 +245,7 @@ model KpiConfigurationRevision {
   calculationTemplate      String?                                    @map("calculation_template") @db.VarChar(40)
   evaluationScope          String                                     @default("OVERALL") @map("evaluation_scope") @db.VarChar(30)
   goalType                 String                                     @default("SINGLE_VALUE") @map("goal_type") @db.VarChar(30)
+  entityEvaluationMode     String?                                    @map("entity_evaluation_mode") @db.VarChar(30)
   goalAssignment           String?                                    @map("goal_assignment") @db.VarChar(40)
   goalUnitId               BigInt                                     @map("goal_unit_id")
   resultMethod             String                                     @default("DIRECT") @map("result_method") @db.VarChar(40)

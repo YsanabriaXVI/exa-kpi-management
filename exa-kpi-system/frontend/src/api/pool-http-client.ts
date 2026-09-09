@@ -9,7 +9,10 @@ export async function poolApiRequest<T>(path: string, init?: RequestInit): Promi
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({})) as { error?: { code?: string; message?: string; details?: unknown } };
-    throw new ApiError(payload.error?.message ?? "The KPI Pool request could not be completed.", response.status, payload.error?.code, payload.error?.details);
+    const details = payload.error?.details as { fieldErrors?: Record<string, unknown>; formErrors?: unknown } | undefined;
+    const fieldMessages = Object.entries(details?.fieldErrors ?? {}).flatMap(([field, errors]) => Array.isArray(errors) ? errors.filter((message): message is string => typeof message === "string").map(message => field + ": " + message) : []);
+    if (Array.isArray(details?.formErrors)) fieldMessages.push(...details.formErrors.filter((message): message is string => typeof message === "string"));
+    throw new ApiError(fieldMessages.length ? fieldMessages.join("; ") : payload.error?.message ?? "The KPI Pool request could not be completed.", response.status, payload.error?.code, payload.error?.details);
   }
   return response.json() as Promise<T>;
 }

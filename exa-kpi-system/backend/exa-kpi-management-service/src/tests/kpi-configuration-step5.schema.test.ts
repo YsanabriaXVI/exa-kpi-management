@@ -6,6 +6,11 @@ const base = { definitionId: "1", goal: 10, measurementUnit: "USD", dataSource: 
 describe("KPI Configuration Step 5 contract", () => {
   const entities = [{subjectExternalId:"A",subjectLabel:"Jacky"},{subjectExternalId:"B",subjectLabel:"Nancy"}];
   const perEntity = {...base,measurementUnit:undefined,goalUnit:undefined,evaluationScope:"BY_SUBJECT",goalMode:"BY_SUBJECT",goalAssignment:"DIFFERENT_GOAL_PER_SUBJECT",subjectType:"EMPLOYEE",subjects:entities,subjectGoals:entities.map((row,i)=>({...row,goal:100,goalUnit:i?"MXN":"USD"}))};
+  it.each(["SUBDIVISIONS", "CUSTOM_CATALOG_CATEGORY"])("accepts individual %s without a group target", (subjectType) => {
+    const value = kpiConfigurationBodySchema.parse({...perEntity, subjectType, entityEvaluationMode: "INDIVIDUAL", groupGoal: null});
+    expect(value).toMatchObject({subjectType, entityEvaluationMode: "INDIVIDUAL", groupGoal: null});
+    expect(value.subjectGoals).toHaveLength(2);
+  });
   it("accepts per-entity units without a global Goal or Result Unit",()=>{
     expect(kpiConfigurationBodySchema.parse(perEntity).subjectGoals.map(row=>row.goalUnit)).toEqual(["USD","MXN"]);
   });

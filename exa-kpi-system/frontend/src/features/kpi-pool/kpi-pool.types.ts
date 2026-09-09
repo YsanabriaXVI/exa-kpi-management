@@ -34,7 +34,7 @@ export type PoolKpi = {
   measurementUnit: string;
   dataSource: string;
   status: "ACTIVE" | "INACTIVE";
-  evaluationScope?: "OVERALL" | "BY_SUBJECT";
+  entityEvaluationMode?: "INDIVIDUAL" | "CONTRIBUTE_TO_OVERALL" | null; evaluationScope?: "OVERALL" | "BY_SUBJECT";
   subjectGoalCount?: number;
   groupGoal?: { value: string; unit: string } | null;
 };

@@ -2,6 +2,7 @@ import { evaluationUnits } from "../contracts/evaluation-units.js";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
+import { contributionContractError, isContributingEvaluation } from "../contracts/entity-participation.js";
 import { historicalContractError, isHistorical } from "../contracts/historical-contract.js";
 import { parseFrozenEffectiveKpiSettings } from "../contracts/frozen-effective-kpi-settings.js";
 import { AppError } from "../utils/app-error.js";
@@ -14,7 +15,7 @@ export const baselineQuery = z.object({ query: z.string().trim().max(200).option
   page: z.coerce.number().int().min(1).default(1) }).strict();
 export const selectedBaselineBody = z.object({ expectedBaselineVersion: z.number().int().nonnegative(), sourceResultId: id }).strict();
 export const manualBaselineBody = z.object({ expectedBaselineVersion: z.number().int().nonnegative(),
-  value: z.string().trim().regex(/^\d{1,14}(\.\d{1,6})?$/), reason: z.string().trim().min(10).max(10000) }).strict();
+  value: z.string().trim().regex(/^\d{1,14}(\.\d{1,6})?$/), reason: z.string().trim().min(10).max(10000), sourceReference: z.string().trim().min(1).max(10000) }).strict();
 type Tx = Prisma.TransactionClient;
 const date = (s: string) => new Date(s + "T00:00:00.000Z");
 const asJson = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value, (_key, v) => typeof v === "bigint" ? String(v) : v));
@@ -23,13 +24,13 @@ export function resolutionDto(r: any) {
     requiredPeriod: {key: r.requiredPeriodKey, start: r.requiredPeriodStart.toISOString().slice(0,10), end: r.requiredPeriodEnd.toISOString().slice(0,10)},
     sourceType: r.sourceType, state: r.sourceType === "AUTO_MATCH" ? "AUTO_RESOLVED" : r.sourceType === "USER_MATCH" ? "USER_RESOLVED" : "MANUAL",
     value: r.baselineValueSnapshot.toString(), unit: r.baselineUnitSnapshot, sourceResultId: r.sourceResultId?.toString() ?? null,
-    provenance: r.provenance, reason: r.reason, resolvedBy: String(r.resolvedByUserId), resolvedAt: r.resolvedAt.toISOString() };
+    provenance: r.provenance, reason: r.reason, sourceReference: r.sourceType === "MANUAL" ? r.provenance?.sourceReference ?? null : null, resolvedByUserId: String(r.resolvedByUserId), resolvedBy: String(r.resolvedByUserId), resolvedAt: r.resolvedAt.toISOString() };
 }
 export function baselineContext(period: any, input: any, resolution?: any) {
   const frozen = input.effectiveSettingsSnapshot;
   if (!isHistorical(frozen)) return {state: "NOT_REQUIRED", requiredPeriod: null, resolution: null, errorCode: null};
-  const invalid = historicalContractError(frozen);
-  const requiredPeriod = invalid ? null : requiredHistoricalPeriod(period, frozen);
+  const invalid = historicalContractError(frozen) ?? (resolution?.sourceType === "MANUAL" && (!resolution.reason?.trim() || !resolution.provenance?.sourceReference?.trim()) ? "MANUAL_BASELINE_DOCUMENTATION_REQUIRED" : null);
+  const requiredPeriod = historicalContractError(frozen) ? null : requiredHistoricalPeriod(period, frozen);
   return {state: invalid || !requiredPeriod ? "INVALID" : resolution ? resolutionDto(resolution).state : "UNRESOLVED",
     requiredPeriod, resolution: resolution ? resolutionDto(resolution) : null,
     errorCode: invalid ?? (!requiredPeriod ? "HISTORICAL_REQUIRED_PERIOD_NOT_FOUND" : null)};
@@ -57,8 +58,17 @@ function sourceWhere(period: any, input: any, required: RequiredPeriod): Prisma.
       period: {periodStart:date(required.start),periodEnd:date(required.end),inputFrequencyCodeSnapshot:required.frequencyCode,
         status:{code:"CLOSED"}} }};
 }
-function eligible(source: any): boolean {
-  return !!source && source.resultValue !== null && source.calculationStatus === "CALCULATED" && hasCurrentScoring(source.input.period);
+// Totals are comparable only when they represent the same frozen contributor cohort.
+function compatibleContributors(source: any, input: any): boolean {
+  const current = input.effectiveSettingsSnapshot;
+  if (!isContributingEvaluation(current)) return true;
+  const previous = source?.input?.effectiveSettingsSnapshot;
+  if (!isContributingEvaluation(previous) || contributionContractError(previous) || contributionContractError(current)) return false;
+  const cohort = (settings: any) => JSON.stringify(settings.subjects.map((subject: any) => [settings.subjectType, subject.subjectExternalId]).sort((a: string[], b: string[]) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  return previous.entityAggregation === current.entityAggregation && cohort(previous) === cohort(current);
+}
+function eligible(source: any, input: any): boolean {
+  return !!source && source.resultValue !== null && source.calculationStatus === "CALCULATED" && hasCurrentScoring(source.input.period) && compatibleContributors(source, input);
 }
 function candidateDto(source: any, input: any) {
   const i=source.input, p=i.period;
@@ -67,6 +77,7 @@ function candidateDto(source: any, input: any) {
     poolId:String(p.kpiPoolExternalId),poolName:p.poolNameSnapshot,scorecardId:String(i.scorecard.scorecardExternalId),
     scorecardName:i.scorecard.scorecardNameSnapshot,kpiCode:i.kpiCodeSnapshot,kpiName:i.kpiNameSnapshot,
     subjectExternalId:i.subjectExternalIdSnapshot,subjectLabel:i.subjectLabelSnapshot,
+    contributors: isContributingEvaluation(i.effectiveSettingsSnapshot) ? (i.effectiveSettingsSnapshot as any).subjects : null,
     rank:i.kpiConfigurationExternalId===input.kpiConfigurationExternalId?1:i.kpiDefinitionExternalId===input.kpiDefinitionExternalId?2:3,
     sourceMonitoringPeriodId:String(p.id),sourceKpiDefinitionId:String(i.kpiDefinitionExternalId),
     sourceKpiConfigurationId:String(i.kpiConfigurationExternalId),sourceRevisionId:String(i.kpiConfigurationRevisionExternalId),
@@ -78,25 +89,26 @@ async function sources(db: Tx, period: any, input: any, req: RequiredPeriod, fil
   if (exact) {
     inputWhere.kpiDefinitionExternalId=input.kpiDefinitionExternalId;
     inputWhere.evaluationTypeCodeSnapshot=input.evaluationTypeCodeSnapshot;
-    inputWhere.scoringMethodCodeSnapshot=input.scoringMethodCodeSnapshot;
+    if (!isContributingEvaluation(input.effectiveSettingsSnapshot)) inputWhere.scoringMethodCodeSnapshot=input.scoringMethodCodeSnapshot;
   }
   if (filters.pool) (inputWhere.period as Prisma.MonitoringPeriodWhereInput).kpiPoolExternalId=BigInt(filters.pool);
   if (filters.scorecard) inputWhere.scorecard={scorecardExternalId:BigInt(filters.scorecard)};
   if (filters.query) inputWhere.OR=[{kpiCodeSnapshot:{contains:filters.query}},{kpiNameSnapshot:{contains:filters.query}},
     {subjectLabelSnapshot:{contains:filters.query}},{period:{poolNameSnapshot:{contains:filters.query}}},{scorecard:{scorecardNameSnapshot:{contains:filters.query}}}];
   // Do not truncate automatic matching: truncation must never turn ambiguity into a unique match.
-  const rows=(await db.kpiResult.findMany({where,include:sourceInclude,orderBy:{id:"asc"}})).filter(eligible);
+  const rows=(await db.kpiResult.findMany({where,include:sourceInclude,orderBy:{id:"asc"}})).filter(source => eligible(source, input));
   return rows.sort((a,b)=>candidateDto(a,input).rank-candidateDto(b,input).rank);
 }
 async function latest(db:Tx,inputId:bigint) {
   return db.historicalBaselineResolution.findFirst({where:{monitoringPeriodInputId:inputId},orderBy:{revisionNo:"desc"}});
 }
 async function record(db:Tx, period:any, input:any, req:RequiredPeriod, sourceType:string, actor:bigint,
-  value:Prisma.Decimal, reason:string|null, source:any|null) {
+  value:Prisma.Decimal, reason:string|null, source:any|null, sourceReference:string|null = null) {
   const previous=await latest(db,input.id);
   // Source origin and reason are meaningful context, even if the numeric value is unchanged.
   if(previous && previous.sourceType===sourceType && previous.sourceResultId===(source?.id??null)
     && previous.baselineValueSnapshot.eq(value) && previous.reason===reason
+    && (sourceType !== "MANUAL" || (previous.provenance as any)?.sourceReference === sourceReference)
     && previous.requiredPeriodKey===req.key
     && ["id","code","name","symbol"].every(key=>(previous.baselineUnitSnapshot as any)?.[key]===evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).resultUnit[key])) return previous;
   period.baselineVersion=(period.baselineVersion??0)+1;
@@ -110,7 +122,7 @@ async function record(db:Tx, period:any, input:any, req:RequiredPeriod, sourceTy
     sourceMonitoringPeriodId:i?.monitoringPeriodId??null,sourcePoolExternalId:i?.period.kpiPoolExternalId??null,
     sourceScorecardExternalId:i?.scorecard.scorecardExternalId??null,sourceKpiDefinitionExternalId:i?.kpiDefinitionExternalId??null,
     sourceKpiConfigurationExternalId:i?.kpiConfigurationExternalId??null,sourceSubjectExternalId:i?.subjectExternalIdSnapshot??null,
-    provenance:asJson(source?candidateDto(source,input):{requiredPeriod:req,unit:evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).resultUnit,description:reason}),
+    provenance:asJson(source?candidateDto(source,input):{requiredPeriod:req,unit:evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).resultUnit,description:reason,sourceReference}),
     reason,resolvedByUserId:actor }});
   await clearCurrentScoring(db,period.id);
   await db.monitoringPeriod.update({where:{id:period.id},data:{baselineVersion:period.baselineVersion,currentScoringResultsVersion:null,
@@ -135,7 +147,7 @@ export async function resolveEvaluationContexts(db:Tx,period:any,inputs:any[],ac
       context=baselineContext(period,input,resolution);
       if(resolution.sourceResultId) {
         const source=await db.kpiResult.findFirst({where:{...sourceWhere(period,input,context.requiredPeriod!),id:resolution.sourceResultId},include:sourceInclude});
-        if(!eligible(source)||!source!.resultValue!.eq(resolution.baselineValueSnapshot)) context={...context,state:"INVALID",errorCode:"HISTORICAL_BASELINE_SOURCE_NOT_ELIGIBLE"};
+        if(!eligible(source, input)||!source!.resultValue!.eq(resolution.baselineValueSnapshot)) context={...context,state:"INVALID",errorCode:"HISTORICAL_BASELINE_SOURCE_NOT_ELIGIBLE"};
       }
     }
     contexts.set(String(input.id),context);
@@ -169,11 +181,11 @@ export const historicalBaselineService = {
         let source=null;
         if("sourceResultId" in body) {
           source=await db.kpiResult.findFirst({where:{...sourceWhere(period,input,requiredPeriod),id:BigInt(body.sourceResultId)},include:sourceInclude});
-          if(!eligible(source)) throw new AppError(422,"HISTORICAL_BASELINE_INCOMPATIBLE","Selected source must be a calculated CLOSED Result with the required period, unit and subject.");
+          if(!eligible(source, input)) throw new AppError(422,"HISTORICAL_BASELINE_INCOMPATIBLE","Selected source must be a calculated CLOSED Result with the required period, unit and subject or contributor cohort.");
         }
         const resolution=await record(db,period,input,requiredPeriod,source?"USER_MATCH":"MANUAL",actor,
           source?source.resultValue!:new Prisma.Decimal((body as z.infer<typeof manualBaselineBody>).value),
-          "reason" in body?body.reason:null,source);
+          "reason" in body?body.reason:null,source,"sourceReference" in body?body.sourceReference:null);
         return {baselineVersion:period.baselineVersion,resolution:resolutionDto(resolution)};
       },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
     } catch(error) {

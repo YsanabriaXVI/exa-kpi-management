@@ -20,9 +20,9 @@ describe("Baseline API contracts",()=>{
       expect((await request(createApp()).put(url+"/baseline-resolution").send(body)).status).toBe(400);expect(service.save).not.toHaveBeenCalled();
     });
   it("validates manual provenance and prevents changing required unit/period",async()=>{
-    const valid={expectedBaselineVersion:0,value:"100000",reason:"Historical ERP export"};
+    const valid={expectedBaselineVersion:0,value:"100000",reason:"Historical ERP export",sourceReference:"ERP export for required reference period"};
     expect((await request(createApp()).post(url+"/baseline-resolution/manual").send(valid)).status).toBe(200);
-    for(const body of [{...valid,reason:"short"},{...valid,unit:"EUR"},{...valid,period:"2025-01"},{...valid,value:"-1"},{...valid,value:"Infinity"}]) {
+    for(const body of [{...valid,sourceReference:""},{...valid,sourceReference:undefined},{...valid,reason:"short"},{...valid,unit:"EUR"},{...valid,period:"2025-01"},{...valid,value:"-1"},{...valid,value:"Infinity"}]) {
       expect((await request(createApp()).post(url+"/baseline-resolution/manual").send(body)).status).toBe(400);
     }
   });

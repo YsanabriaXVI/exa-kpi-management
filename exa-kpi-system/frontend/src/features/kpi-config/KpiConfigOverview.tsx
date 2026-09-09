@@ -1,3 +1,4 @@
+import { EntityGoalsModal } from "./EntityGoalsDisplay";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, CirclePause, Eye, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
@@ -213,6 +214,7 @@ function GoalOverviewCell({ config, onView }: { config: KpiConfigRecord; onView:
     return <div className="overview-goal-value"><strong>{formatGoal(config.rangeMinGoal ?? 0)}–{formatGoal(config.rangeMaxGoal ?? 0)}</strong><small>{config.measurementUnit}</small></div>;
   }
   if (mode === "BY_SUBJECT") {
+    if (config.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL") return <div className="overview-subject-goal"><strong>By Entity / Contributes to Overall</strong><small>Target: {formatGoal(config.goal)} {config.goalUnit} / {config.subjects?.length ?? 0} contributors / SUM</small><button type="button" onClick={event => {event.stopPropagation();onView();}}>View contributors</button></div>;
     const goals = config.subjectGoals ?? [];
     const values = goals.map((item) => item.goal);
     const minimum = values.length ? Math.min(...values) : null;
@@ -231,6 +233,7 @@ function GoalOverviewCell({ config, onView }: { config: KpiConfigRecord; onView:
 }
 
 function SubjectGoalsModal({ config, onClose }: { config: KpiConfigRecord; onClose: () => void }) {
+  if (config.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL") return <EntityGoalsModal data={{configCode:config.code,kpiCode:config.definitionCode,kpiName:config.definitionName,entityEvaluationMode:config.entityEvaluationMode,goal:config.goal,goalUnit:config.goalUnit,resultUnit:config.measurementUnit,subjects:config.subjects,subjectGoals:[],groupGoal:config.groupGoal}} onClose={onClose}/>;
   const historical = config.periodScope && config.periodScope !== "CURRENT_PERIOD";
   const unit = config.goalUnit || config.measurementUnit;
   return <div className="subject-goals-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -256,7 +259,7 @@ function formatSignedGoal(value: number, showPositiveSign: boolean) {
 }
 
 function subjectTypeLabel(subjectType?: KpiConfigRecord["subjectType"]) {
-  return ({ FLEET: "Fleet", EMPLOYEE: "Collaborator", CUSTOMER: "Customer", LOCATION: "Location", DEPARTMENT: "Department", COMPANY: "Company", OPERATION: "Operation", PROJECT: "Project", ASSET: "Asset / Equipment" } as const)[subjectType ?? "COMPANY"] ?? "Subject";
+  return ({ FLEET: "Fleet", EMPLOYEE: "Collaborator", CUSTOMER: "Customer", LOCATION: "Location", DEPARTMENT: "Department", COMPANY: "Company", OPERATION: "Operation", PROJECT: "Project", ASSET: "Asset / Equipment" } as Record<string, string>)[subjectType ?? "COMPANY"] ?? subjectType?.replace(/_/g, " ") ?? "Subject";
 }
 
 function findDuplicatedDefinitions(configurations: KpiConfigRecord[]) {

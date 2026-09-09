@@ -15,6 +15,8 @@ const environmentSchema = z.object({
   TEMPORARY_ACTOR_USER_ID: z.coerce.bigint().positive().default(1n),
   KPI_MANAGEMENT_BASE_URL: z.string().url().default("http://localhost:4001"),
   KPI_MANAGEMENT_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(5_000),
+  MONITORING_BASE_URL: z.string().url().default("http://localhost:4004"),
+  MONITORING_TIMEOUT_MS: z.coerce.number().int().positive().max(30000).default(5000),
   SCORECARDS_BASE_URL: z.string().url().default("http://localhost:4003"),
   SCORECARDS_TIMEOUT_MS: z.coerce.number().int().positive().max(30_000).default(5_000),
   NATS_ENABLED: booleanFromEnvironment,

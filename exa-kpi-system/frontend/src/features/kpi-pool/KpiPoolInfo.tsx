@@ -98,6 +98,7 @@ export function KpiPoolInfo() {
       const pool = await kpiPoolService.save(form, poolId);
       return { pool, manage };
     },
+    onError: (saveError) => setError(saveError instanceof Error ? saveError.message : "No se pudo guardar el pool."),
     onSuccess: ({ pool, manage }) => {
       window.localStorage.removeItem("exa:kpi-config:pool-draft-ids");
       queryClient.invalidateQueries({ queryKey: ["kpi-configurations"] });

@@ -1,3 +1,5 @@
+import { isContributingEvaluation, isIndividualEvaluation } from "../contracts/entity-participation.js";
+import { sumContributorResults } from "./contributor-results.js";
 import { historicalContractError, isHistorical } from "../contracts/historical-contract.js";
 import { evaluationUnits } from "../contracts/evaluation-units.js";
 import { historicalComparison } from "./historical-comparison.js";
@@ -11,12 +13,17 @@ const decimal = (value: any) => new Prisma.Decimal(value);
 const fixed = (value: Prisma.Decimal) => persistedDecimal(value)!.toFixed(6);
 const sum = (values: Prisma.Decimal[]) => values.reduce((a,b)=>a.plus(b),decimal(0));
 export type CheckFinding = {
-  code: string; severity: "ERROR" | "CRITICAL"; scope: "EVALUATION" | "SCORECARD";
+  code: string; severity: "WARNING" | "ERROR" | "CRITICAL"; scope: "EVALUATION" | "SCORECARD";
   message: string; monitoringPeriodInputId: string | null; kpiConfigurationId: string | null;
   kpiCode: string | null; entityId: string | null; entityLabel: string | null;
   scorecardId: string; blocking: boolean;
 };
 const messages: Record<string,string> = {
+  MANUAL_BASELINE_DOCUMENTATION_REQUIRED: "Complete the manual baseline reason and source reference before checking Results.",
+  COUNT_RESULT_INVALID: "Every count must be a nonnegative integer.",
+  CONTRIBUTOR_RESULT_MISSING: "Enter a Result for every contributor. The official Result is pending.",
+  CONTRIBUTOR_INPUTS_INVALID: "Contributor inputs must match the frozen entities.",
+  SUM_REQUIRES_ADDITIVE_RESULT: "SUM requires additive counts or quantities in a supported Result Unit.",
   RESULT_DENOMINATOR_ZERO: "The denominator is zero. The official Result cannot be calculated.",
   RESULT_INPUT_MISSING: "Enter both numerator and denominator. The official Result is pending.",
   RESULT_MISSING: "Enter a Result for this evaluation. Zero is a valid Result.",
@@ -44,7 +51,7 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
     let frozen: ReturnType<typeof parseFrozenEffectiveKpiSettings> | null=null;
     let saved=input.result?.resultValue??null;
     const division = divisionDefinition(input.effectiveSettingsSnapshot);
-    const derived = division ? calculateDivision(input.result?.inputValues) : null;
+    const derived = isContributingEvaluation(input.effectiveSettingsSnapshot) ? sumContributorResults(input.effectiveSettingsSnapshot, input.result?.inputValues?.contributors) : division ? calculateDivision(input.result?.inputValues) : null;
     if (derived) saved = derived.value;
     try {
       const candidate=input.effectiveSettingsSnapshot;
@@ -57,8 +64,10 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
           ||frozen.evaluationType.code!==input.evaluationTypeCodeSnapshot||frozen.scoringMethod!==input.scoringMethodCodeSnapshot
           ||goal==null||input.goalValueSnapshot==null||!decimal(goal).eq(input.goalValueSnapshot)
           ||evaluationUnits(frozen,input.subjectExternalIdSnapshot).resultUnit.code!==input.measurementUnitCodeSnapshot
-          ||input.evaluationKindSnapshot==="ENTITY"&&(frozen.evaluationScope!=="BY_SUBJECT"||!subject||!decimal(subject.weight!).eq(input.weightPercentSnapshot))
-          ||input.evaluationKindSnapshot==="OVERALL"&&frozen.evaluationScope!=="OVERALL") failure="FROZEN_SCORING_CONTRACT_INVALID";
+          ||input.evaluationKindSnapshot==="ENTITY"&&(!isIndividualEvaluation(frozen)||!subject||!decimal(subject.weight!).eq(input.weightPercentSnapshot))
+          ||input.evaluationKindSnapshot==="OVERALL"&&frozen.evaluationScope!=="OVERALL"
+          ||input.evaluationKindSnapshot==="CONTRIBUTED"&&!isContributingEvaluation(frozen)
+          ||isContributingEvaluation(frozen)&&input.evaluationKindSnapshot!=="CONTRIBUTED") failure="FROZEN_SCORING_CONTRACT_INVALID";
       }
     } catch(error) {failure=typeof (error as any)?.code==="string"?(error as any).code:"FROZEN_KPI_SETTINGS_INVALID";}
     if (!failure && input.effectiveSettingsSnapshot?.resultMethod === "CALCULATED_FROM_INPUTS" && !division) failure = "RESULT_METHOD_NOT_SUPPORTED";
@@ -91,6 +100,7 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
         : messages[code] ?? `This evaluation is not calculable (${code}).`;
       findings.push({code,severity:code==="RESULT_MISSING"?"ERROR":"CRITICAL",scope:"EVALUATION",message,monitoringPeriodInputId:row.id,kpiConfigurationId:row.kpiConfigurationId,kpiCode:row.kpiCode,entityId:row.entityId,entityLabel:row.entityLabel,scorecardId:row.scorecardId,blocking:true});
     }
+    if (historical && context?.resolution?.sourceType === "MANUAL") findings.push({code:"MANUAL_BASELINE_USED",severity:"WARNING",scope:"EVALUATION",message:isContributingEvaluation(input.effectiveSettingsSnapshot) ? "Manual baseline: historical contributor composition and provenance cannot be verified automatically. Explicit exception approval is required." : "Manual baseline: historical provenance cannot be verified automatically. Explicit exception approval is required.",monitoringPeriodInputId:row.id,kpiConfigurationId:row.kpiConfigurationId,kpiCode:row.kpiCode,entityId:row.entityId,entityLabel:row.entityLabel,scorecardId:row.scorecardId,blocking:false});
     return row;
   });
   const byId=new Map(cards.map(c=>[String(c.id),c]));
@@ -129,10 +139,10 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
   const historicalEvaluations=evaluations.filter(e=>e.historical);
   const resolvedBaselines=historicalEvaluations.filter(e=>e.historical.resolution && e.historical.state!=="INVALID").length;
   return {evaluations,scorecards:[...summaries.values()],findings,summary:{expected,entered,pending:expected-entered,completionPercent:expected?Math.round(entered/expected*100):0,
-    errorCount:findings.length,passed:calculated,missing:expected-entered,errors:findings.filter(f=>f.severity==="ERROR").length,critical:findings.filter(f=>f.severity==="CRITICAL").length,warnings:0,blocking,
+    errorCount:findings.filter(f=>f.severity!=="WARNING").length,passed:calculated,missing:expected-entered,errors:findings.filter(f=>f.severity==="ERROR").length,critical:findings.filter(f=>f.severity==="CRITICAL").length,warnings:findings.filter(f=>f.severity==="WARNING").length,blocking,manualBaselineCount:findings.filter(f=>f.code==="MANUAL_BASELINE_USED").length,
     historicalBaselines:{required:historicalEvaluations.length,resolved:resolvedBaselines,unresolved:historicalEvaluations.length-resolvedBaselines},
     allRequiredHistoricalBaselinesResolved:resolvedBaselines===historicalEvaluations.length,
     scoring:{calculated,missing:expected-entered,notCalculable:expected-calculated},weightCoverageComplete,allRequiredScoringCalculable:calculated===expected&&expected>0,
-    readyForSubmitWithExceptions:selectedEntryMethod==="MANUAL"&&expected>0&&entered<expected&&weightCoverageComplete&&calculated===entered&&findings.length>0&&findings.every(f=>f.code==="RESULT_MISSING"),
-    runStatus:blocking?"BLOCKED":"PASSED",readyForSubmit:selectedEntryMethod==="MANUAL"&&expected>0&&entered===expected&&weightCoverageComplete&&blocking===0&&calculated===expected}};
+    readyForSubmitWithExceptions:selectedEntryMethod==="MANUAL"&&expected>0&&entered<=expected&&weightCoverageComplete&&calculated===entered&&findings.length>0&&findings.every(f=>["RESULT_MISSING","MANUAL_BASELINE_USED"].includes(f.code)),
+    runStatus:blocking?"BLOCKED":findings.length?"PASSED_WITH_WARNINGS":"PASSED",readyForSubmit:selectedEntryMethod==="MANUAL"&&expected>0&&entered===expected&&weightCoverageComplete&&findings.length===0&&calculated===expected}};
 }

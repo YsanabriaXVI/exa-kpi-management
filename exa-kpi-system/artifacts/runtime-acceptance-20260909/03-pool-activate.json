@@ -1,0 +1,1 @@
+﻿{"endpoint":"http://localhost:4002/api/v1/kpi-pools/1/activate","request":{},"status":200,"response":{"data":{"id":"1","status":"ACTIVE","eventId":"c9664e48-f031-4a54-8fac-345771003888"}},"method":"POST"}

@@ -16,7 +16,8 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
-    "sync:input-frequencies": "tsx scripts/sync-input-frequencies.ts"
+    "sync:input-frequencies": "tsx scripts/sync-input-frequencies.ts",
+    "ops:closures": "tsx src/ops/closures.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",

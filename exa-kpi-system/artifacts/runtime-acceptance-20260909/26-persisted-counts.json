@@ -1,0 +1,54 @@
+﻿[
+    {
+        "id":  "37",
+        "status":  "CLOSED",
+        "version":  6,
+        "resultsVersion":  1,
+        "baselineVersion":  0,
+        "inputs":  1,
+        "results":  1,
+        "checks":  1,
+        "baselineResolutions":  0,
+        "workflowEvents":  3,
+        "inputIds":  [
+                         "76"
+                     ],
+        "resultIds":  [
+                          "64"
+                      ],
+        "scores":  {
+                       "id":  "37",
+                       "directScorePercent":  null,
+                       "linkedScorePercent":  null,
+                       "previewScorePercent":  "90",
+                       "finalScorePercent":  "90",
+                       "calculationVersion":  "CHECK_RESULTS_V1"
+                   }
+    },
+    {
+        "id":  "38",
+        "status":  "DRAFT",
+        "version":  1,
+        "resultsVersion":  0,
+        "baselineVersion":  0,
+        "inputs":  1,
+        "results":  0,
+        "checks":  0,
+        "baselineResolutions":  0,
+        "workflowEvents":  0,
+        "inputIds":  [
+                         "77"
+                     ],
+        "resultIds":  [
+
+                      ],
+        "scores":  {
+                       "id":  "38",
+                       "directScorePercent":  null,
+                       "linkedScorePercent":  null,
+                       "previewScorePercent":  null,
+                       "finalScorePercent":  null,
+                       "calculationVersion":  null
+                   }
+    }
+]

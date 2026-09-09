@@ -19,6 +19,7 @@ import {
 } from "../kpi-definition/kpi-definition.service";
 import { ApiError } from "../../api/http-client";
 import type { LegacyKpiDefinitionOption } from "../kpi-definition/kpi-definition.types";
+import { catalogManagementService } from "./catalog-management.service";
 import { kpiConfigService } from "./kpi-config.service";
 import { TrafficLightEditor } from "./TrafficLightEditor";
 import { KpiSemanticSetup } from "./KpiSemanticSetup";
@@ -26,6 +27,8 @@ import { kpiPoolService } from "../kpi-pool/kpi-pool.service";
 import type {
   GoalMode,
   EvaluationScope,
+  EntityEvaluationMode,
+  SubjectSelection,
   GoalType,
   GoalAssignment,
   GroupGoal,
@@ -140,14 +143,17 @@ export function SetKpiConfigPage() {
     return stored || null;
   });
   const [goal, setGoal] = useState("");
+  const [showGoalErrors, setShowGoalErrors] = useState(false);
   const [periodScope, setPeriodScope] = useState<PeriodScope>("CURRENT_PERIOD");
   const [inputFrequencyCode, setInputFrequencyCode] = useState("MONTHLY");
+  const [entityEvaluationMode, setEntityEvaluationMode] = useState<EntityEvaluationMode>("INDIVIDUAL");
+  const [contributorSubjects, setContributorSubjects] = useState<SubjectSelection[]>([]);
   const [goalMode, setGoalMode] = useState<GoalMode>("SINGLE");
   const [evaluationScope, setEvaluationScope] =
     useState<EvaluationScope>("OVERALL");
   const [goalType, setGoalType] = useState<GoalType>("SINGLE_VALUE");
   const [goalAssignment, setGoalAssignment] =
-    useState<GoalAssignment>("SAME_GOAL_FOR_ALL");
+    useState<GoalAssignment>("DIFFERENT_GOAL_PER_SUBJECT");
   const [goalUnit, setGoalUnit] = useState("");
   const [resultMethod, setResultMethod] = useState<ResultMethod>("DIRECT");
   const [measurementInputs, setMeasurementInputs] = useState<
@@ -164,6 +170,8 @@ export function SetKpiConfigPage() {
   const [rangeMinGoal, setRangeMinGoal] = useState("");
   const [rangeMaxGoal, setRangeMaxGoal] = useState("");
   const [subjectType, setSubjectType] = useState<SubjectType | "">("");
+  const contributing = evaluationScope === "BY_SUBJECT" && entityEvaluationMode === "CONTRIBUTE_TO_OVERALL";
+  const individual = evaluationScope === "BY_SUBJECT" && !contributing;
   const [subjectGoals, setSubjectGoals] = useState<SubjectGoal[]>([]);
   const [subjectGoalDrafts, setSubjectGoalDrafts] = useState<
     Record<string, string>
@@ -235,6 +243,11 @@ export function SetKpiConfigPage() {
     queryKey: ["kpi-config-lookups"],
     queryFn: () => kpiConfigService.lookups(),
     staleTime: 5 * 60 * 1000,
+    enabled: editMode !== "POOL_PERIOD_EDIT",
+  });
+  const subjectTypesQuery = useQuery({
+    queryKey: ["catalog-subject-types"],
+    queryFn: catalogManagementService.subjectTypes,
     enabled: editMode !== "POOL_PERIOD_EDIT",
   });
   const subjectLookupsQuery = useQuery({
@@ -385,6 +398,8 @@ export function SetKpiConfigPage() {
     setGoal(String(config.goal));
     setPeriodScope(config.periodScope ?? "CURRENT_PERIOD");
     setInputFrequencyCode(config.inputFrequencyCode ?? "MONTHLY");
+    setEntityEvaluationMode(config.entityEvaluationMode ?? "INDIVIDUAL");
+    setContributorSubjects(config.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? config.subjects ?? [] : []);
     setGoalMode(config.goalMode ?? "SINGLE");
     setEvaluationScope(
       config.evaluationScope ??
@@ -394,12 +409,7 @@ export function SetKpiConfigPage() {
       config.goalType ??
         (config.goalMode === "RANGE" ? "RANGE" : "SINGLE_VALUE"),
     );
-    setGoalAssignment(
-      config.goalMode === "BY_SUBJECT" ||
-        config.evaluationScope === "BY_SUBJECT"
-        ? "DIFFERENT_GOAL_PER_SUBJECT"
-        : "SAME_GOAL_FOR_ALL",
-    );
+    setGoalAssignment("DIFFERENT_GOAL_PER_SUBJECT");
     setGoalUnit(config.goalUnit ?? config.measurementUnit);
     setResultMethod(config.resultMethod ?? "DIRECT");
     setMeasurementInputs(config.measurementInputs ?? []);
@@ -430,7 +440,7 @@ export function SetKpiConfigPage() {
             )?.goal ?? config.goal,
         }))
       : (config.subjectGoals ?? []);
-    setSubjectGoals(configuredSubjects);
+    setSubjectGoals(config.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? [] : configuredSubjects);
     setGroupGoal(config.groupGoal ?? null);
     setSubjectGoalDrafts(
       Object.fromEntries(
@@ -583,7 +593,7 @@ export function SetKpiConfigPage() {
     editMode === "POOL_PERIOD_EDIT" && applyToFuturePeriods !== true;
   const poolGoalOverrideSupported =
     editMode !== "POOL_PERIOD_EDIT" ||
-    (poolEffectiveQuery.data?.global.goalMode ?? "SINGLE") === "SINGLE";
+    ((poolEffectiveQuery.data?.global.goalMode ?? "SINGLE") === "SINGLE" || poolEffectiveQuery.data?.global.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL");
   const poolHasChanges =
     (poolGoalOverrideSupported && poolGoalChanged) ||
     poolTrafficChanged ||
@@ -669,7 +679,7 @@ export function SetKpiConfigPage() {
     ).map((item) => item.subjectExternalId),
   );
   const currentSubjectIds = new Set(
-    subjectGoals.map((item) => item.subjectExternalId),
+    (contributing ? contributorSubjects : subjectGoals).map((item) => item.subjectExternalId),
   );
   const subjectCompositionChanged =
     goalMode === "BY_SUBJECT" &&
@@ -680,6 +690,7 @@ export function SetKpiConfigPage() {
       ? []
       : [
           editConfigQuery.data.goalMode !== goalMode ? "Goal Mode" : null,
+          (editConfigQuery.data.entityEvaluationMode ?? "INDIVIDUAL") !== entityEvaluationMode ? "Entity participation" : null,
           (editConfigQuery.data.subjectType ?? "") !== subjectType
             ? "Subject Type"
             : null,
@@ -703,6 +714,7 @@ export function SetKpiConfigPage() {
         ].filter((item): item is string => Boolean(item));
   const modifiesExpectedResults =
     subjectCompositionChanged ||
+    (evaluationScope === "BY_SUBJECT" && (editConfigQuery.data?.entityEvaluationMode ?? "INDIVIDUAL") !== entityEvaluationMode) ||
     (editConfigQuery.data?.goalMode !== goalMode &&
       (editConfigQuery.data?.goalMode === "BY_SUBJECT" ||
         goalMode === "BY_SUBJECT"));
@@ -747,7 +759,7 @@ export function SetKpiConfigPage() {
   const baseConfigPayload = () => ({
     definitionId: selected!.id,
     goal: Number(goal || 0),
-    measurementUnit: evaluationScope === "BY_SUBJECT" ? (periodScope === "CURRENT_PERIOD" ? subjectGoals[0]?.goalUnit : subjectGoals[0]?.resultUnit) ?? "" : measurementUnit,
+    measurementUnit: individual ? (periodScope === "CURRENT_PERIOD" ? subjectGoals[0]?.goalUnit : subjectGoals[0]?.resultUnit) ?? "" : measurementUnit,
     dataSource,
     ranges,
     isActive,
@@ -755,9 +767,10 @@ export function SetKpiConfigPage() {
     periodScope,
     goalMode,
     evaluationScope,
+    ...(evaluationScope === "BY_SUBJECT" ? { entityEvaluationMode } : {}),
     goalType,
-    goalAssignment: evaluationScope === "BY_SUBJECT" ? goalAssignment : null,
-    goalUnit: evaluationScope === "OVERALL" ? goalUnit || measurementUnit : undefined,
+    goalAssignment: individual ? "DIFFERENT_GOAL_PER_SUBJECT" as const : null,
+    goalUnit: !individual ? goalUnit || measurementUnit : undefined,
     resultMethod,
     measurementInputs: resultMethod === "DIRECT" ? [] : measurementInputs,
     calculationTemplate: resultMethod === "DIRECT" ? null : calculationTemplate,
@@ -766,18 +779,18 @@ export function SetKpiConfigPage() {
     rangeMaxGoal: goalMode === "RANGE" ? Number(rangeMaxGoal) : null,
     subjectType: evaluationScope === "BY_SUBJECT" ? subjectType || null : null,
     subjectGoals:
-      evaluationScope === "BY_SUBJECT"
+      individual
         ? subjectGoals.map((item) => ({
             ...item,
-            goal: Number(item.goal),
+            goal: Number(subjectGoalDrafts[item.subjectExternalId] ?? item.goal),
             resultUnit: periodScope === "CURRENT_PERIOD" ? item.goalUnit : item.resultUnit,
           }))
         : [],
     subjects:
       evaluationScope === "BY_SUBJECT"
-        ? subjectGoals.map(({ subjectExternalId, subjectCode, subjectLabel }) => ({ subjectExternalId, subjectCode, subjectLabel }))
+        ? (contributing ? contributorSubjects : subjectGoals).map(({ subjectExternalId, subjectCode, subjectLabel }) => ({ subjectExternalId, subjectCode, subjectLabel }))
         : [],
-    groupGoal: evaluationScope === "BY_SUBJECT" ? groupGoal : null,
+    groupGoal: null,
     resultSemantics: analysis?.resultSemantics?.value ?? null,
     evaluationTypeCode: confirmedEvaluation,
     comparisonDirection: analysis?.comparison?.direction ?? null,
@@ -908,7 +921,7 @@ export function SetKpiConfigPage() {
               mutationError.code === "POOL_OVERRIDE_STALE"
             ? "These settings changed while you were editing. Reload the page before trying again."
             : mutationError instanceof ApiError
-              ? mutationError.message
+              ? configurationErrorMessage(mutationError)
               : "KPI Configuration could not be saved.",
       );
     },
@@ -1037,19 +1050,32 @@ export function SetKpiConfigPage() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    setShowGoalErrors(true);
+    const pendingGoal = (event.currentTarget as HTMLFormElement).querySelector<HTMLElement>('[data-goal-invalid="true"]');
+    if (pendingGoal) {
+      pendingGoal.scrollIntoView({behavior: "smooth", block: "center"});
+      pendingGoal.focus({preventScroll: true});
+      showValidationToast("Completa la meta y su unidad de medida en el campo marcado en rojo.");
+      return;
+    }
     setError("");
     setResultUnitErrorVisible(false);
     if (!selected) {
       showValidationToast("Select a KPI Definition before saving.");
       return;
     }
-    if (!inputFrequencyCode || (evaluationScope === "OVERALL" && !measurementUnit) || !dataSource) {
+    if (!inputFrequencyCode || (!individual && !measurementUnit) || !dataSource) {
+      const missingFields = [
+        !inputFrequencyCode && "Measurement Frequency",
+        !individual && !measurementUnit && "Official Result Unit",
+        !dataSource && "Data Source",
+      ].filter(Boolean);
       showValidationToast(
-        "Complete Measurement Frequency, Measurement Unit and Data Source before saving.",
+        `Complete ${missingFields.join(", ")} before saving.`,
       );
       return;
     }
-    if (evaluationScope === "OVERALL" && goalType === "SINGLE_VALUE" && !isValidGoalNumber(goal)) {
+    if (!individual && goalType === "SINGLE_VALUE" && !isValidGoalNumber(goal)) {
       showValidationToast("Enter a valid numeric Goal before saving.");
       return;
     }
@@ -1070,12 +1096,14 @@ export function SetKpiConfigPage() {
       );
       return;
     }
+    if (contributing && !contributorSubjects.length) { showValidationToast("Select at least one contributor."); return; }
+    
     if (evaluationScope === "BY_SUBJECT" && !subjectType) {
       showValidationToast("Select a Subject Type before saving.");
       return;
     }
     if (
-      evaluationScope === "BY_SUBJECT" &&
+      individual &&
       (!subjectGoals.length ||
         (goalAssignment === "DIFFERENT_GOAL_PER_SUBJECT" &&
           subjectGoals.some(
@@ -1090,11 +1118,11 @@ export function SetKpiConfigPage() {
       );
       return;
     }
-    if (evaluationScope === "OVERALL" && !goalUnit && periodScope === "CURRENT_PERIOD") {
+    if (!individual && !(goalUnit || measurementUnit) && periodScope === "CURRENT_PERIOD") {
       showValidationToast("Select a Goal / Target Unit before saving.");
       return;
     }
-    if (evaluationScope === "BY_SUBJECT" && subjectGoals.some(row => !row.goalUnit || (periodScope !== "CURRENT_PERIOD" && (row.goalUnit !== "%" || !row.resultUnit || row.resultUnit === "%")))) {
+    if (individual && subjectGoals.some(row => !row.goalUnit || (periodScope !== "CURRENT_PERIOD" && (row.goalUnit !== "%" || !row.resultUnit || row.resultUnit === "%")))) {
       showValidationToast("Select a Goal Unit for every entity and an actual Result Unit for historical targets.");
       return;
     }
@@ -1104,7 +1132,7 @@ export function SetKpiConfigPage() {
       goalUnit || measurementUnit,
     );
     if (
-      evaluationScope === "OVERALL" && historicalPercentageTarget &&
+      !individual && historicalPercentageTarget &&
       (!measurementUnit || measurementUnit === "%")
     ) {
       setResultUnitErrorVisible(true);
@@ -1169,6 +1197,10 @@ export function SetKpiConfigPage() {
       return;
     }
     setError("");
+    if (editMode !== "POOL_PERIOD_EDIT" && !monitoringProfile.ready) {
+      showValidationToast("Completa y confirma las reglas de evaluacion para Monitoring antes de guardar.");
+      return;
+    }
     if (editMode === "CREATE") saveMutation.mutate();
     else if (editMode === "GLOBAL_EDIT") {
       setImpactSaveRequested(true);
@@ -1328,7 +1360,7 @@ export function SetKpiConfigPage() {
         </section>
       )}
 
-      <form className="config-form" onSubmit={submit}>
+      <form className={`config-form ${showGoalErrors ? "show-goal-errors" : ""}`} onSubmit={submit}>
         <section className="config-card definition-step-card">
           <div className="config-section-heading">
             <span className="step-number">1</span>
@@ -1484,6 +1516,7 @@ export function SetKpiConfigPage() {
 
         {editMode !== "POOL_PERIOD_EDIT" && (
           <KpiSemanticSetup
+            showGoalErrors={showGoalErrors}
             periodScope={periodScope}
             setPeriodScope={setPeriodScope}
             evaluationScope={evaluationScope}
@@ -1498,15 +1531,30 @@ export function SetKpiConfigPage() {
               );
               if (value === "OVERALL") setGroupGoal(null);
             }}
-            goalAssignment={goalAssignment}
+            entityEvaluationMode={entityEvaluationMode}
+            setEntityEvaluationMode={(mode) => {
+              setEntityEvaluationMode(mode);
+              setGoalAssignment("DIFFERENT_GOAL_PER_SUBJECT");
+              setGroupGoal(null);
+              if (mode === "CONTRIBUTE_TO_OVERALL") {
+                if (!contributorSubjects.length) setContributorSubjects(subjectGoals.map(({subjectExternalId,subjectCode,subjectLabel}) => ({subjectExternalId,subjectCode,subjectLabel})));
+                setResultMethod("DIRECT"); setCalculationTemplate(null); setMeasurementInputs([]);
+                if (periodScope === "CURRENT_PERIOD") setMeasurementUnit(goalUnit || measurementUnit);
+                else setGoalUnit("%");
+              }
+            }}
+            contributorSubjects={contributorSubjects}
+            setContributorSubjects={setContributorSubjects}
+            goalAssignment="DIFFERENT_GOAL_PER_SUBJECT"
             setGoalAssignment={setGoalAssignment}
             goal={goal}
             setGoal={setGoal}
             goalUnit={goalUnit || measurementUnit}
-            setGoalUnit={setGoalUnit}
+            setGoalUnit={(value) => { setGoalUnit(value); if (contributing && periodScope === "CURRENT_PERIOD") setMeasurementUnit(value); }}
             resultUnit={measurementUnit}
             setResultUnit={(value) => {
               setMeasurementUnit(value);
+              if (contributing && periodScope === "CURRENT_PERIOD") setGoalUnit(value);
               setResultUnitErrorVisible(false);
               setResultUnitToastVisible(false);
             }}
@@ -1530,6 +1578,7 @@ export function SetKpiConfigPage() {
             dataSource={dataSource}
             setDataSource={setDataSource}
             units={measurementUnitOptions}
+            subjectTypes={subjectTypesQuery.data?.filter(type => type.isActive)}
             subjects={(lookupsQuery.data?.subjectCatalogs ?? []).map(
               (item) => ({
                 id: item.id,
@@ -2393,7 +2442,7 @@ export function SetKpiConfigPage() {
                 type="submit"
                 className="button primary"
                 disabled={
-                  saveMutation.isPending || (editMode !== "POOL_PERIOD_EDIT" && !monitoringProfile.ready) ||
+                  saveMutation.isPending ||
                   (editMode === "POOL_PERIOD_EDIT" && !poolHasChanges)
                 }
               >
@@ -2939,6 +2988,16 @@ export function SetKpiConfigPage() {
       )}
     </main>
   );
+}
+
+function configurationErrorMessage(error: ApiError): string {
+  if (error.code !== "VALIDATION_ERROR" || !error.details || typeof error.details !== "object") return error.message;
+  const details = error.details as { fieldErrors?: Record<string, unknown>; formErrors?: unknown };
+  const messages = Object.entries(details.fieldErrors ?? {}).flatMap(([field, errors]) =>
+    Array.isArray(errors) ? errors.filter((message): message is string => typeof message === "string").map(message => `${field}: ${message}`) : [],
+  );
+  if (Array.isArray(details.formErrors)) messages.push(...details.formErrors.filter((message): message is string => typeof message === "string"));
+  return messages.length ? `No se pudo guardar la configuración. ${messages.join(" · ")}` : error.message;
 }
 
 function normalizeAutocompleteText(value: string) {

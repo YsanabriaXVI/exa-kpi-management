@@ -1,3 +1,4 @@
+import { recoverMonitoringClosure } from "../clients/monitoring-closure.client.js";
 import type { InputPeriod } from "../domain/input-period.js";
 import { formatDateOnly } from "../domain/input-period.js";
 import { prisma } from "../config/prisma.js";
@@ -15,10 +16,16 @@ export interface MonitoringPeriodStatusProvider {
   getStatus(poolId: bigint, period: InputPeriod): Promise<MonitoringClosureStatus>;
 }
 
-// Safe foundation until Monitoring exposes an authoritative REST contract or projection.
-// It deliberately never assumes that an unknown period is closed.
+// Recover a missing projection from Monitoring; never infer closure from calendar dates.
 const persistedMonitoringProvider: MonitoringPeriodStatusProvider = {
-  async getStatus(poolId, period) { const closure=await prisma.monitoringPeriodClosureReference.findFirst({where:{kpiPoolId:poolId,periodKey:formatDateOnly(period.start).slice(0,7)}}); return closure ? closure.closureType==="WITH_EXCEPTIONS" ? "CLOSED_WITH_APPROVED_EXCEPTION" : "CLOSED" : "OPEN"; },
+  async getStatus(poolId, period) {
+    const input=await prisma.kpiPoolInputPeriod.findUnique({where:{kpiPoolId_periodStart:{kpiPoolId:poolId,periodStart:period.start}}});
+    if(!input)return "UNKNOWN";
+    const where={kpiPoolId_poolInputPeriodExternalId:{kpiPoolId:poolId,poolInputPeriodExternalId:input.id}};
+    let closure=await prisma.monitoringPeriodClosureReference.findUnique({where});
+    if(!closure && await recoverMonitoringClosure(poolId,input)) closure=await prisma.monitoringPeriodClosureReference.findUnique({where});
+    return closure ? closure.closureType==="WITH_EXCEPTIONS" ? "CLOSED_WITH_APPROVED_EXCEPTION" : "CLOSED" : "OPEN";
+  },
 };
 
 export const periodFinalizationGateway = {

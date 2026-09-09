@@ -1,3 +1,5 @@
+import { contributionContractError, isContributingEvaluation } from "../contracts/entity-participation.js";
+import { sumContributorResults } from "./contributor-results.js";
 import { calculateDivision, divisionDefinition } from "./result-calculation.js";
 import { baselineContext } from "./historical-baseline.service.js";
 import { evaluationUnits } from "../contracts/evaluation-units.js";
@@ -12,6 +14,8 @@ function entryBlock(input: any): string | null {
   if (input.evaluationKindSnapshot === "GROUP") return "GROUP_RESULT_RUNTIME_UNSUPPORTED";
   const frozen = input.effectiveSettingsSnapshot;
   if (frozen?.executability?.executable === false) return "KPI_CONFIGURATION_NOT_EXECUTABLE";
+  const contributionError = contributionContractError(frozen);
+  if (contributionError) return contributionError;
   if (historicalContractError(frozen)) return "HISTORICAL_CONTRACT_INVALID";
   return null;
 }
@@ -37,13 +41,17 @@ function serialize(row: any) {
     scorecardCode: input.scorecard.scorecardCodeSnapshot,
     scorecardName: input.scorecard.scorecardNameSnapshot,
     kpiConfigurationId: input.kpiConfigurationExternalId.toString(),
-    configCode: input.evaluationKindSnapshot === "OVERALL" ? input.configCodeSnapshot : `${input.configCodeSnapshot}:${input.subjectCodeSnapshot ?? input.subjectExternalIdSnapshot ?? "GROUP"}`,
-    kpiCode: input.evaluationKindSnapshot === "OVERALL" ? input.kpiCodeSnapshot : `${input.kpiCodeSnapshot} · ${input.subjectLabelSnapshot}`,
+    configCode: input.evaluationKindSnapshot !== "ENTITY" ? input.configCodeSnapshot : `${input.configCodeSnapshot}:${input.subjectCodeSnapshot ?? input.subjectExternalIdSnapshot ?? "GROUP"}`,
+    kpiCode: input.evaluationKindSnapshot !== "ENTITY" ? input.kpiCodeSnapshot : `${input.kpiCodeSnapshot} · ${input.subjectLabelSnapshot}`,
     kpiName: input.kpiNameSnapshot,
     parentKpiCode: input.kpiCodeSnapshot,
     weight: input.weightPercentSnapshot?.toString() ?? null,
     goalUnit: evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).goalUnit?.symbol ?? null,
     groupGoal: input.effectiveSettingsSnapshot?.groupGoal ?? null,
+    entityEvaluationMode: input.effectiveSettingsSnapshot?.entityEvaluationMode ?? (input.evaluationKindSnapshot === "ENTITY" ? "INDIVIDUAL" : null),
+    entityAggregation: isContributingEvaluation(input.effectiveSettingsSnapshot) ? "SUM" : null,
+    contributors: isContributingEvaluation(input.effectiveSettingsSnapshot) ? (input.effectiveSettingsSnapshot.subjects ?? []).map((s: any) => ({...s, subjectType: input.effectiveSettingsSnapshot.subjectType})) : [],
+    contributorValues: isContributingEvaluation(input.effectiveSettingsSnapshot) ? input.result?.inputValues?.contributors ?? [] : [],
     entryBlock: entryBlock(input),
     periodScope: input.effectiveSettingsSnapshot?.periodScope ?? null,
     comparisonDirection: input.effectiveSettingsSnapshot?.comparisonDirection ?? null,
@@ -57,7 +65,7 @@ function serialize(row: any) {
     resultMethod: input.effectiveSettingsSnapshot?.resultMethod ?? "DIRECT",
     resultSemantics: input.effectiveSettingsSnapshot?.resultSemantics ?? null,
     measurementInputs: divisionDefinition(input.effectiveSettingsSnapshot),
-    inputValues: input.result?.inputValues ?? null,
+    inputValues: isContributingEvaluation(input.effectiveSettingsSnapshot) ? null : input.result?.inputValues ?? null,
     resultCalculation: divisionDefinition(input.effectiveSettingsSnapshot) ? { errorCode: calculateDivision(input.result?.inputValues).errorCode } : null,
     comment: input.result?.comment ?? null,
     version: input.result?.version ?? null,
@@ -134,7 +142,7 @@ function sameDecimal(left: Prisma.Decimal | null, right: Prisma.Decimal | null) 
   return left === null ? right === null : right !== null && left.equals(right);
 }
 function sameInputs(left: unknown, right: unknown) {
-  const pair = (value: any) => value == null ? null : [value.numerator ?? null, value.denominator ?? null];
+  const pair = (value: any) => value == null ? null : value.aggregation === "SUM" ? value.contributors : [value.numerator ?? null, value.denominator ?? null];
   return JSON.stringify(pair(left)) === JSON.stringify(pair(right));
 }
 
@@ -178,12 +186,18 @@ export const resultEntryService = {
         const blocked = entryBlock(input);
         if (blocked) throw new AppError(409, blocked, "This frozen evaluation does not support Manual Result Entry V1");
         const settings = input.effectiveSettingsSnapshot as any;
+        const contributing = isContributingEvaluation(settings);
+        if (!contributing && change.contributorValues) throw new AppError(422, "CONTRIBUTOR_INPUTS_NOT_ALLOWED", "This evaluation has no contributor inputs");
+        if (contributing && (change.inputValues || change.resultValue !== null)) throw new AppError(422, "OFFICIAL_RESULT_READ_ONLY", "The official Result is the SUM of contributor values");
+        if (contributing && !change.contributorValues) throw new AppError(422, "CONTRIBUTOR_INPUTS_REQUIRED", "Send the frozen contributor values, leaving missing results null");
+        const contribution = contributing ? sumContributorResults(settings, change.contributorValues) : null;
+        if (contribution?.errorCode && contribution.errorCode !== "CONTRIBUTOR_RESULT_MISSING") throw new AppError(422, contribution.errorCode, "Enter one valid result or null for each frozen contributor");
         const division = divisionDefinition(settings);
         if (settings?.resultMethod === "CALCULATED_FROM_INPUTS" && !division) throw new AppError(422, "RESULT_METHOD_NOT_SUPPORTED", "Only an ordered division of two inputs is supported");
         if (division && !change.inputValues) throw new AppError(422, "RESULT_INPUTS_REQUIRED", "Enter the numerator and denominator, leaving missing values null");
         if (!division && change.inputValues) throw new AppError(422, "RESULT_INPUTS_NOT_ALLOWED", "This evaluation requires a direct Result");
-        const nextInputs = division ? change.inputValues! : null;
-        const nextValue = division ? calculateDivision(nextInputs).value : change.resultValue === null ? null : new Prisma.Decimal(change.resultValue);
+        const nextInputs = contribution ? { aggregation: "SUM", contributors: contribution.values } : division ? change.inputValues! : null;
+        const nextValue = contribution ? contribution.value : division ? calculateDivision(change.inputValues!).value : change.resultValue === null ? null : new Prisma.Decimal(change.resultValue);
         if (!division && settings?.resultSemantics === "BINARY" && nextValue !== null && !nextValue.eq(0) && !nextValue.eq(1)) throw new AppError(422, "BINARY_RESULT_INVALID", "Select Yes (1) or No (0)");
         const nextComment = input.result?.comment ?? null;
         if (change.comment !== undefined && change.comment !== nextComment) throw new AppError(422, "RESULT_ONLY_EDITABLE", "Only Result can be edited in Manual Entry V1");

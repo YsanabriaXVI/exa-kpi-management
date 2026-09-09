@@ -1,22 +1,16 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Search, Settings2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { kpiPoolService } from "./kpi-pool.service";
 import { PoolOverviewMultiSelect } from "./PoolOverviewMultiSelect";
 import { SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
-import { OverviewDeleteConfirmation } from "../../components/OverviewDeleteConfirmation";
 import { scorecardService } from "../scorecards/scorecard.service";
 import "./kpi-pool.css";
 
 export function KpiPoolOverview() {
-  const [hiddenPoolIds, setHiddenPoolIds] = useState<Set<number>>(() => {
-    try { return new Set<number>(JSON.parse(window.localStorage.getItem("exa:kpi-pools:hidden-overview") ?? "[]")); }
-    catch { return new Set<number>(); }
-  });
-  const [poolToHide, setPoolToHide] = useState<{ id: number; code: string } | null>(null);
   const [pageSize, setPageSize] = useState(10);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -31,11 +25,11 @@ export function KpiPoolOverview() {
   const listParams = { page, pageSize, ...(search.trim() ? { search: search.trim() } : {}), ...(companiesSelected.length ? { companyId: companiesSelected } : {}), ...(statuses.length ? { status: statuses } : {}), ...(frequenciesSelected.length ? { inputFrequencyId: frequenciesSelected } : {}), ...(yearsSelected.length ? { issueYear: yearsSelected } : {}), sortBy: apiSortBy[sort.key], sortOrder: sort.direction } as const;
   const poolsQuery = useQuery({ queryKey: ["kpi-pools", "list", listParams], queryFn: () => kpiPoolService.listPage(listParams) });
   const paginated = poolsQuery.data?.data ?? [];
-  const visiblePools = paginated.filter((pool) => !hiddenPoolIds.has(pool.id));
+  const visiblePools = paginated;
   const usageTargets = visiblePools.flatMap((pool) => pool.operationalPeriod?.status === "FINALIZED" ? [{ poolId: String(pool.id), periodKey: pool.operationalPeriod.periodKey }] : []);
   const usageQuery = useQuery({ queryKey: ["scorecard-pool-usage", usageTargets], queryFn: () => scorecardService.poolUsageBatch(usageTargets), enabled: usageTargets.length > 0 });
   const usageByPeriod = new Map((usageQuery.data ?? []).map((usage) => [`${usage.poolId}:${usage.periodKey}`, usage.scorecardsUsing]));
-  const totalItems = Math.max(0, (poolsQuery.data?.meta.totalItems ?? 0) - hiddenPoolIds.size);
+  const totalItems = poolsQuery.data?.meta.totalItems ?? 0;
   const totalPages = Math.max(1, poolsQuery.data?.meta.totalPages ?? 1);
   const pageStart = (page - 1) * pageSize;
   const currentYear = new Date().getFullYear();
@@ -47,15 +41,6 @@ export function KpiPoolOverview() {
   const sortBy = (key: PoolSortKey) => {
     setSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" }));
     setPage(1);
-  };
-  const hidePool = (id: number) => {
-    setHiddenPoolIds((current) => {
-      const next = new Set(current); next.add(id);
-      window.localStorage.setItem("exa:kpi-pools:hidden-overview", JSON.stringify([...next]));
-      return next;
-    });
-    if (visiblePools.length === 1 && page > 1) setPage(page - 1);
-    setPoolToHide(null);
   };
 
   return (
@@ -77,6 +62,7 @@ export function KpiPoolOverview() {
         <PoolOverviewMultiSelect label="All years" options={years.map((item) => ({ value: item, label: item }))} selected={yearsSelected} onChange={setYearsSelected} />
       </section>
 
+      {poolsQuery.isError && <div className="pool-form-error" role="alert">{poolsQuery.error instanceof Error ? poolsQuery.error.message : "No se pudieron cargar los pools."} <button type="button" className="button secondary" onClick={() => void poolsQuery.refetch()}>Reintentar</button></div>}
       <div className="kpi-table-wrap pool-table-wrap stable-table-shell">
         <table className="kpi-table pool-table">
           <thead><tr>
@@ -106,10 +92,9 @@ export function KpiPoolOverview() {
                 <button className="icon-button edit" title="Edit" aria-label={`Edit ${pool.code}`} onClick={() => navigate(`/app/pool-kpis/create-pool-info?poolId=${pool.id}`)}><Pencil size={15} /></button>
                 <button className="icon-button configure" title="Manage KPIs" onClick={() => navigate(`/app/pool-kpis/manage-kpis?poolId=${pool.id}&source=overview`)}><Settings2 size={15} /></button>
                 <button className="icon-button view" title="View Details" aria-label={`View details for ${pool.code}`} onClick={() => navigate(`/app/pool-kpis/detail/${pool.id}`)}><Eye size={15} /></button>
-                <button className="icon-button delete" title="Delete" aria-label={`Delete ${pool.code}`} onClick={() => setPoolToHide({ id: pool.id, code: pool.code })}><Trash2 size={15} /></button>
               </div></td>
             </tr>
-          )) : <tr><td colSpan={10} className="table-message">No KPI Pools match the selected filters.</td></tr>}</tbody>
+          )) : <tr><td colSpan={10} className="table-message">{poolsQuery.isError ? "No se pudo cargar el listado. Reintenta arriba." : "No KPI Pools match the selected filters."}</td></tr>}</tbody>
         </table>
         <footer className="pool-results">
           <span>Showing <strong>{totalItems ? pageStart + 1 : 0}-{Math.min(pageStart + visiblePools.length, totalItems)}</strong> of <strong>{totalItems}</strong> pools</span>
@@ -117,7 +102,6 @@ export function KpiPoolOverview() {
           <PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="KPI Pool pagination" className="pool-pagination" />
         </footer>
       </div>
-      {poolToHide && <OverviewDeleteConfirmation title="Remove KPI Pool from Overview?" message={`${poolToHide.code} will be hidden from this Overview only. The Pool and its database history will remain unchanged.`} onAccept={() => hidePool(poolToHide.id)} onCancel={() => setPoolToHide(null)} />}
     </main>
   );
 }

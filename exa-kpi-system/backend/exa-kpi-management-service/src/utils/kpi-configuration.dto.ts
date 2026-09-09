@@ -15,6 +15,7 @@ export function toKpiConfigurationDto(record: RecordWithRelations) {
     calculationPattern: revision?.calculationPattern ?? null,
     calculationTemplate: revision?.calculationTemplate ?? null,
     evaluationScope: revision?.evaluationScope ?? (revision?.goalMode === "BY_SUBJECT" ? "BY_SUBJECT" : "OVERALL"),
+    entityEvaluationMode: revision?.evaluationScope === "BY_SUBJECT" || revision?.goalMode === "BY_SUBJECT" ? revision?.entityEvaluationMode ?? "INDIVIDUAL" : null,
     goalType: revision?.goalType ?? (revision?.goalMode === "RANGE" ? "RANGE" : "SINGLE_VALUE"),
     goalAssignment: revision?.goalAssignment ?? (revision?.goalMode === "BY_SUBJECT" ? "DIFFERENT_GOAL_PER_SUBJECT" : null),
     goalUnit: (revision?.goalUnit ?? revision?.measurementUnit ?? record.measurementUnit).symbol,

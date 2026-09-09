@@ -10,15 +10,18 @@ export function PeriodWorkflow({ data, disabled, onAction }: {
   const [reason, setReason] = useState("");
   const period = data.monitoringPeriod;
   const current = data.check?.status === "CURRENT";
-  const exceptions = data.summary.pending > 0;
+  const manualBaselines = data.check?.findings.filter(f => f.code === "MANUAL_BASELINE_USED").length ?? 0;
+  const exceptions = data.summary.pending > 0 || manualBaselines > 0;
   const exceptionReady = current && exceptions && data.check?.summary?.readyForSubmitWithExceptions === true;
   const ready = current && (data.check?.summary?.readyForSubmit === true || exceptionReady);
   const labels = { submit: exceptionReady ? "Submit with Exceptions" : "Submit Results", approve: exceptionReady ? "Approve with Exceptions" : "Approve Results", "return-for-correction": "Return for Correction", close: exceptions ? "Close with Exceptions" : "Close Period" };
   const needsReason = action === "return-for-correction" || (action !== null && exceptions);
   return <section className="check-results-review" aria-label="Period workflow">
     <h2>Period workflow</h2><p>Draft → Submitted → Validated → Closed</p>
+    {manualBaselines > 0 && <p>{manualBaselines} manual baseline(s) require explicit exception approval and justification. Calculated scores are preserved.</p>}
+    {period.status === "VALIDATED" && period.validationStatus === "VALIDATED_WITH_EXCEPTIONS" && <p>Validated with Exceptions</p>}
     {period.returnReason && <p>Return reason: {period.returnReason}</p>}
-    {exceptionReady && <p>{data.summary.pending} missing Results require an explicit exception and justification. Affected Scorecards remain incomplete.</p>}
+    {exceptionReady && data.summary.pending > 0 && <p>{data.summary.pending} missing Results require an explicit exception and justification. Affected Scorecards remain incomplete.</p>}
     {period.status === "DRAFT" && <><p>{ready ? "Saved Results are ready for review." : "Run Check Results and resolve blocking findings before submitting."}</p><button className="entry-primary" disabled={disabled || !ready} onClick={() => setAction("submit")}>{labels.submit}</button></>}
     {period.status === "SUBMITTED" && <><button className="entry-primary" disabled={disabled || !ready} onClick={() => setAction("approve")}>{labels.approve}</button><button className="entry-secondary" disabled={disabled} onClick={() => setAction("return-for-correction")}>{labels["return-for-correction"]}</button></>}
     {period.status === "VALIDATED" && <button className="entry-primary" disabled={disabled || !ready} onClick={() => setAction("close")}>{labels.close}</button>}

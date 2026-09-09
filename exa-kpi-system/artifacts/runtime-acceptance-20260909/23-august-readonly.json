@@ -1,0 +1,1 @@
+﻿{"endpoint":"http://localhost:4004/api/v1/monitoring-periods/37/result-entry/save-changes","request":{"resultsVersion":1,"changes":[{"monitoringPeriodInputId":"76","version":1,"resultValue":"90"}]},"status":409,"response":"{\"error\":{\"code\":\"MONITORING_PERIOD_NOT_DRAFT\",\"message\":\"Results can only be changed while the Monitoring Period is DRAFT\"}}","method":"POST"}

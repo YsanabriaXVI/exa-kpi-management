@@ -2,10 +2,11 @@ import type { HistoricalContext } from "./HistoricalBaseline";
 import type { DivisionValues } from "./DivisionResultInput";
 import type { CheckReport } from "./CheckResultsReview";
 import { monitoringRequest, type ResultEntryInput, type ResultEntryResponse } from "./monitoring-results.service";
+export type ContributorValue = { subjectType: string; subjectExternalId: string; resultValue: string | null };
 export type ManualEntryResponse = Omit<ResultEntryResponse, "inputs" | "monitoringPeriod" | "summary"> & {
   check?: CheckReport;
   monitoringPeriod: ResultEntryResponse["monitoringPeriod"] & { baselineVersion?: number; resultsVersion: number; selectedEntryMethod: string | null };
-  inputs: Array<ResultEntryInput & { resultMethod?: string; resultSemantics?: string | null; measurementInputs?: Array<{name:string;unit:string}> | null; inputValues?: DivisionValues | null; resultCalculation?: {errorCode:string|null} | null; historical?: HistoricalContext; periodScope?: string | null; comparisonDirection?: string | null; parentKpiCode: string; weight: string | null; goalUnit: string | null; groupGoal: { value: string; unit: string; label: string } | null; entryBlock: string | null }>;
+  inputs: Array<ResultEntryInput & { entityEvaluationMode?: "INDIVIDUAL" | "CONTRIBUTE_TO_OVERALL" | null; entityAggregation?: "SUM" | null; contributors?: Array<{subjectType:string;subjectExternalId:string;subjectCode:string|null;subjectLabel:string}>; contributorValues?: ContributorValue[]; resultMethod?: string; resultSemantics?: string | null; measurementInputs?: Array<{name:string;unit:string}> | null; inputValues?: DivisionValues | null; resultCalculation?: {errorCode:string|null} | null; historical?: HistoricalContext; periodScope?: string | null; comparisonDirection?: string | null; parentKpiCode: string; weight: string | null; goalUnit: string | null; groupGoal: { value: string; unit: string; label: string } | null; entryBlock: string | null }>;
   summary: { expected: number; entered: number; pending: number; completionPercent: number };
 };
 async function request(id: string, body?: unknown): Promise<ManualEntryResponse> {
@@ -15,5 +16,5 @@ export const manualResultEntryService = {
   workflow: (id: string, action: "submit" | "approve" | "return-for-correction" | "close", version: number, details: { reason?: string; withExceptions?: boolean; justification?: string | null } = {}) => monitoringRequest<ManualEntryResponse>(`/v1/monitoring-periods/${id}/${action}`, { method: "POST", body: JSON.stringify({ version, ...details }) }),
   check: (id:string, expectedResultsVersion:number,expectedBaselineVersion?:number) => monitoringRequest<ManualEntryResponse>(`/v1/monitoring-periods/${id}/check-results`,{method:"POST",body:JSON.stringify({expectedResultsVersion,expectedBaselineVersion})}),
   get: (id:string) => request(id),
-  save: (id:string, resultsVersion:number, changes:Array<{monitoringPeriodInputId:string;resultValue:string|null;version:number|null;inputValues?:DivisionValues}>) => request(id,{resultsVersion,changes}),
+  save: (id:string, resultsVersion:number, changes:Array<{monitoringPeriodInputId:string;resultValue:string|null;version:number|null;inputValues?:DivisionValues;contributorValues?:ContributorValue[]}>) => request(id,{resultsVersion,changes}),
 };

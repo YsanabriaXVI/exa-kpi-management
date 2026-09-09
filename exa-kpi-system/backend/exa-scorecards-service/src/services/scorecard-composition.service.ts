@@ -1,3 +1,4 @@
+import { isIndividualEvaluation } from "../contracts/entity-participation.js";
 import { freezeWeightedSettings, entityWeights, type EntityWeight } from "../contracts/evaluation-weights.js";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -122,7 +123,9 @@ async function assignmentDto(value: FullComposition, poolId: bigint) {
     const row = value.kpis.find(row => row.id.toString() === item.id)!;
     const resolved = await kpiPoolClient.effectiveSettings(poolId.toString(), value.poolPeriodExternalId!.toString(), item.kpiConfigurationExternalId);
     item.evaluationScope = resolved.effective.evaluationScope;
-    item.evaluations = resolved.effective.evaluationScope === "BY_SUBJECT" ? entityWeights(resolved.effective, (row.entityWeights ?? []) as EntityWeight[], false) : [];
+    item.evaluations = isIndividualEvaluation(resolved.effective) ? entityWeights(resolved.effective, (row.entityWeights ?? []) as EntityWeight[], false) : [];
+    if (resolved.effective.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL") item.goal = resolved.effective.goal;
+    item.entityEvaluationMode = resolved.effective.entityEvaluationMode ?? (resolved.effective.evaluationScope === "BY_SUBJECT" ? "INDIVIDUAL" : null);
     item.groupGoal = resolved.effective.groupGoal ?? null;
     item.goalUnit = resolved.effective.goalUnit.symbol;
     item.resultUnit = resolved.effective.measurementUnit.symbol;
@@ -143,6 +146,7 @@ function dto(value: FullComposition) {
       id: row.id.toString(), poolMembershipExternalId: row.kpiPoolMembershipExternalId.toString(),
       kpiDefinitionExternalId: row.kpiDefinitionExternalId.toString(), kpiConfigurationExternalId: row.kpiConfigurationExternalId.toString(),
       definitionCode: row.definitionCodeSnapshot, definitionName: row.definitionNameSnapshot,
+      entityEvaluationMode: (row.effectiveSettingsSnapshot as any)?.entityEvaluationMode ?? ((row.effectiveSettingsSnapshot as any)?.evaluationScope === "BY_SUBJECT" ? "INDIVIDUAL" : null),
       evaluationScope: (row.effectiveSettingsSnapshot as any)?.evaluationScope as string | undefined,
       evaluations: ((row.effectiveSettingsSnapshot as any)?.evaluationWeightsVersion === "EXPLICIT_ENTITY_V1" ? (row.effectiveSettingsSnapshot as any).subjectGoals : []) as Array<{subjectExternalId:string;subjectCode:string|null;subjectLabel:string;goal:string|null;goalUnit?:{symbol:string};resultUnit?:{symbol:string};weight:string|null}>,
       groupGoal: (row.effectiveSettingsSnapshot as any)?.groupGoal ?? null,
@@ -223,7 +227,7 @@ export const scorecardCompositionService = {
           await tx.scorecardPeriodDepartmentScope.deleteMany({ where: { scorecardPeriodCompositionId: target.id } });
           for (const department of source.scopeDepartments) await tx.scorecardPeriodDepartmentScope.create({ data: { scorecardPeriodCompositionId: target.id, externalDepartmentId: department.externalDepartmentId, externalCompanyId: department.externalCompanyId, departmentCodeSnapshot: department.departmentCodeSnapshot, departmentNameSnapshot: department.departmentNameSnapshot, displayOrder: department.displayOrder, createdByUserId: actor, employees: { create: department.employees.map(employee => ({ externalEmployeeId: employee.externalEmployeeId, employeeCodeSnapshot: employee.employeeCodeSnapshot, employeeNameSnapshot: employee.employeeNameSnapshot, createdByUserId: actor })) } } });
         }
-        for (const { row, membership, frozen } of selections) await tx.scorecardPeriodKpi.create({ data: { scorecardPeriodCompositionId: target.id, kpiPoolMembershipExternalId: membership.poolMembershipExternalId, kpiDefinitionExternalId: membership.kpiDefinitionExternalId, kpiConfigurationExternalId: membership.kpiConfigurationExternalId, kpiPoolExternalId: poolId, periodKey: targetPeriodKey, definitionCodeSnapshot: membership.definitionCode, definitionNameSnapshot: membership.definitionName, configurationCodeSnapshot: membership.configurationCode, categoryNameSnapshot: membership.categoryName, goalSnapshot: frozen.goal, dataSourceSnapshot: membership.dataSourceSnapshot, measurementUnitSnapshot: membership.measurementUnitSnapshot, weightPercent: row.weightPercent, entityWeights: frozen.evaluationScope === "BY_SUBJECT" ? (frozen.subjectGoals as Array<{ subjectExternalId: string; weight: string }>).map(({ subjectExternalId, weight }) => ({ subjectExternalId, weight })) : Prisma.DbNull, displayOrder: row.displayOrder, createdByUserId: actor } });
+        for (const { row, membership, frozen } of selections) await tx.scorecardPeriodKpi.create({ data: { scorecardPeriodCompositionId: target.id, kpiPoolMembershipExternalId: membership.poolMembershipExternalId, kpiDefinitionExternalId: membership.kpiDefinitionExternalId, kpiConfigurationExternalId: membership.kpiConfigurationExternalId, kpiPoolExternalId: poolId, periodKey: targetPeriodKey, definitionCodeSnapshot: membership.definitionCode, definitionNameSnapshot: membership.definitionName, configurationCodeSnapshot: membership.configurationCode, categoryNameSnapshot: membership.categoryName, goalSnapshot: frozen.goal, dataSourceSnapshot: membership.dataSourceSnapshot, measurementUnitSnapshot: membership.measurementUnitSnapshot, weightPercent: row.weightPercent, entityWeights: isIndividualEvaluation(frozen) ? (frozen.subjectGoals as Array<{ subjectExternalId: string; weight: string }>).map(({ subjectExternalId, weight }) => ({ subjectExternalId, weight })) : Prisma.DbNull, displayOrder: row.displayOrder, createdByUserId: actor } });
         for (const link of source.links) await tx.scorecardPeriodLink.create({ data: { scorecardPeriodCompositionId: target.id, linkedScorecardId: link.linkedScorecardId, weightPercent: link.weightPercent, displayOrder: link.displayOrder, createdByUserId: actor } });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     }
@@ -435,8 +439,8 @@ export const scorecardCompositionService = {
         const row = current.kpis.find(row => row.kpiConfigurationExternalId.toString() === item.kpiConfigurationExternalId);
         if (!row) throw new AppError(422, "SCORECARD_KPI_NOT_FOUND", "A KPI weight targets an item outside this composition");
         const resolved = await kpiPoolClient.effectiveSettings(owner.kpiPoolExternalId.toString(), current.poolPeriodExternalId!.toString(), item.kpiConfigurationExternalId);
-        const entities = resolved.effective.evaluationScope === "BY_SUBJECT" ? entityWeights(resolved.effective, item.entityWeights ?? (row.entityWeights ?? []) as EntityWeight[], false) : null;
-        if (!entities && item.entityWeights?.length) throw new AppError(422, "SCORECARD_ENTITY_NOT_FOUND", "OVERALL has no entity weights");
+        const entities = isIndividualEvaluation(resolved.effective) ? entityWeights(resolved.effective, item.entityWeights ?? (row.entityWeights ?? []) as EntityWeight[], false) : null;
+        if (!entities && item.entityWeights?.length) throw new AppError(422, "SCORECARD_ENTITY_NOT_FOUND", "This KPI uses one official weight and has no entity weights");
         await tx.scorecardPeriodKpi.updateMany({ where: { id: row.id }, data: { entityWeights: entities ? entities.map(({subjectExternalId, weight}) => ({subjectExternalId, weight})) : Prisma.DbNull, weightPercent: entities ? entities.reduce((sum, entity) => sum.plus(entity.weight ?? 0), new Prisma.Decimal(0)) : new Prisma.Decimal(item.weight) } });
       }
       for (const item of input.linkedScorecards) if (!(await tx.scorecardPeriodLink.updateMany({ where: { scorecardPeriodCompositionId: current.id, linkedScorecardId: BigInt(item.linkedScorecardId) }, data: { weightPercent: new Prisma.Decimal(item.weight) } })).count) throw new AppError(422, "LINKED_SCORECARD_NOT_FOUND", "A linked weight targets an item outside this composition");
@@ -459,7 +463,7 @@ export const scorecardCompositionService = {
     }));
     const total = current.kpis.reduce((sum, row) => {
       const frozen = frozenSettings.get(row.id.toString())!;
-      return sum.plus(frozen.evaluationScope === "BY_SUBJECT" ? (frozen.subjectGoals as Array<{weight:string}>).reduce((subtotal, entity) => subtotal.plus(entity.weight), new Prisma.Decimal(0)) : row.weightPercent);
+      return sum.plus(isIndividualEvaluation(frozen) ? (frozen.subjectGoals as Array<{weight:string}>).reduce((subtotal, entity) => subtotal.plus(entity.weight), new Prisma.Decimal(0)) : row.weightPercent);
     }, current.links.reduce((sum, row) => sum.plus(row.weightPercent), new Prisma.Decimal(0)));
     if (!total.equals(new Prisma.Decimal("100.0000"))) throw new AppError(422, "SCORECARD_WEIGHT_TOTAL_INVALID", "KPI and Linked Scorecard weights must total exactly 100.0000", { total: total.toFixed(4) });
     return prisma.$transaction(async (tx) => {
@@ -470,7 +474,7 @@ export const scorecardCompositionService = {
       for (const row of current.kpis) {
         const resolved = resolvedSettings.get(row.id.toString())!;
         const frozen=frozenSettings.get(row.id.toString())!;
-        await tx.scorecardPeriodKpi.update({ where: { id: row.id }, data: { kpiConfigurationRevisionExternalId: BigInt(resolved.effective.kpiConfigurationRevisionId), goalSnapshot: resolved.effective.goal, effectiveSettingsSnapshot: frozen as Prisma.InputJsonValue, settingsProvenanceSnapshot: resolved.sources as Prisma.InputJsonValue } });
+        await tx.scorecardPeriodKpi.update({ where: { id: row.id }, data: { kpiConfigurationRevisionExternalId: BigInt(resolved.effective.kpiConfigurationRevisionId), goalSnapshot: resolved.effective.goal, ...(frozen.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? { entityWeights: Prisma.DbNull } : {}), effectiveSettingsSnapshot: frozen as Prisma.InputJsonValue, settingsProvenanceSnapshot: resolved.sources as Prisma.InputJsonValue } });
       }
       const changed = await tx.scorecardPeriodComposition.updateMany({ where: { id: current.id, statusCode: "PREPARING" }, data: { statusCode: "FINALIZED", finalizedAt: new Date(), finalizedByUserId: actor, updatedByUserId: actor } });
       if (!changed.count) throw new AppError(409, "SCORECARD_COMPOSITION_ALREADY_FINALIZED", "The composition is no longer editable");

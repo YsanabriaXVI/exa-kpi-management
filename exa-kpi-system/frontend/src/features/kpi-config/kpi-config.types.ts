@@ -1,6 +1,7 @@
 export type KpiConfigStatus = "CONFIGURED" | "INCOMPLETE" | "INACTIVE";
 export type PeriodScope = "CURRENT_PERIOD" | "SAME_PERIOD_PREVIOUS_YEAR" | "PREVIOUS_PERIOD";
 export type GoalMode = "SINGLE" | "RANGE" | "BY_SUBJECT";
+export type EntityEvaluationMode = "INDIVIDUAL" | "CONTRIBUTE_TO_OVERALL";
 export type EvaluationScope = "OVERALL" | "BY_SUBJECT";
 export type GoalType = "SINGLE_VALUE" | "RANGE";
 export type GoalAssignment = "SAME_GOAL_FOR_ALL" | "DIFFERENT_GOAL_PER_SUBJECT";
@@ -8,7 +9,7 @@ export type ResultMethod = "DIRECT" | "CALCULATED_FROM_INPUTS";
 export type MeasurementInput = { name: string; unit: string; description: string };
 export type CalculationTemplate = "DIVIDE" | "PERCENT_RATIO" | "SUM" | "AVERAGE" | "DIFFERENCE";
 export type TargetKind = "ABSOLUTE_TARGET" | "CHANGE_TARGET" | "UPPER_LIMIT" | "LOWER_LIMIT" | "DEADLINE";
-export type SubjectType = "FLEET" | "EMPLOYEE" | "CUSTOMER" | "LOCATION" | "DEPARTMENT" | "COMPANY" | "OPERATION" | "PROJECT" | "ASSET";
+export type SubjectType = string;
 export type SubjectGoal = { subjectExternalId: string; subjectCode?: string | null; subjectLabel: string; goal: number; goalUnit?: string; resultUnit?: string };
 export type SubjectSelection = Omit<SubjectGoal, "goal" | "goalUnit" | "resultUnit">;
 export type GroupGoal = { value: number; unit: string; label: string };
@@ -26,7 +27,7 @@ export type KpiConfigRecord = {
   evaluationTypeCode?: string | null;
   resultSemantics?: string | null;
   scoringMethod?: string | null;
-  scoringRuleConfig?: { bandMode?: "STEP_POINTS" | "LINEAR_POINTS"; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult: number; maxResult?: number; compliance: number; includesMin?: boolean; includesMax?: boolean }> } | null;
+  scoringRuleConfig?: { bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "INTERVALS"; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult: number | null; maxResult?: number | null; compliance: number; includesMin?: boolean; includesMax?: boolean }> } | null;
   negativeResultPolicy?: string | null;
   id: number;
   code: string;
@@ -44,6 +45,7 @@ export type KpiConfigRecord = {
   goalMode?: GoalMode;
   evaluationScope?: EvaluationScope;
   goalType?: GoalType;
+  entityEvaluationMode?: EntityEvaluationMode | null;
   goalAssignment?: GoalAssignment | null;
   goalUnit?: string;
   resultMethod?: ResultMethod;
@@ -82,6 +84,7 @@ export type KpiConfigInput = {
   goalMode: GoalMode;
   evaluationScope: EvaluationScope;
   goalType: GoalType;
+  entityEvaluationMode?: EntityEvaluationMode | null;
   goalAssignment?: GoalAssignment | null;
   goalUnit?: string;
   resultMethod: ResultMethod;

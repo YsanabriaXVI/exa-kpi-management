@@ -35,6 +35,7 @@ export const saveResultEntryBodySchema = z.object({
   changes: z.array(z.object({
     monitoringPeriodInputId: id,
     resultValue: decimalValue,
+    contributorValues: z.array(z.object({ subjectType: z.string().min(1), subjectExternalId: z.string().min(1), resultValue: decimalValue }).strict()).min(1).max(500).optional(),
     inputValues: z.object({ numerator: decimalValue, denominator: decimalValue }).strict().optional(),
     comment: z.string().max(10_000).nullable().optional(),
     version: z.number().int().positive().nullable(),

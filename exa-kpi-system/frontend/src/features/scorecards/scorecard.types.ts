@@ -107,7 +107,7 @@ export type ScorecardComposition = {
     dataSource: string | null;
     measurementUnit: string | null;
     weight: string;
-    evaluationScope?: string;
+    entityEvaluationMode?: "INDIVIDUAL" | "CONTRIBUTE_TO_OVERALL" | null; evaluationScope?: string;
     goalUnit?: string;
     resultUnit?: string;
     evaluations?: Array<{subjectExternalId:string;subjectCode:string|null;subjectLabel:string;goal:string|null;goalUnit?:{symbol:string};resultUnit?:{symbol:string};weight:string|null}>;

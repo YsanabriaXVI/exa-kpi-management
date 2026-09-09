@@ -38,9 +38,10 @@ export function CreateScorecardInfo() {
   const formActionsRef = useRef<HTMLElement>(null);
   const poolsQuery = useQuery({
     queryKey: ["kpi-pools", "scorecard-source", "DRAFT_ACTIVE"],
-    queryFn: () => kpiPoolService.listPage({ page: 1, pageSize: 100, status: ["DRAFT", "ACTIVE"], sortBy: "poolName", sortOrder: "asc" }).then((response) => {
-      return response.data.filter((pool) => (pool.kpiCount ?? 0) > 0);
-    }),
+    queryFn: () => kpiPoolService.list().then((pools) =>
+      pools.filter((pool) => pool.status === "DRAFT" || pool.status === "ACTIVE")
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    ),
     staleTime: 0,
     refetchOnMount: "always",
   });

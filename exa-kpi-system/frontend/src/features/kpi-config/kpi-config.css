@@ -3639,7 +3639,7 @@ html[data-theme="dark"] .goal-clear-all-button {
 .ratio-setup-modal .division-input-definitions > div { padding: 16px; border: 1px solid var(--ems-border); border-radius: 12px; background: var(--ems-surface-muted); }
 .ratio-setup-modal label { display: grid; gap: 8px; font-size: 13px; font-weight: 600; }
 .ratio-setup-modal input, .ratio-setup-modal select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid var(--ems-border); border-radius: 8px; background-color: var(--ems-surface); color: var(--ems-text); font: inherit; font-weight: 400; }
-.ratio-setup-modal select, .official-result-unit-field select { appearance: none; padding-right: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%231680a5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; cursor: pointer; }
+.ratio-setup-modal select, .official-result-unit-field select, .band-mode-field select { appearance: none; padding-right: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%231680a5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; cursor: pointer; }
 .ratio-setup-modal input:focus, .ratio-setup-modal select:focus { outline: 2px solid #1680a5; outline-offset: 2px; }
 .ratio-setup-modal .ratio-official-unit { box-sizing: border-box; max-width: 320px; padding: 14px; border: 1px solid var(--ems-border); border-radius: 12px; background: var(--ems-surface-muted); }
 .ratio-setup-modal .ratio-official-unit > span { color: #1680a5; }
@@ -3692,7 +3692,174 @@ html[data-theme="dark"] .goal-clear-all-button {
 .simple-result-bands .result-band-row label:nth-child(2) { position: relative; }
 .simple-result-bands .result-band-row label:nth-child(2)::after { content: '%'; position: absolute; right: 23px; top: 50%; transform: translateY(-50%); color: var(--ems-muted); pointer-events: none; }
 .simple-result-bands .result-band-row label:nth-child(2) input { padding-right: 35px; }
+.interval-result-bands .bands-table-heading,
+.interval-result-bands .result-band-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(90px, .7fr) 48px;
+}
+.interval-result-bands .result-band-row label:nth-child(2)::after { content: none; }
+.interval-result-bands .result-band-row label:nth-child(2) input { padding-right: 12px; }
+.interval-result-bands .result-band-row select {
+  width: 100%;
+  min-width: 0;
+  margin-top: 6px;
+  padding: 6px 2px;
+}
+@media (max-width: 700px) {
+  .interval-result-bands .bands-table-heading { display: none; }
+  .interval-result-bands .result-band-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .interval-result-bands .result-band-row label > span { display: block; }
+}
 .bands-format-badge { display: inline-flex; padding: 5px 10px; margin-right: 8px; border: 1px solid #7dd3fc; border-radius: 20px; background: #e0f2fe; color: #075985; font-size: 12px; font-weight: 650; }
 .bands-format-hint { font-size: 12px; color: var(--ems-muted); }
 .bands-preview-panel .band-traffic { display: inline-flex; align-items: center; min-width: 16px; min-height: 16px; }
 .bands-preview-panel .band-traffic i { display: inline-block; flex: 0 0 15px; min-width: 15px; min-height: 15px; }
+
+/* Pending selections and committed values in KPI configuration. */
+.set-kpi-config-page label > span { font-weight: 750; }
+.set-kpi-config-page input::placeholder { color: #788391; font-weight: 400; opacity: 1; }
+.set-kpi-config-page select.config-select-selected { color: #096b86; font-weight: 700; }
+.set-kpi-config-page select.config-select-pending { color: #788391; font-weight: 400; border: 1px solid #dc2626; background-color: #fff7f7; }
+.set-kpi-config-page .config-select-required { display: block; color: #b91c1c; font-size: 12px; font-weight: 500; }
+.set-kpi-config-page select option { color: var(--ems-text); background: var(--ems-surface); font-weight: 400; }
+.set-kpi-config-page select option:checked { font-weight: 700; }
+html[data-theme="dark"] .set-kpi-config-page select.config-select-selected { color: #67d8ef; }
+html[data-theme="dark"] .set-kpi-config-page select.config-select-pending { background-color: #38252b; color: #a7b0be; border-color: #f87171; }
+html[data-theme="dark"] .set-kpi-config-page .config-select-required { color: #fca5a5; }
+
+/* Compact band mode control with space around the field. */
+.set-kpi-config-page .result-bands-editor .band-mode-field {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 280px);
+  margin: 24px 0 28px;
+}
+.set-kpi-config-page .result-bands-editor .band-mode-field > span {
+  font-size: 14px;
+  font-weight: 750;
+}
+.set-kpi-config-page .result-bands-editor .band-mode-field > select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  margin: 0;
+  padding: 9px 40px 9px 12px;
+  border: 1px solid var(--ems-border);
+  border-radius: 7px;
+  background-color: var(--ems-surface);
+  color: var(--ems-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Space the Result unit label, selection, and guidance independently. */
+.set-kpi-config-page .official-result-unit-field {
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+.set-kpi-config-page .official-result-unit-field > label {
+  display: grid;
+  gap: 10px;
+}
+.set-kpi-config-page .official-result-unit-field > label > span,
+.set-kpi-config-page .official-result-unit-field > label > small {
+  margin: 0;
+  line-height: 1.5;
+}
+.set-kpi-config-page .official-result-unit-field select {
+  min-height: 44px;
+}
+.set-kpi-config-page .band-mode-field > select:focus-visible {
+  outline: 2px solid #1680a5;
+  outline-offset: 2px;
+}
+
+/* Explicit intervals: readable controls and a schematic preview per band. */
+.set-kpi-config-page .interval-result-bands .bands-layout { grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr); gap: 24px; }
+.set-kpi-config-page .interval-result-bands .result-band-row { align-items: start; }
+.set-kpi-config-page .interval-result-bands .result-band-row label { padding: 12px; }
+.set-kpi-config-page .interval-result-bands .result-band-row select { min-height: 36px; padding: 7px; font-size: 12px; color: var(--ems-text); border: 1px solid var(--ems-border); border-radius: 6px; background-color: var(--ems-surface-muted); }
+.set-kpi-config-page .interval-result-bands .delete-band-button { margin-top: 12px; }
+.interval-row-help { grid-column: 1 / -1; display: grid; gap: 6px; padding: 9px 14px 12px; color: var(--ems-muted); background: var(--ems-surface-muted); font-size: 12px; line-height: 1.6; border-top: 1px dashed var(--ems-border); }
+.interval-row-help .field-error { color: #b91c1c; font-size: 12px; }
+.set-kpi-config-page .interval-visual-preview .interval-legend { font-size: 11px; line-height: 1.7; }
+.set-kpi-config-page .interval-visual-preview ul { border: 0; display: grid; gap: 12px; }
+.set-kpi-config-page .interval-visual-preview li.interval-preview-item { display: block; padding: 14px; border: 1px solid var(--ems-border); border-left: 4px solid var(--interval-color); border-radius: 9px; background: var(--ems-surface); }
+.interval-color-red { --interval-color: #dc2626; }
+.interval-color-yellow { --interval-color: #ca8a04; }
+.interval-color-green { --interval-color: #16a34a; }
+.interval-color-unconfigured { --interval-color: #94a3b8; }
+.interval-preview-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; font-size: 12px; line-height: 1.5; }
+.interval-preview-heading > strong { overflow-wrap: anywhere; }
+.interval-compliance { font-size: 17px; white-space: nowrap; }
+.interval-mini-bar { display: flex; align-items: center; margin-top: 18px; color: var(--interval-color); }
+.interval-line { flex: 1; height: 4px; background: currentColor; opacity: .7; }
+.interval-endpoint { box-sizing: border-box; width: 14px; height: 14px; border: 2px solid currentColor; border-radius: 50%; flex: 0 0 14px; }
+.interval-endpoint.closed { background: currentColor; }
+.interval-endpoint.open { background: var(--ems-surface); }
+.interval-endpoint.unbounded { border: 0; display: grid; place-content: center; font-size: 22px; }
+.interval-endpoint-labels { display: flex; justify-content: space-between; gap: 16px; margin-top: 8px; font-size: 12px; color: var(--ems-muted); }
+.interval-preview-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; font-size: 11px; color: var(--ems-muted); }
+.set-kpi-config-page .interval-preview-footer .band-traffic { font-size: 11px; }
+@media (max-width: 1050px) { .set-kpi-config-page .interval-result-bands .bands-layout { grid-template-columns: minmax(0, 1fr); } }
+
+.set-kpi-config-page .show-goal-errors [data-goal-invalid="true"] {
+  border: 2px solid #dc2626;
+  background-color: #fff7f7;
+  outline-color: #dc2626;
+}
+html[data-theme="dark"] .set-kpi-config-page .show-goal-errors [data-goal-invalid="true"] {
+  border-color: #f87171;
+  background-color: #38252b;
+}
+
+/* Keep both quick-fill controls aligned even when the unit has a hint. */
+.set-kpi-config-page .entity-quick-fill > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+}
+.set-kpi-config-page .entity-quick-fill .quick-fill-field {
+  display: grid;
+  grid-template-rows: 20px 44px auto;
+  gap: 8px;
+  margin: 0;
+}
+.set-kpi-config-page .entity-quick-fill .quick-fill-field > span { margin: 0; line-height: 20px; }
+.set-kpi-config-page .entity-quick-fill .quick-fill-field input,
+.set-kpi-config-page .entity-quick-fill .quick-fill-field select { box-sizing: border-box; height: 44px; margin: 0; }
+.set-kpi-config-page .entity-quick-fill .quick-fill-checkbox { margin-top: 28px; }
+@media (max-width: 700px) {
+  .set-kpi-config-page .entity-quick-fill > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .set-kpi-config-page .entity-quick-fill .quick-fill-checkbox { grid-column: 1 / -1; margin-top: 0; }
+}
+
+.set-kpi-config-page .expected-entity-results-badge {
+  justify-self: start;
+  min-height: 0;
+  max-width: 100%;
+  padding: 6px 10px;
+  gap: 10px;
+  border-radius: 7px;
+}
+.set-kpi-config-page .expected-entity-results-badge > span { font-size: 11px; }
+.set-kpi-config-page .expected-entity-results-badge > strong { font-size: 14px; line-height: 1.3; }
+
+.monitoring-status-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.monitoring-status-heading h3 { margin: 0; font-size: 16px; }
+.monitoring-status-badge { padding: 5px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; background: var(--ems-surface-muted); color: var(--ems-muted); }
+.monitoring-status-badge.ready { color: #166534; background: #dcfce7; }
+.expected-change-suggestion { margin: 6px 0 16px; font-size: 12px; color: var(--ems-muted); line-height: 1.5; }
+
+.set-kpi-config-page .expected-change-row { align-items: start; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.set-kpi-config-page .expected-change-row .explained-select { grid-template-rows: 20px 44px; align-content: start; }
+.set-kpi-config-page .expected-change-row .explained-select-label { line-height: 20px; }
+.set-kpi-config-page .expected-change-row .explained-select-trigger { box-sizing: border-box; height: 44px; min-height: 44px; }
+.set-kpi-config-page .expected-change-row .explained-select-trigger > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set-kpi-config-page .expected-change-row .explained-select-trigger > svg { flex-shrink: 0; }
+
+.global-contribution-rule { margin: 12px 0 20px; padding: 16px 18px; border: 1px solid var(--ems-border); border-left: 4px solid #1680a5; border-radius: 9px; background: var(--ems-surface-muted); font-size: 13px; line-height: 1.6; }
+.global-contribution-rule > strong { font-size: 14px; }
+.global-contribution-rule p { margin: 8px 0; }
+.global-contribution-rule small { display: block; color: var(--ems-muted); font-size: 12px; }

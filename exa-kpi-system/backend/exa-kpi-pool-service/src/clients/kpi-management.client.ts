@@ -1,3 +1,4 @@
+import { entityParticipationFields, contributionContractError } from "../contracts/entity-participation.js";
 import { historicalFields, historicalContractError } from "../contracts/historical-contract.js";
 import { z } from "zod";
 import { env } from "../config/env.js";
@@ -9,7 +10,7 @@ const configurationSchema = z.object({
   definitionIsActive: z.boolean(), inputFrequencyId: z.string(), inputFrequencyCode: z.string(), inputFrequencyName: z.string(),
   inputFrequencyIsActive: z.boolean(), status: z.string(), isActive: z.boolean(),
   categoryName: z.string().optional(), measurementUnit: z.string().optional(), dataSource: z.string().optional(), goal: z.string().nullable().optional(),
-  evaluationScope: z.enum(["OVERALL", "BY_SUBJECT"]).optional(), goalUnit: z.string().optional(), subjectGoalCount: z.number().int().nonnegative().optional(), groupGoal: z.object({ value: z.string(), unit: z.string() }).nullable().optional(),
+  ...entityParticipationFields, evaluationScope: z.enum(["OVERALL", "BY_SUBJECT"]).optional(), goalUnit: z.string().optional(), subjectGoalCount: z.number().int().nonnegative().optional(), groupGoal: z.object({ value: z.string(), unit: z.string() }).nullable().optional(),
   executability: z.object({ capabilityVersion:z.literal("KPI_EXECUTION_V1"),status:z.enum(["EXECUTABLE","BLOCKED"]),executable:z.boolean(),reasons:z.array(z.object({code:z.string(),message:z.string()})) }).nullable().optional(),
 });
 const catalogConfigurationSchema = configurationSchema.extend({
@@ -19,7 +20,7 @@ const metaSchema = z.object({ page: z.number(), pageSize: z.number(), totalItems
 const batchResponseSchema = z.object({ data: z.array(configurationSchema), notFoundIds: z.array(z.string()) });
 const catalogResponseSchema = z.object({ data: z.array(catalogConfigurationSchema), meta: metaSchema });
 const effectiveSnapshotSchema = z.object({
-  contractVersion: z.literal("EffectiveKpiSettingsV1"),...historicalFields,
+  contractVersion: z.literal("EffectiveKpiSettingsV1"),...historicalFields,...entityParticipationFields,
   kpiConfigurationId: z.string(), kpiConfigurationRevisionId: z.string(), revisionNumber: z.number(), configCode: z.string(),
   kpiDefinitionId: z.string().optional(), evaluationScope: z.enum(["OVERALL","BY_SUBJECT"]).optional(),
   goalUnit: z.object({id:z.string(),code:z.string(),name:z.string(),symbol:z.string()}).optional(),
@@ -61,6 +62,7 @@ export const kpiManagementClient = {
     const parsed = z.object({ data: z.array(effectiveSnapshotSchema).length(1) }).safeParse(payload);
     if (!parsed.success) throw new AppError(502, "KPI_MANAGEMENT_INVALID_RESPONSE", "KPI Management returned an invalid effective snapshot");
     const snapshot = parsed.data.data[0]!;
+    if (contributionContractError(snapshot)) throw new AppError(502, "CONTRIBUTION_CONTRACT_INVALID", "Invalid contributor snapshot");
     if (historicalContractError(snapshot)) throw new AppError(502, "HISTORICAL_CONTRACT_INVALID", "Incomplete historical effective contract");
     return snapshot;
   },

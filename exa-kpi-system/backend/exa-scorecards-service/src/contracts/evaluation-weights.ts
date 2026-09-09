@@ -1,3 +1,4 @@
+import { isIndividualEvaluation } from "./entity-participation.js";
 import { Prisma } from "@prisma/client";
 import { AppError } from "../utils/app-error.js";
 import { freezeEffectiveKpiSettings, type EffectiveKpiSettingsV1 } from "./frozen-effective-kpi-settings.js";
@@ -7,8 +8,8 @@ export function freezeWeightedSettings(settings: EffectiveKpiSettingsV1, entries
   const frozen = structuredClone(freezeEffectiveKpiSettings(settings));
   return {
     ...frozen,
-    ...(settings.evaluationScope === "BY_SUBJECT" ? { evaluationWeightsVersion: "EXPLICIT_ENTITY_V1" } : {}),
-    subjectGoals: settings.evaluationScope === "BY_SUBJECT" ? structuredClone(entityWeights(settings, entries)) : [],
+    ...(isIndividualEvaluation(settings) ? { evaluationWeightsVersion: "EXPLICIT_ENTITY_V1" } : {}),
+    subjectGoals: isIndividualEvaluation(settings) ? structuredClone(entityWeights(settings, entries)) : [],
   };
 }
 export function entityWeights(settings: EffectiveKpiSettingsV1, entries: EntityWeight[], requireComplete = true) {

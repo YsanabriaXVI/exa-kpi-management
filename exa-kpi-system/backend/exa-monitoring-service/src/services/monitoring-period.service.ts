@@ -4,6 +4,7 @@ import { kpiPoolClient } from "../clients/kpi-pool.client.js";
 import { scorecardsClient } from "../clients/scorecards.client.js";
 import type { MaterializeMonitoringPeriodBody } from "../schemas/monitoring-period.schema.js";
 import { AppError } from "../utils/app-error.js";
+import { isIndividualEvaluation, isContributingEvaluation } from "../contracts/entity-participation.js";
 import {parseFrozenEffectiveKpiSettings} from "../contracts/frozen-effective-kpi-settings.js";
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 const label = (value: string) =>
@@ -227,12 +228,12 @@ export const monitoringPeriodService = {
           let displayOrder = 0;
           for (const { scorecard, assignment } of assignments) {
             const snapshot = byConfiguration.get(assignment.kpiConfigurationId)!;
-            const entityEvaluations = snapshot.evaluationScope === "BY_SUBJECT"
+            const entityEvaluations = isIndividualEvaluation(snapshot)
               ? snapshot.subjectGoals.map((subject) => ({ kind: "ENTITY" as const, goal: subject.goal, subject, unit: subject.resultUnit ?? snapshot.measurementUnit }))
               : [];
             const evaluations = entityEvaluations.length
               ? entityEvaluations
-              : [{ kind: "OVERALL" as const, goal: snapshot.goal, subject: null, unit: snapshot.measurementUnit }];
+              : [{ kind: isContributingEvaluation(snapshot) ? "CONTRIBUTED" as const : "OVERALL" as const, goal: snapshot.goal, subject: null, unit: snapshot.measurementUnit }];
             for (const evaluation of evaluations) {
             await tx.monitoringPeriodInput.create({
               data: {

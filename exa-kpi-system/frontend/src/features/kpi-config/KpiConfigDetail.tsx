@@ -101,7 +101,7 @@ export function KpiConfigDetail() {
         <div className="measurement-values">
           <div><span>Measurement Unit</span><strong className={isUnconfigured ? "no-data-value" : ""}>{isUnconfigured ? "No Data" : config.measurementUnit}</strong></div>
           <div><span>Data Source</span><strong className={isUnconfigured ? "no-data-value" : ""}>{isUnconfigured ? "No Data" : config.dataSource}</strong></div>
-          <div><span>Goal</span>{isUnconfigured ? <strong className="no-data-value">No Data</strong> : config.evaluationScope === "BY_SUBJECT" ? <EntityGoalsSummary count={config.subjectGoals?.length ?? 0} subjectType={config.subjectType} groupGoal={config.groupGoal} onView={() => setEntityGoalsOpen(true)}/> : <strong>{config.goal}</strong>}</div>
+          <div><span>Goal</span>{config.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" && <strong>{config.goal} {config.goalUnit}</strong>}{isUnconfigured ? <strong className="no-data-value">No Data</strong> : config.evaluationScope === "BY_SUBJECT" ? <EntityGoalsSummary entityEvaluationMode={config.entityEvaluationMode} count={config.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? config.subjects?.length ?? 0 : config.subjectGoals?.length ?? 0} subjectType={config.subjectType} groupGoal={config.groupGoal} onView={() => setEntityGoalsOpen(true)}/> : <strong>{config.goal}</strong>}</div>
         </div>
       </section>
 
@@ -150,7 +150,7 @@ export function KpiConfigDetail() {
       </div>
 
       <footer className="config-detail-actions"><button className="button secondary" onClick={() => navigate(openedFromPool ? (openedFromPoolDetail ? `/app/pool-kpis/detail/${requestedPoolId}` : `/app/pool-kpis/manage-kpis?poolId=${requestedPoolId}`) : "/app/kpi-management/config/overview")}><ArrowLeft size={15} /> {openedFromPool ? (openedFromPoolDetail ? "Back to KPI Pool Detail" : "Back to Manage KPIs") : "Back to KPI Config Overview"}</button></footer>
-      {entityGoalsOpen && <EntityGoalsModal data={{configCode:config.code,kpiCode:config.definitionCode,kpiName:config.definitionName,subjectType:config.subjectType,subjectGoals:config.subjectGoals ?? [],groupGoal:config.groupGoal,goalUnit:config.goalUnit,resultUnit:config.measurementUnit,historical:config.periodScope !== "CURRENT_PERIOD"}} onClose={() => setEntityGoalsOpen(false)}/>}
+      {entityGoalsOpen && <EntityGoalsModal data={{entityEvaluationMode:config.entityEvaluationMode,subjects:config.subjects,goal:config.goal,configCode:config.code,kpiCode:config.definitionCode,kpiName:config.definitionName,subjectType:config.subjectType,subjectGoals:config.subjectGoals ?? [],groupGoal:config.groupGoal,goalUnit:config.goalUnit,resultUnit:config.measurementUnit,historical:config.periodScope !== "CURRENT_PERIOD"}} onClose={() => setEntityGoalsOpen(false)}/>}
       </>}
     </main>
   );

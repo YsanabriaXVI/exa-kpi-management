@@ -52,7 +52,7 @@ type AvailabilityApiRecord = {
   definitionName: string;
   categoryName: string;
   goal: string | null;
-  evaluationScope?: "OVERALL" | "BY_SUBJECT";
+  entityEvaluationMode?: "INDIVIDUAL" | "CONTRIBUTE_TO_OVERALL" | null; evaluationScope?: "OVERALL" | "BY_SUBJECT";
   goalUnit?: string;
   subjectGoalCount?: number;
   groupGoal?: { value: string; unit: string } | null;
@@ -64,6 +64,10 @@ type AvailabilityApiRecord = {
   conflictingConfigurationCode?: string | null;
 };
 type MembershipApiRecord = {
+  evaluationScope?: "OVERALL" | "BY_SUBJECT";
+  entityEvaluationMode?: "INDIVIDUAL" | "CONTRIBUTE_TO_OVERALL" | null;
+  subjectGoalCount?: number;
+  groupGoal?: {value:string;unit:string} | null;
   configurationId: string;
   definitionId: string;
   configCode: string;
@@ -655,11 +659,12 @@ export const kpiPoolService = {
       kpiCode: value.definitionCode,
       name: value.definitionName,
       category: value.categoryName,
-      goal: value.evaluationScope === "BY_SUBJECT" ? `By Entity · ${value.subjectGoalCount ?? 0} goals${value.groupGoal ? ` · Group ${Number(value.groupGoal.value).toLocaleString("en-US")} ${value.groupGoal.unit}` : ""}` : value.goal ?? "—",
+      goal: value.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? `By Entity / Contributes to Overall / Target ${value.goal ?? "-"}` : value.evaluationScope === "BY_SUBJECT" ? `By Entity · ${value.subjectGoalCount ?? 0} goals${value.groupGoal ? ` · Group ${Number(value.groupGoal.value).toLocaleString("en-US")} ${value.groupGoal.unit}` : ""}` : value.goal ?? "—",
       measurementUnit: value.measurementUnit,
       dataSource: value.dataSource,
       status: value.isActive ? "ACTIVE" : "INACTIVE",
       evaluationScope: value.evaluationScope,
+      entityEvaluationMode: value.entityEvaluationMode,
       subjectGoalCount: value.subjectGoalCount,
       groupGoal: value.groupGoal,
       availability:
@@ -781,7 +786,8 @@ export const kpiPoolService = {
       kpiCode: value.definitionCode,
       name: value.definitionName,
       category: value.categoryName ?? "Not specified",
-      goal: value.goal ?? "Not specified",
+      goal: value.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? "By Entity / Contributes to Overall / Target " + (value.goal ?? "-") : value.goal ?? "Not specified",
+      evaluationScope: value.evaluationScope, entityEvaluationMode: value.entityEvaluationMode, subjectGoalCount: value.subjectGoalCount, groupGoal: value.groupGoal,
       measurementUnit: value.measurementUnit ?? "Not specified",
       dataSource: value.dataSource ?? "Not specified",
       status: value.isActive ? "ACTIVE" : "INACTIVE",

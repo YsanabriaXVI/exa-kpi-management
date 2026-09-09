@@ -56,6 +56,7 @@ function membershipDto(value: KpiPoolKpi, configuration?: KpiManagementConfigura
     inputFrequencyId: value.inputFrequencyExternalIdSnapshot.toString(), inputFrequencyCode: value.inputFrequencyCodeSnapshot,
     displayOrder: value.displayOrder, isRequired: value.isRequired,
     effectiveFrom: formatDateOnly(value.effectiveFrom), effectiveTo: value.effectiveTo ? formatDateOnly(value.effectiveTo) : null,
+    evaluationScope: configuration?.evaluationScope, entityEvaluationMode: configuration?.entityEvaluationMode, subjectGoalCount: configuration?.subjectGoalCount, groupGoal: configuration?.groupGoal,
     categoryName: configuration?.categoryName ?? null, goal: effectiveGoal ?? configuration?.goal ?? null,
     measurementUnit: configuration?.measurementUnit ?? null, dataSource: configuration?.dataSource ?? null,
     isActive: configuration?.isActive ?? true,

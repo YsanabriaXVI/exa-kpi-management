@@ -24,14 +24,14 @@ export function historicalContractError(value: any): string | null {
     && thresholds.every((t:any,i:number)=>!Number.isNaN(t.min)&&!Number.isNaN(t.max)&&t.min<t.max
       && (i===0 || thresholds[i-1].max<t.min || thresholds[i-1].max===t.min && !(thresholds[i-1].includesMax&&t.includesMin)));
   const subjects = Array.isArray(value.subjectGoals) ? value.subjectGoals : [];
-  const units = value.evaluationScope === "BY_SUBJECT" ? subjects.map((s: any) => ({goal: s?.goalUnit ?? value.goalUnit, result: s?.resultUnit ?? value.measurementUnit})) : [{goal: value.goalUnit, result: value.measurementUnit}];
-  const goals = value.evaluationScope === "BY_SUBJECT" ? subjects.map((s: any) => s?.goal) : [value.goal];
+  const units = value.evaluationScope === "BY_SUBJECT" && value.entityEvaluationMode !== "CONTRIBUTE_TO_OVERALL" ? subjects.map((s: any) => ({goal: s?.goalUnit ?? value.goalUnit, result: s?.resultUnit ?? value.measurementUnit})) : [{goal: value.goalUnit, result: value.measurementUnit}];
+  const goals = value.evaluationScope === "BY_SUBJECT" && value.entityEvaluationMode !== "CONTRIBUTE_TO_OVERALL" ? subjects.map((s: any) => s?.goal) : [value.goal];
   if (!z.object(historicalFields).safeParse(value).success
     || !["PREVIOUS_PERIOD","SAME_PERIOD_PREVIOUS_YEAR"].includes(value.periodScope)
     || value.comparisonMode !== value.periodScope || value.targetKind !== "CHANGE_TARGET"
     || !["INCREASE","REDUCTION"].includes(value.comparisonDirection)
     || value.historicalCapabilityVersion !== "HISTORICAL_COMPARISON_V1"
-    || !trafficValid || !["GREATER_IS_BETTER","HIGHER_IS_BETTER","LOWER_IS_BETTER"].includes(value.evaluationType?.code)
+    || !trafficValid || !["GREATER_IS_BETTER","HIGHER_IS_BETTER","LOWER_IS_BETTER","ZERO_IS_BETTER"].includes(value.evaluationType?.code)
     || !value.inputFrequency || !goals.length || !goals.every(positive)
     || units.some((u: any) => u.goal?.symbol !== "%" || !u.result?.code || u.result?.symbol === "%") || !value.resultSemantics
     || !["PROPORTIONAL", "RESULT_BANDS"].includes(value.scoringMethod) || value.scoringApprovalStatus !== "APPROVED"

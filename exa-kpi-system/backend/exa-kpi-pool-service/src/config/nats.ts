@@ -1,87 +1,49 @@
-import {
-  connect,
-  type JetStreamClient,
-  type NatsConnection,
-  StorageType,
-} from "nats";
+import { connect, StorageType, type JetStreamClient, type NatsConnection } from "nats";
 import { env } from "./env.js";
 import { logger } from "./logger.js";
-
 export type NatsConnectionState = "disabled" | "connecting" | "connected" | "degraded" | "closed";
-
 class NatsManager {
-  private connection?: NatsConnection;
-  private jetStreamClient?: JetStreamClient;
-  private state: NatsConnectionState = env.NATS_ENABLED ? "closed" : "disabled";
-  private lastError?: string;
-  private connectionPromise?: Promise<void>;
-
-  get status(): { state: NatsConnectionState; lastError?: string } {
-    return { state: this.state, ...(this.lastError ? { lastError: this.lastError } : {}) };
+  private connection?:NatsConnection;
+  private client?:JetStreamClient;
+  private state:NatsConnectionState=env.NATS_ENABLED?"closed":"disabled";
+  private lastError?:string;
+  private stopped=true;
+  private timer?:NodeJS.Timeout;
+  private pending?:Promise<void>;
+  get status(){return {state:this.state,...(this.lastError?{lastError:this.lastError}:{})};}
+  get jetStream(){return this.client;}
+  async start(){
+    if(!env.NATS_ENABLED)return;
+    this.stopped=false;
+    if(!this.pending)this.pending=this.ensure().finally(()=>{this.pending=undefined;});
+    await this.pending;
   }
-
-  get jetStream(): JetStreamClient | undefined {
-    return this.jetStreamClient;
-  }
-
-  async start(): Promise<void> {
-    if (!env.NATS_ENABLED || this.connection || this.connectionPromise) return this.connectionPromise;
-
-    this.state = "connecting";
-    this.connectionPromise = this.connectInternal().finally(() => {
-      this.connectionPromise = undefined;
-    });
-    return this.connectionPromise;
-  }
-
-  private async connectInternal(): Promise<void> {
+  private async ensure(){
+    let candidate:NatsConnection|undefined;
     try {
-      const connection = await connect({
-        servers: env.NATS_URL,
-        name: env.NATS_NAME,
-        reconnect: true,
-        maxReconnectAttempts: -1,
-      });
-      const manager = await connection.jetstreamManager();
-      try {
-        await manager.streams.info(env.NATS_STREAM);
-      } catch {
-        await manager.streams.add({
-          name: env.NATS_STREAM,
-          subjects: [env.NATS_SUBJECTS],
-          storage: StorageType.File,
-        });
+      if(this.stopped||this.connection&&!this.connection.isClosed())return;
+      this.state="connecting";
+      candidate=await connect({servers:env.NATS_URL,name:env.NATS_NAME,reconnect:true,maxReconnectAttempts:-1,timeout:5000});
+      const manager=await candidate.jetstreamManager();
+      try{await manager.streams.info(env.NATS_STREAM);}catch(error){
+        if((error as {code?:string}).code!=="404")throw error;
+        await manager.streams.add({name:env.NATS_STREAM,subjects:[env.NATS_SUBJECTS],storage:StorageType.File});
       }
-
-      this.connection = connection;
-      this.jetStreamClient = connection.jetstream();
-      this.state = "connected";
-      this.lastError = undefined;
-      logger.info({ server: connection.getServer(), stream: env.NATS_STREAM }, "NATS JetStream connected");
-
-      void connection.closed().then((error) => {
-        this.connection = undefined;
-        this.jetStreamClient = undefined;
-        if (this.state !== "closed") {
-          this.state = "degraded";
-          this.lastError = error?.message ?? "NATS connection closed";
-          logger.warn({ error }, "NATS connection closed");
-        }
+      if(this.stopped){await candidate.close();return;}
+      const active=candidate;this.connection=active;this.client=active.jetstream();this.state="connected";this.lastError=undefined;
+      void active.closed().then(error=>{
+        if(this.connection!==active)return;
+        this.connection=undefined;this.client=undefined;
+        if(!this.stopped){this.state="degraded";this.lastError=error?.message??"NATS connection closed";}
       });
-    } catch (error) {
-      this.state = "degraded";
-      this.lastError = error instanceof Error ? error.message : String(error);
-      logger.warn({ error }, "NATS is unavailable; HTTP remains available and Outbox events stay pending");
+    }catch(error){
+      if(candidate)await candidate.close().catch(()=>{});
+      this.state=this.stopped?"closed":"degraded";this.lastError=error instanceof Error?error.message:String(error);
+      logger.warn({error},"NATS unavailable; automatic startup recovery will retry");
+    }finally{
+      if(!this.stopped){if(this.timer)clearTimeout(this.timer);this.timer=setTimeout(()=>void this.start(),5000);this.timer.unref();}
     }
   }
-
-  async stop(): Promise<void> {
-    this.state = env.NATS_ENABLED ? "closed" : "disabled";
-    const connection = this.connection;
-    this.connection = undefined;
-    this.jetStreamClient = undefined;
-    if (connection && !connection.isClosed()) await connection.drain();
-  }
+  async stop(){this.stopped=true;if(this.timer)clearTimeout(this.timer);await this.pending;const active=this.connection;this.connection=undefined;this.client=undefined;this.state=env.NATS_ENABLED?"closed":"disabled";if(active&&!active.isClosed())await active.drain();}
 }
-
-export const natsManager = new NatsManager();
+export const natsManager=new NatsManager();
