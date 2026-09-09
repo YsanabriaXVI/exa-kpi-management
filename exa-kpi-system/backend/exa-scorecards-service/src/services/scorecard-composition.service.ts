@@ -123,6 +123,7 @@ async function assignmentDto(value: FullComposition, poolId: bigint) {
     const resolved = await kpiPoolClient.effectiveSettings(poolId.toString(), value.poolPeriodExternalId!.toString(), item.kpiConfigurationExternalId);
     item.evaluationScope = resolved.effective.evaluationScope;
     item.evaluations = resolved.effective.evaluationScope === "BY_SUBJECT" ? entityWeights(resolved.effective, (row.entityWeights ?? []) as EntityWeight[], false) : [];
+    item.groupGoal = resolved.effective.groupGoal ?? null;
     item.goalUnit = resolved.effective.goalUnit.symbol;
     item.resultUnit = resolved.effective.measurementUnit.symbol;
   }
@@ -144,6 +145,7 @@ function dto(value: FullComposition) {
       definitionCode: row.definitionCodeSnapshot, definitionName: row.definitionNameSnapshot,
       evaluationScope: (row.effectiveSettingsSnapshot as any)?.evaluationScope as string | undefined,
       evaluations: ((row.effectiveSettingsSnapshot as any)?.evaluationWeightsVersion === "EXPLICIT_ENTITY_V1" ? (row.effectiveSettingsSnapshot as any).subjectGoals : []) as Array<{subjectExternalId:string;subjectCode:string|null;subjectLabel:string;goal:string|null;goalUnit?:{symbol:string};resultUnit?:{symbol:string};weight:string|null}>,
+      groupGoal: (row.effectiveSettingsSnapshot as any)?.groupGoal ?? null,
       goalUnit: (row.effectiveSettingsSnapshot as any)?.goalUnit?.symbol as string | undefined,
       resultUnit: (row.effectiveSettingsSnapshot as any)?.measurementUnit?.symbol as string | undefined,
       configurationCode: row.configurationCodeSnapshot, categoryName: row.categoryNameSnapshot, goal: row.goalSnapshot,

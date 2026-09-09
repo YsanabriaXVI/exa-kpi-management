@@ -111,6 +111,7 @@ export type ScorecardComposition = {
     goalUnit?: string;
     resultUnit?: string;
     evaluations?: Array<{subjectExternalId:string;subjectCode:string|null;subjectLabel:string;goal:string|null;goalUnit?:{symbol:string};resultUnit?:{symbol:string};weight:string|null}>;
+    groupGoal?: {value:string;unit:string;label:string} | null;
     displayOrder: number;
   }>;
   linkedScorecards: Array<{

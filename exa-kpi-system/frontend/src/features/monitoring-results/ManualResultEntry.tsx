@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { manualResultEntryService, type ManualEntryResponse } from "./manual-result-entry.service";
 import "./manual-result-entry.css";
+import { EntityGoalsSummary } from "../kpi-config/EntityGoalsDisplay";
 
 export function ManualResultEntry({ periodId }: { periodId: string }) {
   const client = useQueryClient();
@@ -104,7 +105,7 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
       {readOnly && <p>Results are read-only for this period.</p>}
       {[...groups.entries()].map(([key, rows]) => {
         const parent = rows[0]!;
-        return <section className="manual-v1-group" key={key}><header><h3>{parent.kpiName}</h3><p>{parent.parentKpiCode} · {parent.scorecardName}</p></header>
+        return <section className={`manual-v1-group ${parent.evaluationKind === "ENTITY" ? "by-entity" : ""}`} key={key}><header><div><h3>{parent.kpiName}</h3><p>{parent.parentKpiCode} · {parent.scorecardName}</p></div>{parent.evaluationKind === "ENTITY" && <EntityGoalsSummary count={rows.length} subjectType={parent.subject?.type} groupGoal={parent.groupGoal}/>}</header>
           <div className="manual-entry-table-wrap"><table className="manual-entry-table"><thead><tr><th>{parent.evaluationKind === "ENTITY" ? "Entity" : "Evaluation"}</th><th>Goal</th><th>Weight</th><th>Result Unit</th><th>Result</th></tr></thead><tbody>{rows.map(input => <tr key={input.id}><td>{input.subject?.label ?? input.kpiName}</td><td>{input.goal ?? "—"} {input.goalUnit ?? ""}</td><td>{input.weight === null ? "—" : `${input.weight}%`}</td><td>{input.unit ?? "—"}</td><td>{input.resultMethod === "CALCULATED_FROM_INPUTS" && input.measurementInputs ? <DivisionResultInput name={input.subject?.label ?? input.kpiName} inputs={input.measurementInputs} unit={input.unit} values={divisionValues[input.id] ?? {numerator:null,denominator:null}} disabled={readOnly || !selected || busy || !!input.entryBlock} onChange={value => {setDivisionValues(current=>({...current,[input.id]:value}));setSaved(false);}}/> : input.resultSemantics === "BINARY" ? <select aria-label={"Result for " + (input.subject?.label ?? input.kpiName)} value={values[input.id] ?? ""} disabled={readOnly || !selected || busy || !!input.entryBlock} onChange={e=>{setValues(current=>({...current,[input.id]:e.target.value}));setSaved(false);}}><option value="">Select result</option><option value="1">Si</option><option value="0">No</option></select> : <input aria-label={`Result for ${input.subject?.label ?? input.kpiName}`} className="manual-inline-input result" inputMode="decimal" value={values[input.id] ?? ""} disabled={readOnly || !selected || busy || !!input.entryBlock} onChange={event => { setValues(current => ({...current, [input.id]: event.target.value})); setSaved(false); }} placeholder="Enter Result"/>}{input.entryBlock && <small>Entry is unavailable for this frozen evaluation.</small>}</td></tr>)}</tbody></table></div>
           {parent.groupGoal && <aside className="manual-v1-group-goal"><strong>Group Goal</strong><p>{parent.groupGoal.value} {parent.groupGoal.unit}</p><p>Group Weight: —</p><p>Group Evaluation: Not available yet</p></aside>}
         </section>;

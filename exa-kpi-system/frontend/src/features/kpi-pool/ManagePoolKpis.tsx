@@ -19,6 +19,7 @@ import { PoolPeriodSelect } from "./PoolPeriodSelect";
 import { ConfigMultiSelect } from "../kpi-config/ConfigMultiSelect";
 import "../kpi-config/kpi-config-overview.css";
 import { scorecardService } from "../scorecards/scorecard.service";
+import { EntityGoalsModal, EntityGoalsSummary } from "../kpi-config/EntityGoalsDisplay";
 
 const availabilityCopy: Record<PoolKpiAvailability, string> = {
   AVAILABLE: "Available to Add",
@@ -48,6 +49,7 @@ export function ManagePoolKpis() {
   const requestedPeriod = params.get("period") ?? "";
   const [targetPeriod, setTargetPeriod] = useState(requestedPeriod);
   const [finalizeConfirmationOpen, setFinalizeConfirmationOpen] = useState(false);
+  const [entityGoalsId, setEntityGoalsId] = useState<string | null>(null);
   const poolQuery = useQuery({ queryKey: ["kpi-pool-basic", poolId], queryFn: () => kpiPoolService.getBasic(poolId), enabled: poolId > 0, retry: false });
   const periodsQuery = useQuery({ queryKey: ["kpi-pool-periods", poolId], queryFn: () => kpiPoolService.getInputPeriods(poolId), enabled: poolId > 0, retry: false });
   useEffect(() => { if (!periodsQuery.data) return; const validRequested = periodsQuery.data.data.some((period) => period.start === requestedPeriod); setTargetPeriod((current) => current && periodsQuery.data.data.some((period) => period.start === current) ? current : validRequested ? requestedPeriod : periodsQuery.data.meta.defaultPeriodStart ?? periodsQuery.data.data[0]?.start ?? ""); }, [periodsQuery.data, requestedPeriod]);
@@ -59,6 +61,7 @@ export function ManagePoolKpis() {
   const catalogQuery = useQuery({ queryKey: ["pool-manage-kpis", poolId, targetPeriod], queryFn: () => periodIsEditable ? kpiPoolService.getManageableKpis(poolId, targetPeriod) : kpiPoolService.getManageableComposition(poolId, targetPeriod), enabled: poolId > 0 && Boolean(targetPeriod) && Boolean(editingPeriod) && editingPeriod?.workflowStatus !== "FUTURE", retry: false });
   const effectiveCompositionQuery = useQuery({ queryKey: ["kpi-pool-composition", poolId, targetPeriod], queryFn: () => kpiPoolService.getComposition(poolId, targetPeriod), enabled: poolId > 0 && Boolean(targetPeriod) && Boolean(editingPeriod) && editingPeriod?.workflowStatus !== "FUTURE", retry: false });
   const scorecardUsageQuery = useQuery({ queryKey:["scorecard-pool-usage",poolId,targetPeriod.slice(0,7)], queryFn:()=>scorecardService.poolUsage(poolId,targetPeriod.slice(0,7)), enabled:poolId>0 && Boolean(targetPeriod), retry:false });
+  const entityGoalsQuery = useQuery({ queryKey:["pool-entity-goals",poolId,editingPeriod?.poolPeriodId,entityGoalsId], queryFn:()=>kpiPoolService.getEffectiveSettings(poolId,editingPeriod!.poolPeriodId!,entityGoalsId!), enabled:Boolean(entityGoalsId && editingPeriod?.poolPeriodId), retry:false });
   const refresh = async () => {
     setSelected([]);
     await Promise.all([
@@ -213,7 +216,7 @@ export function ManagePoolKpis() {
             <tbody key={filterAnimationKey}>{catalogQuery.isLoading ? <tr><td colSpan={isFinalized ? 9 : 11} className="table-message">Loading KPI Configurations...</td></tr> : paginated.length ? paginated.map((record) => (
               <tr key={record.configCode} className={`${selected.includes(record.configCode) ? "selected-row" : ""} ${record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE" ? "definition-conflict-row" : ""}`}>
                 {!isFinalized && <><td><input type="checkbox" disabled={record.availability === "NOT_AVAILABLE"} checked={selected.includes(record.configCode)} onChange={() => toggle(record.configCode)} aria-label={`Select ${record.configCode}${record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE" ? `. Another configuration of ${record.kpiCode} is already selected for this period.` : ""}`} title={availabilityReason(record)} /></td><td><span title={availabilityReason(record)} className={`availability-label ${record.availability.toLowerCase()}`}>{availabilityCopy[record.availability]}</span></td></>}
-                <td><span className="code-pill">{record.configCode}</span></td><td>{record.kpiCode}</td><td className="name-cell">{record.name}</td><td>{record.category}</td><td>{record.goal}</td><td>{record.measurementUnit}</td><td>{record.dataSource}</td>
+                <td><span className="code-pill">{record.configCode}</span></td><td>{record.kpiCode}</td><td className="name-cell">{record.name}</td><td>{record.category}</td><td>{record.evaluationScope === "BY_SUBJECT" ? <EntityGoalsSummary count={record.subjectGoalCount ?? 0} groupGoal={record.groupGoal} onView={record.configurationId ? () => setEntityGoalsId(record.configurationId!) : undefined}/> : record.goal}</td><td>{record.measurementUnit}</td><td>{record.dataSource}</td>
                 <td><span className={`status-chip ${record.status.toLowerCase()}`}><i />{record.status === "ACTIVE" ? "Active" : "Inactive"}</span></td>
                 <td><div className="table-actions">
                   <button className="icon-button view" title="View KPI Configuration detail" onClick={() => navigate(`/app/kpi-management/config/detail-record?kpiConfigCode=${encodeURIComponent(record.configCode)}&poolId=${poolId}&from=pool-manage`)}><Eye size={15} /></button>
@@ -245,6 +248,8 @@ export function ManagePoolKpis() {
 
       {finalizeConfirmationOpen && poolQuery.data && <div className="pool-modal-backdrop" role="presentation"><section className="finalize-composition-modal" role="dialog" aria-modal="true" aria-labelledby="finalize-composition-title"><header><span><LockKeyhole size={21}/></span><div><h2 id="finalize-composition-title">Finalize {formatMonthLong(targetPeriod)} Composition?</h2><p>{includedCount} KPI {includedCount === 1 ? "Configuration" : "Configurations"}</p></div><button type="button" aria-label="Close confirmation" onClick={() => setFinalizeConfirmationOpen(false)} disabled={finalizeMutation.isPending}><X size={18}/></button></header><p>These KPI Configurations will become available to Scorecards for {formatMonthLong(targetPeriod)}.</p><dl><div><dt>Pool</dt><dd>{poolQuery.data.code} · {poolQuery.data.name}</dd></div><div><dt>Input Period</dt><dd>{formatMonthLong(targetPeriod)}</dd></div><div><dt>KPI Configurations</dt><dd>{includedCount}</dd></div><div><dt>Companies</dt><dd>{poolQuery.data.companies.join(", ")}</dd></div><div><dt>Validity</dt><dd>{formatMonthLong(poolQuery.data.validFrom)} – {formatMonthLong(poolQuery.data.validTo)}</dd></div><div><dt>Frequency</dt><dd>{poolQuery.data.frequency}</dd></div></dl>{isFirstInputPeriod && <section className="finalize-next-steps"><h3>What happens next?</h3><ul><li>The Pool becomes Active.</li><li>These KPI Configurations become available to Scorecards for this Input Period.</li><li>Pool validity, frequency, companies and structural scope become locked.</li><li>The finalized composition becomes read-only.</li></ul><p>Future period compositions can still be prepared according to the Pool workflow.</p></section>}<footer><button className="button secondary" onClick={() => setFinalizeConfirmationOpen(false)} disabled={finalizeMutation.isPending}>Cancel</button><button className="button primary" onClick={() => finalizeMutation.mutate()} disabled={finalizeMutation.isPending}>{finalizeMutation.isPending ? "Finalizing…" : "Finalize Composition"}</button></footer></section></div>}
 
+      {entityGoalsId && entityGoalsQuery.data && <EntityGoalsModal data={{configCode:entityGoalsQuery.data.effective.configCode,kpiCode:entityGoalsQuery.data.effective.kpiCode,kpiName:entityGoalsQuery.data.effective.kpiName,subjectType:entityGoalsQuery.data.effective.subjectType,subjectGoals:entityGoalsQuery.data.effective.subjectGoals ?? [],groupGoal:entityGoalsQuery.data.effective.groupGoal,goalUnit:entityGoalsQuery.data.effective.goalUnit?.symbol,resultUnit:entityGoalsQuery.data.effective.measurementUnit?.symbol,historical:entityGoalsQuery.data.effective.periodScope !== "CURRENT_PERIOD"}} onClose={() => setEntityGoalsId(null)}/>}
+      {entityGoalsId && entityGoalsQuery.isLoading && <div className="entity-goals-modal-backdrop" role="presentation"><section className="entity-goals-dialog" role="status">Loading frozen entity goals…</section></div>}
     </main>
   );
 }

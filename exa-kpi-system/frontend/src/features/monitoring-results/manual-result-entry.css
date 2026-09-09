@@ -45,6 +45,7 @@
 .check-results-review > header {display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
 .check-evaluations { min-width: 1100px; }
 .check-evaluations small {display:block;color:#526176;margin-top:4px;}
+.manual-v1-group.by-entity{border-left:3px solid #1680a5}.manual-v1-group.by-entity>header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.check-entity-parent td{padding:12px 14px!important;border-top:2px solid #b9dfe9!important;background:#eef8fb!important}.check-entity-parent strong,.check-entity-parent span{display:block}.check-entity-parent span{margin-top:4px;color:#526176;font-size:11px}.check-entity-evaluation td:first-child{padding-left:28px;box-shadow:inset 3px 0 #b9dfe9}.check-entity-evaluation td:first-child strong{color:#172b4d}
 .check-scorecard,.check-findings li {padding:16px;border:1px solid #dce3ec;border-radius:8px;margin:12px 0;}
 .check-findings {list-style:none;padding:0;}
 

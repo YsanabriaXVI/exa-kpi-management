@@ -2,15 +2,18 @@ import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  ArrowUpDown,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Database,
-  MoreVertical,
+  Eye,
   Pencil,
   Plus,
   Ruler,
   Search,
   Shapes,
+  Trash2,
   X,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -26,6 +29,8 @@ import {
 import "./catalog-management.css";
 
 type Tab = "subjects" | "units" | "sources";
+type SortDirection = "asc" | "desc";
+type SortState = { key: string; direction: SortDirection };
 type Editor =
   | { kind: "subjectType"; item?: SubjectTypeItem }
   | { kind: "subjectValue"; item?: SubjectValueItem }
@@ -59,9 +64,10 @@ export function CatalogManagementPage() {
     references: number;
   } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [status, setStatus] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [status, setStatus] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ACTIVE");
   const [sourceTypeFilter, setSourceTypeFilter] = useState("ALL");
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortState>({ key: "name", direction: "asc" });
   const [usage, setUsage] = useState<{
     kind: "subject-type" | "subject-value" | "measurement-unit" | "data-source";
     id: string;
@@ -129,8 +135,15 @@ export function CatalogManagementPage() {
       rows = rows.filter((row) => row.isActive === (status === "ACTIVE"));
     if (tab === "sources" && sourceTypeFilter !== "ALL")
       rows = rows.filter((row) => row.sourceType === sourceTypeFilter);
-    return rows;
-  }, [current.data, search, sourceTypeFilter, status, tab]);
+    return [...rows].sort((left, right) => {
+      const leftValue = left[sort.key as keyof typeof left];
+      const rightValue = right[sort.key as keyof typeof right];
+      const comparison = typeof leftValue === "number" && typeof rightValue === "number"
+        ? leftValue - rightValue
+        : String(leftValue ?? "").localeCompare(String(rightValue ?? ""), undefined, { numeric: true, sensitivity: "base" });
+      return sort.direction === "asc" ? comparison : -comparison;
+    });
+  }, [current.data, search, sort, sourceTypeFilter, status, tab]);
 
   const pageSize = 10;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -144,8 +157,9 @@ export function CatalogManagementPage() {
     setTab(next);
     setSubjectType(null);
     setSearch("");
-    setStatus("ALL");
+    setStatus("ACTIVE");
     setSourceTypeFilter("ALL");
+    setSort({ key: "name", direction: "asc" });
     setPage(1);
     setNotice(null);
   };
@@ -359,10 +373,18 @@ export function CatalogManagementPage() {
                 tab={tab}
                 subjectType={subjectType}
                 rows={pagedRows}
+                sort={sort}
+                onSort={(key) => {
+                  setSort((currentSort) => ({
+                    key,
+                    direction: currentSort.key === key && currentSort.direction === "asc" ? "desc" : "asc",
+                  }));
+                  setPage(1);
+                }}
                 onSubjectType={(item) => {
                   setSubjectType(item);
                   setSearch("");
-                  setStatus("ALL");
+                  setStatus("ACTIVE");
                   setPage(1);
                 }}
                 onEdit={setEditor}
@@ -417,7 +439,7 @@ export function CatalogManagementPage() {
         />
       )}
       {confirmItem && (
-        <ConfirmToggle
+        <ConfirmRemove
           item={confirmItem}
           pending={toggle.isPending}
           error={toggle.error}
@@ -434,6 +456,8 @@ function CatalogTable({
   tab,
   subjectType,
   rows,
+  sort,
+  onSort,
   onSubjectType,
   onEdit,
   onToggle,
@@ -442,6 +466,8 @@ function CatalogTable({
   tab: Tab;
   subjectType: SubjectTypeItem | null;
   rows: Array<any>;
+  sort: SortState;
+  onSort: (key: string) => void;
   onSubjectType: (item: SubjectTypeItem) => void;
   onEdit: (editor: Editor) => void;
   onToggle: (kind: Editor["kind"], item: any) => void;
@@ -461,12 +487,12 @@ function CatalogTable({
         <table>
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Values</th>
-              <th>Used by</th>
-              <th aria-label="Actions" />
+              <SortableHeader label="Code" sortKey="code" sort={sort} onSort={onSort} />
+              <SortableHeader label="Name" sortKey="name" sort={sort} onSort={onSort} />
+              <SortableHeader label="Status" sortKey="isActive" sort={sort} onSort={onSort} />
+              <SortableHeader label="Values" sortKey="valueCount" sort={sort} onSort={onSort} />
+              <SortableHeader label="Used by" sortKey="referenceCount" sort={sort} onSort={onSort} />
+              <th className="catalog-actions-heading">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -520,11 +546,11 @@ function CatalogTable({
         <table>
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Used by</th>
-              <th aria-label="Actions" />
+              <SortableHeader label="Code" sortKey="code" sort={sort} onSort={onSort} />
+              <SortableHeader label="Name" sortKey="name" sort={sort} onSort={onSort} />
+              <SortableHeader label="Status" sortKey="isActive" sort={sort} onSort={onSort} />
+              <SortableHeader label="Used by" sortKey="referenceCount" sort={sort} onSort={onSort} />
+              <th className="catalog-actions-heading">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -568,13 +594,13 @@ function CatalogTable({
         <table>
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Symbol</th>
-              <th>Precision</th>
-              <th>Status</th>
-              <th>Used by</th>
-              <th aria-label="Actions" />
+              <SortableHeader label="Code" sortKey="code" sort={sort} onSort={onSort} />
+              <SortableHeader label="Name" sortKey="name" sort={sort} onSort={onSort} />
+              <SortableHeader label="Symbol" sortKey="symbol" sort={sort} onSort={onSort} />
+              <SortableHeader label="Precision" sortKey="decimalPlaces" sort={sort} onSort={onSort} />
+              <SortableHeader label="Status" sortKey="isActive" sort={sort} onSort={onSort} />
+              <SortableHeader label="Used by" sortKey="referenceCount" sort={sort} onSort={onSort} />
+              <th className="catalog-actions-heading">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -624,13 +650,13 @@ function CatalogTable({
       <table>
         <thead>
           <tr>
-            <th>Code</th>
-            <th>Name / Description</th>
-            <th>Source Type</th>
-            <th>Integration Mode</th>
-            <th>Status</th>
-            <th>Used by</th>
-            <th aria-label="Actions" />
+            <SortableHeader label="Code" sortKey="code" sort={sort} onSort={onSort} />
+            <SortableHeader label="Name / description" sortKey="name" sort={sort} onSort={onSort} />
+            <SortableHeader label="Source type" sortKey="sourceType" sort={sort} onSort={onSort} />
+            <SortableHeader label="Integration mode" sortKey="supportsAutomation" sort={sort} onSort={onSort} />
+            <SortableHeader label="Status" sortKey="isActive" sort={sort} onSort={onSort} />
+            <SortableHeader label="Used by" sortKey="referenceCount" sort={sort} onSort={onSort} />
+            <th className="catalog-actions-heading">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -677,6 +703,18 @@ function CatalogTable({
   );
 }
 
+function SortableHeader({ label, sortKey, sort, onSort }: { label: string; sortKey: string; sort: SortState; onSort: (key: string) => void }) {
+  const active = sort.key === sortKey;
+  return (
+    <th aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button className={active ? "catalog-sort active" : "catalog-sort"} onClick={() => onSort(sortKey)} type="button">
+        {label}
+        {active ? <ChevronDown className={sort.direction === "asc" ? "ascending" : ""} size={13} /> : <ArrowUpDown size={12} />}
+      </button>
+    </th>
+  );
+}
+
 function UsageButton({
   count,
   onClick,
@@ -701,37 +739,21 @@ function RowActions({
   onToggle: () => void;
   active: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   return (
     <div className="catalog-row-actions">
       {onView && (
-        <button className="catalog-view-action" onClick={onView}>
-          View Values
+        <button className="catalog-action-button" onClick={onView} title="View values" aria-label="View values">
+          <Eye size={15} />
         </button>
       )}
-      <div className="catalog-more">
-        <button
-          className="catalog-more-trigger"
-          onClick={() => setOpen((value) => !value)}
-          aria-label="More actions"
-          aria-expanded={open}
-        >
-          <MoreVertical size={16} />
+      <button className="catalog-action-button" onClick={onEdit} title="Edit" aria-label="Edit">
+        <Pencil size={14} />
+      </button>
+      {active && (
+        <button className="catalog-action-button remove" onClick={onToggle} title="Remove from active view" aria-label="Remove from active view">
+          <Trash2 size={14} />
         </button>
-        {open && (
-          <div className="catalog-more-menu">
-            <button onClick={onEdit}>
-              <Pencil size={14} /> Edit
-            </button>
-            <button
-              className={active ? "deactivate" : "activate"}
-              onClick={onToggle}
-            >
-              {active ? "Deactivate" : "Activate"}
-            </button>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -748,8 +770,14 @@ function CatalogEditor({
   onSaved: (message: string) => void;
 }) {
   const item = editor.item;
-  const [code, setCode] = useState(item?.code ?? "");
   const [name, setName] = useState(item?.name ?? "");
+  const [isActive, setIsActive] = useState(item?.isActive ?? true);
+  const [codeSuffix] = useState(() => Date.now().toString(36).toUpperCase().slice(-5));
+  const generatedBase = normalizedCode(name).slice(
+    0,
+    editor.kind === "subjectType" ? 24 : editor.kind === "subjectValue" ? 80 : 44,
+  ) || "ITEM";
+  const code = item?.code ?? `${generatedBase}_${codeSuffix}`;
   const unit = editor.kind === "unit" ? editor.item : undefined;
   const source = editor.kind === "source" ? editor.item : undefined;
   const [symbol, setSymbol] = useState(unit?.symbol ?? "");
@@ -765,13 +793,21 @@ function CatalogEditor({
   );
   const mutation = useMutation({
     mutationFn: async () => {
+      const syncStatus = async <T,>(result: T) => {
+        if (!item || isActive === item.isActive) return result;
+        if (editor.kind === "subjectType") await service.toggleSubjectType(item.id);
+        else if (editor.kind === "subjectValue") await service.toggleSubjectValue(item.id);
+        else if (editor.kind === "unit") await service.toggleMeasurementUnit(item.id);
+        else await service.toggleDataSource(item.id);
+        return result;
+      };
       if (editor.kind === "subjectType")
         return item
-          ? service.updateSubjectType(item.id, { code, name })
+          ? syncStatus(await service.updateSubjectType(item.id, { code, name }))
           : service.createSubjectType({ code, name });
       if (editor.kind === "subjectValue")
         return item
-          ? service.updateSubjectValue(item.id, { code, name })
+          ? syncStatus(await service.updateSubjectValue(item.id, { code, name }))
           : service.createSubjectValue(subjectType!.code, { code, name });
       if (editor.kind === "unit") {
         const value = {
@@ -783,7 +819,7 @@ function CatalogEditor({
           isPercentage,
         };
         return item
-          ? service.updateMeasurementUnit(item.id, value)
+          ? syncStatus(await service.updateMeasurementUnit(item.id, value))
           : service.createMeasurementUnit(value);
       }
       const value = {
@@ -795,7 +831,7 @@ function CatalogEditor({
         supportsAutomation,
       };
       return item
-        ? service.updateDataSource(item.id, value)
+        ? syncStatus(await service.updateDataSource(item.id, value))
         : service.createDataSource(value);
     },
     onSuccess: () =>
@@ -827,7 +863,7 @@ function CatalogEditor({
             <p>
               {item
                 ? "Codes cannot be changed because they identify historical references."
-                : "Create a reusable catalog entry for KPI Configuration."}
+                : "Create a reusable catalog entry for KPI Configuration. Its code is generated automatically."}
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close">
@@ -838,16 +874,11 @@ function CatalogEditor({
           <label>
             <span>Code</span>
             <input
-              required
-              minLength={2}
               value={code}
-              disabled={Boolean(item)}
-              onChange={(event) => setCode(normalizedCode(event.target.value))}
-              placeholder={
-                editor.kind === "subjectValue" ? "CUS-001" : "CATALOG_CODE"
-              }
+              disabled
+              aria-label="Automatically generated code"
             />
-            <small>Permanent identifier; cannot be edited later.</small>
+            <small>Generated automatically and kept as the permanent identifier.</small>
           </label>
           <label>
             <span>Name</span>
@@ -859,6 +890,16 @@ function CatalogEditor({
               placeholder="Display name"
             />
           </label>
+          {item && (
+            <label className="catalog-form-wide">
+              <span>Status</span>
+              <button type="button" className={`catalog-status-toggle ${isActive ? "active" : ""}`} role="switch" aria-checked={isActive} onClick={() => setIsActive((current) => !current)}>
+                <span className="catalog-toggle-track" aria-hidden="true"><i /></span>
+                <strong>{isActive ? "Active" : "Inactive"}</strong>
+              </button>
+              <small>Controls whether this item appears in active catalogs and new KPI configurations.</small>
+            </label>
+          )}
           {editor.kind === "unit" && (
             <>
               <label>
@@ -1054,6 +1095,25 @@ function UsageDialog({
             Close
           </button>
         </footer>
+      </section>
+    </div>
+  );
+}
+
+function ConfirmRemove({ item, pending, error, onCancel, onConfirm }: {
+  item: { name: string; active: boolean; references: number };
+  pending: boolean;
+  error: Error | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="catalog-modal-backdrop">
+      <section className="catalog-modal catalog-confirm" role="alertdialog" aria-modal="true">
+        <header><div><h2>Remove {item.name} from the active view?</h2><p>It will become inactive and unavailable for new KPI configurations. You can restore it using the Inactive filter and Edit action.</p></div></header>
+        {item.references > 0 && <div className="catalog-impact-warning"><strong>Currently referenced {item.references} time{item.references === 1 ? "" : "s"}.</strong><span>Existing configurations, finalized Scorecards, Monitoring and historical reports remain unchanged.</span></div>}
+        {error && <p className="catalog-form-error">The item could not be removed from the active view.</p>}
+        <footer><button className="button secondary" onClick={onCancel}>Cancel</button><button className="button danger" disabled={pending} onClick={onConfirm}>{pending ? "Removing..." : "Remove"}</button></footer>
       </section>
     </div>
   );

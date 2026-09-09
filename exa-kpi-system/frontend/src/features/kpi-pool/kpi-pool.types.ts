@@ -34,6 +34,9 @@ export type PoolKpi = {
   measurementUnit: string;
   dataSource: string;
   status: "ACTIVE" | "INACTIVE";
+  evaluationScope?: "OVERALL" | "BY_SUBJECT";
+  subjectGoalCount?: number;
+  groupGoal?: { value: string; unit: string } | null;
 };
 
 export type PoolKpiAvailability = "AVAILABLE" | "IN_POOL" | "NOT_AVAILABLE";

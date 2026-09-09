@@ -659,6 +659,9 @@ export const kpiPoolService = {
       measurementUnit: value.measurementUnit,
       dataSource: value.dataSource,
       status: value.isActive ? "ACTIVE" : "INACTIVE",
+      evaluationScope: value.evaluationScope,
+      subjectGoalCount: value.subjectGoalCount,
+      groupGoal: value.groupGoal,
       availability:
         value.availability === "AVAILABLE_TO_ADD"
           ? "AVAILABLE"
