@@ -5,6 +5,7 @@ const HUNDRED = new Prisma.Decimal(100);
 type DecimalInput = Prisma.Decimal | string | number;
 type Band = { includesMin?: boolean; includesMax?: boolean; compliance: DecimalInput; minResult?: DecimalInput | null; maxResult?: DecimalInput | null; maxDistance?: DecimalInput };
 export type ScoringRuleConfig = {
+  model?: string;
   bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "INTERVALS";
   bands?: Band[];
   tolerance?: DecimalInput;
@@ -51,6 +52,9 @@ export function notCalculable(errorCode: string, method: string | null): KpiScor
   return {status:"NOT_CALCULABLE",errorCode,scoringMethod:method,goalMet:null,rawAchievement:null,compliance:null,trafficLight:null,weightedScore:null,calculationVersion:CALCULATION_VERSION};
 }
 export const persistedDecimal = (value: Prisma.Decimal | null) => value?.toDecimalPlaces(6, Prisma.Decimal.ROUND_HALF_UP) ?? null;
+// Derived from the persisted achievement; never included in weighted scoring.
+export const extraPoints = (raw: DecimalInput | null | undefined, compliance: DecimalInput | null | undefined) =>
+  compliance == null ? null : raw == null ? ZERO : Prisma.Decimal.max(ZERO, decimal(raw).sub(HUNDRED));
 
 export function calculateKpiScore(input: KpiScoringInput): KpiScoringResult {
   const method=input.scoringMethod??null;

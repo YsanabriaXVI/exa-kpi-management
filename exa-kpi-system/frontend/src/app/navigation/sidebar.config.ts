@@ -68,13 +68,6 @@ export const navigationItems: NavigationItem[] = [
         moduleName: "KPI Management",
         icon: Settings2,
       },
-      {
-        id: "catalog-management",
-        label: "Catalog Management",
-        path: "/app/kpi-management/config/catalogs",
-        moduleName: "KPI Management",
-        icon: Settings2,
-      },
     ],
   },
   {

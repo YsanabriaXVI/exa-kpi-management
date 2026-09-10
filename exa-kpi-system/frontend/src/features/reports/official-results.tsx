@@ -3,6 +3,7 @@ import { monitoringRequest } from "../monitoring-results/monitoring-results.serv
 
 export type AuditEvent = { id:string; actionCode:string; fromStatusCode:string; toStatusCode:string; actorUserId:string|null; occurredAt:string; comment:string|null; metadata:unknown };
 export type OfficialEvaluation = {
+  extraPoints?: string | null;
   id:string; configurationId:string; revisionId:string|null; code:string; name:string; configCode:string;
   entityId:string|null; entityLabel:string|null; evaluationKind:string; goal:string|null; goalUnit:string|null; unit:string|null;
   result:string|null; score:string|null; goalMet:boolean|null; trafficLight:string|null; weight:string; weightedContribution:string|null;
@@ -23,6 +24,7 @@ export type OfficialResult = {
 };
 export const numberOrNull = (v: string | number | null | undefined):number|null => v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
 export const percent = (v: string | number | null | undefined, digits=2) => numberOrNull(v) === null ? "—" : `${Number(v).toFixed(digits)}%`;
+export const points = (v: string | number | null | undefined) => numberOrNull(v) === null ? "—" : `${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(2)} pts`;
 export const difference = (a:string|number|null|undefined,b:string|number|null|undefined) => numberOrNull(a) === null || numberOrNull(b) === null ? null : Number(a)-Number(b);
 export const averageOf = (values:Array<string|number|null|undefined>) => { const numbers=values.map(numberOrNull).filter((v):v is number=>v!==null); return numbers.length?numbers.reduce((a,b)=>a+b,0)/numbers.length:null; };
 export const departmentNames = (r:OfficialResult) => (r.departmentsSnapshot ?? []).map(d=>d.name ?? d.departmentName ?? d.departmentNameSnapshot ?? "Unavailable");

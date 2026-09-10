@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const tx = vi.hoisted(() => ({
@@ -146,7 +147,7 @@ describe("kpiConfigurationService.effectiveSnapshots", () => {
     definition: { id: 50n, kpiCode: "KPI-050", kpiName: "Productivity", description: "Improve productivity" },
     measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" },
     primaryDataSource: { id: 2n, code: "EMS", name: "EMS" },
-    revisions: [{ id: 100n, revisionNumber: 1, targetValue: { toString: () => "100" }, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), effectiveTo: new Date("2026-08-31T00:00:00.000Z"), periodScope:"CURRENT_PERIOD",goalMode:"SINGLE",evaluationScope:"OVERALL",goalType:"SINGLE_VALUE",goalAssignment:null,subjectType:null,resultMethod:"DIRECT",calculationPattern:"DIRECT",calculationTemplate:null,measurementInputs:[],subjects:[],subjectGoals:[],groupGoalValue:null,groupGoalUnit:null,groupGoalLabel:null,goalUnit:{id:1n,code:"KMS",name:"Kilometers",symbol:"kms"}, evaluationType: { id: 3n, code: "HIGHER_IS_BETTER", name: "Higher is better" }, measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" }, dataSource: { id: 2n, code: "EMS", name: "EMS" }, resultSemantics:"ABSOLUTE_VALUE",scoringMethod:"PROPORTIONAL",scoringRuleConfig:{floorPercent:0,capPercent:100},scoringRuleConfigVersion:1,negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", thresholds: ["RED","YELLOW","GREEN"].map((code,index)=>({ id: BigInt(4+index), rangeMinPercent: { toString: () => "0" }, rangeMaxPercent: { toString: () => "100" }, includesMin: true, includesMax: true, displayOrder: index+1, trafficLightLevel: { id: BigInt(5+index), code, name: code } })) }],
+    revisions: [{ id: 100n, revisionNumber: 1, targetValue: { toString: () => "100" }, effectiveFrom: new Date("2026-01-01T00:00:00.000Z"), effectiveTo: new Date("2026-08-31T00:00:00.000Z"), periodScope:"CURRENT_PERIOD",goalMode:"SINGLE",evaluationScope:"OVERALL",goalType:"SINGLE_VALUE",goalAssignment:null,subjectType:null,resultMethod:"DIRECT",calculationPattern:"DIRECT",calculationTemplate:null,measurementInputs:[],subjects:[],subjectGoals:[],groupGoalValue:null,groupGoalUnit:null,groupGoalLabel:null,goalUnit:{id:1n,code:"KMS",name:"Kilometers",symbol:"kms"}, evaluationType: { id: 3n, code: "HIGHER_IS_BETTER", name: "Higher is better" }, measurementUnit: { id: 1n, code: "KMS", name: "Kilometers", symbol: "kms" }, dataSource: { id: 2n, code: "EMS", name: "EMS" }, resultSemantics:"ABSOLUTE_VALUE",scoringMethod:"PROPORTIONAL",scoringRuleConfig:{floorPercent:0,capPercent:100},scoringRuleConfigVersion:1,negativeResultPolicy:"DISALLOW",scoringApprovalStatus:"APPROVED", thresholds: ["RED","YELLOW","GREEN"].map((code,index)=>({ id: BigInt(4+index), rangeMinPercent: new Prisma.Decimal([0,65,80][index]!), rangeMaxPercent: new Prisma.Decimal([64,79,100][index]!), includesMin: true, includesMax: true, displayOrder: index+1, trafficLightLevel: { id: BigInt(5+index), code, name: code } })) }],
   };
 
   it("returns the single revision covering the complete Input Period with snapshot catalogs", async () => {
@@ -160,8 +161,8 @@ describe("kpiConfigurationService.effectiveSnapshots", () => {
   it.each(["PREVIOUS_PERIOD","SAME_PERIOD_PREVIOUS_YEAR"])("explicitly propagates the executable historical contract for %s",async reference=>{
     const revision={...effectiveRecord.revisions[0],periodScope:reference,comparisonMode:reference,comparisonDirection:"INCREASE",targetKind:"CHANGE_TARGET",
       targetValue:{toString:()=>"10"},goalUnit:{id:2n,code:"PERCENT",name:"Percent",symbol:"%"},
-      thresholds:effectiveRecord.revisions[0]!.thresholds.map((t,i)=>({...t,rangeMinPercent:{toString:()=>String([0,65,80][i])},
-        rangeMaxPercent:{toString:()=>String([65,80,100][i])},includesMin:true,includesMax:i===2}))};
+      thresholds:effectiveRecord.revisions[0]!.thresholds.map((t,i)=>({...t,rangeMinPercent:new Prisma.Decimal([0,65,80][i]!),
+        rangeMaxPercent:new Prisma.Decimal([64,79,100][i]!),includesMin:true,includesMax:true}))};
     db.kpiConfiguration.findMany.mockResolvedValue([{...effectiveRecord,revisions:[revision]}]);
     const output=(await kpiConfigurationService.effectiveSnapshots({configurationIds:["10"],periodStart:"2026-08-01",periodEnd:"2026-08-31"})).data[0];
     expect(output).toMatchObject({periodScope:reference,comparisonMode:reference,comparisonDirection:"INCREASE",targetKind:"CHANGE_TARGET",goal:"10",

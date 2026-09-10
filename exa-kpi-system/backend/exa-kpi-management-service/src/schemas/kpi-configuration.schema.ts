@@ -88,6 +88,25 @@ export const kpiConfigurationBodySchema = z.object({
   effectiveFrom: dateOnly.optional(),
   changeReason: z.string().trim().max(500).optional(),
 }).strict().superRefine((value, context) => {
+  if (value.scoringRuleConfig?.model === "SINGLE_RESULT_V1") {
+    const issue = (path: string, message: string) => context.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
+    if (value.evaluationScope !== "OVERALL" || value.goalMode !== "SINGLE" || value.periodScope !== "CURRENT_PERIOD" || value.resultMethod !== "DIRECT" || value.subjects.length || value.subjectGoals.length || value.subjectType || value.groupGoal || value.comparisonDirection || value.measurementInputs.length || value.calculationTemplate || value.targetKind !== "ABSOLUTE_TARGET") issue("evaluationScope", "One KPI has one final Result per period, evaluated directly against its Goal");
+    if (!value.goalUnit || value.goalUnit !== value.measurementUnit) issue("measurementUnit", "Result Measurement Unit must match Goal Measurement Unit");
+    if (!["ALLOW", "DISALLOW"].includes(value.negativeResultPolicy ?? "")) issue("negativeResultPolicy", "Choose Yes or No for negative values");
+    if (value.scoringRuleConfig.floorPercent !== 0 || value.scoringRuleConfig.capPercent !== 100) issue("scoringRuleConfig", "Compliance always ranges from 0 to 100 percent");
+    if (!["PROPORTIONAL", "RESULT_BANDS"].includes(value.scoringMethod ?? "")) issue("scoringMethod", "Choose no bands or result intervals");
+    if (value.scoringMethod === "PROPORTIONAL" && value.evaluationTypeCode === "LOWER_IS_BETTER" && value.negativeResultPolicy === "ALLOW") issue("scoringRuleConfig", "Use result bands for Lower is better when negative results are allowed");
+    if (value.scoringMethod === "RESULT_BANDS") {
+      if (value.scoringRuleConfig.bandMode !== "INTERVALS") issue("scoringRuleConfig", "Compliance levels must be stored as result intervals");
+      const bands = value.scoringRuleConfig.bands;
+      if (validResultBands(bands)) {
+        if (bands[0]!.minResult !== null && (value.negativeResultPolicy === "ALLOW" || bands[0]!.minResult! > 0) || bands[bands.length - 1]!.maxResult != null || bands[0]!.includesMin !== true || bands.some((band, i) => i > 0 && (bands[i - 1]!.maxResult == null || band.minResult !== bands[i - 1]!.maxResult || band.includesMin === bands[i - 1]!.includesMax))) issue("scoringRuleConfig", "Intervals must cover all allowed results without gaps; each shared limit must belong to exactly one interval");
+        const higher = ["HIGHER_IS_BETTER", "GREATER_IS_BETTER"].includes(value.evaluationTypeCode ?? "");
+        if (value.evaluationTypeCode !== "ZERO_IS_BETTER" && bands.some((band, i) => i > 0 && (higher ? band.compliance < bands[i - 1]!.compliance : band.compliance > bands[i - 1]!.compliance))) issue("scoringRuleConfig", "Compliance intervals must respect the evaluation direction");
+        if (value.evaluationTypeCode === "ZERO_IS_BETTER" && (value.goal !== 0 || !bands.some(b => (b.minResult == null || b.minResult < 0 || b.minResult === 0 && b.includesMin !== false) && (b.maxResult == null || b.maxResult >= 0) && b.compliance === 100))) issue("goal", "Zero is better requires Goal 0 and Compliance 100 percent at Result 0");
+      }
+    }
+  }
   const effectiveScope = value.evaluationScope === "BY_SUBJECT" || value.goalMode === "BY_SUBJECT" ? "BY_SUBJECT" : "OVERALL";
   const contributing = effectiveScope === "BY_SUBJECT" && value.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL";
   if (value.entityEvaluationMode && effectiveScope !== "BY_SUBJECT") context.addIssue({ code: z.ZodIssueCode.custom, path: ["entityEvaluationMode"], message: "Entity participation applies to By Entity only" });

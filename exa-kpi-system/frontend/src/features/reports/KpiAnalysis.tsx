@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, BarChart3, Download, Eye, EyeOff, FileText, Search } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useOfficialResults, ReportLoadState, OfficialTraffic, latestResults, comparisonResult, departmentNames, percent, numberOrNull, averageOf, difference, resultLink, type OfficialEvaluation } from "./official-results";
+import { useOfficialResults, ReportLoadState, OfficialTraffic, latestResults, comparisonResult, departmentNames, percent, points, numberOrNull, averageOf, difference, resultLink, type OfficialEvaluation } from "./official-results";
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
@@ -14,7 +14,7 @@ const identity=(e:OfficialEvaluation)=>[e.configurationId,e.evaluationKind,e.ent
 const raw=(value:string|number|null|undefined,unit:string|null)=>numberOrNull(value)===null?"—":Number(value).toLocaleString()+" "+(unit??"");
 export function KpiAnalysis() {
   const navigate=useNavigate(); const query=useOfficialResults();
-  const [analysisType,setAnalysisType]=useState("KPI Trend"); const [view,setView]=useState("Goal vs Result");
+  const [analysisType,setAnalysisType]=useState("KPI Trend"); const [view,setView]=useState("Score Trend");
   const [compare,setCompare]=useState("Previous Period"); const [selectedKpi,setSelectedKpi]=useState("");
   const [scorecard,setScorecard]=useState("all"); const [period,setPeriod]=useState("all"); const [search,setSearch]=useState("");
   const [showRaw,setShowRaw]=useState(false); const [showGraphs,setShowGraphs]=useState(false);
@@ -43,13 +43,13 @@ export function KpiAnalysis() {
       ["Search", search || "None"], ["Sort", `${sort.key} ${sort.direction}`],
     ],
     headers: ["KPI Code", "KPI Name / Entity", "ScoreCard", "Period", "Goal", ...(showRaw ? ["Current Result"] : []),
-      view === "Score Trend" ? "Current Score" : "Difference vs Goal", "Compared Period", "Compared Result / Score", "Period Difference", "Goal Met", "Traffic Light"],
+      view === "Score Trend" ? "Current Score" : "Difference vs Goal", "Extra Points", "Compared Period", "Compared Result / Score", "Period Difference", "Goal Met", "Traffic Light"],
     rows: rows.map(r => [r.code, r.name + (r.entityLabel ? " / " + r.entityLabel : ""),
       [r.card.name, departmentNames(r.card).join(", ")].filter(Boolean).join("\n"), r.period,
       `${r.goal ?? "—"} ${r.goalUnit ?? ""}`.trim(), ...(showRaw ? [raw(r.result, r.unit)] : []),
-      view === "Score Trend" ? exportPercent(r.score) : raw(r.goalDifference, r.unit), r.comparedPeriod,
+      view === "Score Trend" ? exportPercent(r.score) : raw(r.goalDifference, r.unit), points(r.extraPoints), r.comparedPeriod,
       view === "Score Trend" ? exportPercent(r.comparedScore) : raw(r.compared, r.unit),
-      view === "Score Trend" ? exportPercent(r.scoreDifference) : raw(r.periodDifference, r.unit),
+      view === "Score Trend" ? points(r.scoreDifference) : raw(r.periodDifference, r.unit),
       r.goalMet === null ? null : r.goalMet ? "Yes" : "No", r.trafficLight]),
   });
   const header=(key:string,label:string)=><SortableTableHeader active={sort.key===key} direction={sort.direction} onSort={()=>{setSort({key,direction:sort.key===key&&sort.direction==="asc"?"desc":"asc"});setPage(1);}}>{label}</SortableTableHeader>;
@@ -69,7 +69,7 @@ export function KpiAnalysis() {
     <section className="analysis-result-section"><header><div><h2>{analysisType} · {selected?.name ?? "No official results"}</h2><p>{view} · Compared with {compare}</p></div><div><button onClick={()=>setShowRaw(!showRaw)}>{showRaw?<EyeOff size={14}/>:<Eye size={14}/>} {showRaw?"Hide Raw Results":"View Raw Results"}</button><ReportExportButtons getReport={exportReport} disabled={query.isLoading || query.isError || !rows.length}/><button className="graphs" onClick={()=>setShowGraphs(!showGraphs)}><BarChart3 size={14}/>{showGraphs?"Hide Graphs":"View Graphs"}</button></div></header>
       {showGraphs&&<div className="analysis-chart"><div className="chart-y-label">Official Score (%)</div><div className="chart-bars">{rows.map(r=><div className="chart-group" key={r.id}><div>{r.score!==null&&<i title={percent(r.score)} className="current" style={{height:Math.max(0,Math.min(100,Number(r.score)))+"%"}}/>}{r.comparedScore!==null&&<i title={percent(r.comparedScore)} className="compared" style={{height:Math.max(0,Math.min(100,Number(r.comparedScore)))+"%"}}/>}</div><span>{r.period} · {r.card.code}</span></div>)}</div><footer><span>Current Score</span><span>Compared Score</span></footer></div>}
       <label className="analysis-search"><Search size={15}/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="Search KPI, ScoreCard or period…"/></label>
-      <div className="report-table-wrap"><table><thead><tr>{header("code","KPI Code")}{header("name","KPI Name / Entity")}{header("scorecardName","ScoreCard")}{header("periodStart","Period")}{header("goal","Goal")}{showRaw&&header("result","Current Result")}{header("score",view==="Score Trend"?"Current Score":"Difference vs Goal")}{header("comparedPeriod","Compared Period")}{header("compared","Compared Result / Score")}<th>Period Difference</th><th>Goal Met</th><th>Traffic Light</th><th>Details</th></tr></thead><tbody>{visible.map(r=><tr key={r.id}><td>{r.code}</td><td>{r.name}{r.entityLabel?" / "+r.entityLabel:""}</td><td>{r.card.name}<small>{departmentNames(r.card).join(", ")}</small></td><td>{r.period}</td><td>{r.goal ?? "—"} {r.goalUnit}</td>{showRaw&&<td>{raw(r.result,r.unit)}</td>}<td>{view==="Score Trend"?percent(r.score):raw(r.goalDifference,r.unit)}</td><td>{r.comparedPeriod ?? "—"}</td><td>{view==="Score Trend"?percent(r.comparedScore):raw(r.compared,r.unit)}</td><td>{view==="Score Trend"?percent(r.scoreDifference):raw(r.periodDifference,r.unit)}</td><td>{r.goalMet===null?"—":r.goalMet?"Yes":"No"}</td><td><OfficialTraffic value={r.trafficLight}/></td><td><Link to={resultLink(r.card)}>View</Link></td></tr>)}</tbody></table></div>
+      <div className="report-table-wrap"><table><thead><tr>{header("code","KPI Code")}{header("name","KPI Name / Entity")}{header("scorecardName","ScoreCard")}{header("periodStart","Period")}{header("goal","Goal")}{showRaw&&header("result","Current Result")}{header("score",view==="Score Trend"?"Compliance %":"Difference vs Goal")}<th>Extra Points</th>{header("comparedPeriod","Compared Period")}{header("compared","Compared Result / Score")}<th>Period Difference</th><th>Goal Met</th><th>Traffic Light</th><th>Details</th></tr></thead><tbody>{visible.map(r=><tr key={r.id}><td>{r.code}</td><td>{r.name}{r.entityLabel?" / "+r.entityLabel:""}</td><td>{r.card.name}<small>{departmentNames(r.card).join(", ")}</small></td><td>{r.period}</td><td>{r.goal ?? "—"} {r.goalUnit}</td>{showRaw&&<td>{raw(r.result,r.unit)}</td>}<td>{view==="Score Trend"?percent(r.score):raw(r.goalDifference,r.unit)}</td><td>{points(r.extraPoints)}</td><td>{r.comparedPeriod ?? "—"}</td><td>{view==="Score Trend"?percent(r.comparedScore):raw(r.compared,r.unit)}</td><td>{view==="Score Trend"?points(r.scoreDifference):raw(r.periodDifference,r.unit)}</td><td>{r.goalMet===null?"—":r.goalMet?"Yes":"No"}</td><td><OfficialTraffic value={r.trafficLight}/></td><td><Link to={resultLink(r.card)}>View</Link></td></tr>)}</tbody></table></div>
       {!rows.length&&!query.isLoading&&<p className="reports-empty">No official closed results match these filters.</p>}
       <footer className="reports-pagination analysis-table-pagination"><span>{rows.length} records</span><RowsPerPageSelect value={pageSize} onChange={v=>{setPageSize(v);setPage(1);}}/><PaginationControls page={currentPage} totalPages={pages} onPage={setPage} label="KPI analysis pagination" className="analysis-pagination-controls"/></footer>
     </section><button className="report-page-back" onClick={()=>navigate(-1)}><ArrowLeft size={17}/>Back</button>

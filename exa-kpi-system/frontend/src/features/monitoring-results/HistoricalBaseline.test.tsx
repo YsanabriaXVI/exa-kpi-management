@@ -41,7 +41,7 @@ async function resolve(){fireEvent.click(await screen.findByRole("button",{name:
 describe("Historical baseline in Monitoring wizard",()=>{
   it("keeps current Result editable while baseline is missing and displays target % separately",async()=>{
     open();expect(await screen.findByRole("textbox",{name:"Result for Increase Sales"})).toBeEnabled();
-    expect(screen.getByText("10 %")).toBeVisible();expect(screen.getByText("Baseline: Missing")).toBeVisible();
+    expect(screen.getByText("10 %")).toBeVisible();expect(screen.getByText("Baseline: Pending - resolve during Result Entry")).toBeVisible();
     expect(screen.getByText(/Required baseline: 2026-07/)).toBeVisible();
   });
   it("searches and explicitly confirms a candidate from another Pool, then rechecks both versions",async()=>{
@@ -49,14 +49,14 @@ describe("Historical baseline in Monitoring wizard",()=>{
     await within(dialog).findByText(/Financial Pool/);
     fireEvent.change(within(dialog).getByRole("textbox",{name:"Search historical Results"}),{target:{value:"Financial"}});
     fireEvent.click(within(dialog).getByRole("button",{name:"Search"}));
-    await waitFor(()=>expect(baselineApi.candidates).toHaveBeenCalledWith("1","2","Financial",1));
+    await waitFor(()=>expect(baselineApi.candidates).toHaveBeenCalledWith("1","2","Financial",1,""));
     fireEvent.click(await within(dialog).findByRole("radio"));
     fireEvent.click(within(dialog).getByRole("button",{name:"Use Selected Baseline"}));
     await waitFor(()=>expect(baselineApi.select).toHaveBeenCalledWith("1","2",0,"21"));
     await screen.findByText("Results or baseline changed. Run Check Results again.");
     expect(screen.getByRole("textbox",{name:"Result for Increase Sales"})).toHaveValue("115000");
     fireEvent.click(screen.getByRole("button",{name:"Run Check Results again"}));
-    await screen.findByText("150.00%");
+    await screen.findByText(/Actual change: 15.00%/);
     expect(manualResultEntryService.check).toHaveBeenCalledWith("1",5,1);
     expect(screen.getByText(/Actual change: 15.00%/)).toBeVisible();
   });
@@ -66,9 +66,11 @@ describe("Historical baseline in Monitoring wizard",()=>{
     expect(within(dialog).getByText(/Required period: 2026-07/)).toBeVisible();
     fireEvent.change(within(dialog).getByRole("textbox",{name:"Baseline value"}),{target:{value:"100000"}});
     expect(within(dialog).getByRole("button",{name:"Save Manual Baseline"})).toBeDisabled();
-    fireEvent.change(within(dialog).getByRole("textbox",{name:"Reason / Source"}),{target:{value:"Historical ERP result before EXA"}});
+    fireEvent.change(within(dialog).getByRole("textbox",{name:"Reason for manual entry"}),{target:{value:"Historical ERP result before EXA"}});
+    expect(within(dialog).getByRole("button",{name:"Save Manual Baseline"})).toBeDisabled();
+    fireEvent.change(within(dialog).getByRole("textbox",{name:"Source reference"}),{target:{value:"ERP July 2026 ledger"}});
     fireEvent.click(within(dialog).getByRole("button",{name:"Save Manual Baseline"}));
-    await waitFor(()=>expect(baselineApi.manual).toHaveBeenCalledWith("1","2",0,"100000","Historical ERP result before EXA"));
+    await waitFor(()=>expect(baselineApi.manual).toHaveBeenCalledWith("1","2",0,"100000","Historical ERP result before EXA","ERP July 2026 ledger"));
     await screen.findByRole("button",{name:"Change Baseline"});
   });
   it("preserves Results and offers reload when a baseline save conflicts",async()=>{

@@ -27,7 +27,7 @@ export type KpiConfigRecord = {
   evaluationTypeCode?: string | null;
   resultSemantics?: string | null;
   scoringMethod?: string | null;
-  scoringRuleConfig?: { bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "INTERVALS"; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult: number | null; maxResult?: number | null; compliance: number; includesMin?: boolean; includesMax?: boolean }> } | null;
+  scoringRuleConfig?: { model?: string; editorMode?: string; bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "INTERVALS"; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult: number | null; maxResult?: number | null; compliance: number; includesMin?: boolean; includesMax?: boolean }> } | null;
   negativeResultPolicy?: string | null;
   id: number;
   code: string;

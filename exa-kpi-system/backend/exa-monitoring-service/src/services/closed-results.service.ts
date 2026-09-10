@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { extraPoints } from "./scoring-engine.js";
 import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/app-error.js";
 
@@ -28,6 +29,7 @@ function serialize(card: Card) {
       goalUnit: checked?.goalUnit ?? null, unit: input.measurementUnitSymbolSnapshot ?? input.measurementUnitNameSnapshot,
       result: input.result?.resultValue?.toString() ?? null, comment: input.result?.comment ?? null,
       score: input.result?.compliancePercent?.toString() ?? null, goalMet: input.result?.goalMet ?? null,
+      extraPoints: extraPoints(input.result?.rawAchievementPercent, input.result?.compliancePercent)?.toString() ?? null,
       trafficLight: input.result?.trafficLightCode ?? null, weight: input.weightPercentSnapshot.toString(),
       weightedContribution: input.result?.weightedScorePoints?.toString() ?? null,
       dataSource: input.primaryDataSourceNameSnapshot, historical: checked?.historical ?? null,

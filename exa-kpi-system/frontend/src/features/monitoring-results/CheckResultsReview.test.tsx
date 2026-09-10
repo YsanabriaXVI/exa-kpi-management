@@ -8,7 +8,7 @@ let saved:any;
 const input=(id:string,name:string,result:string|null)=>({id,scorecardId:"9",scorecardName:"Sales",kpiConfigurationId:id,parentKpiCode:`KPI-${id}`,kpiName:name,evaluationKind:"OVERALL",subject:null,goal:"100",weight:"20",goalUnit:"USD",unit:"USD",resultValue:result,version:1,groupGoal:null,entryBlock:null});
 const report=()=>({status:"CURRENT",runId:"12",runNo:12,basedOnResultsVersion:saved.monitoringPeriod.resultsVersion,
  summary:{expected:4,entered:3,pending:1,completionPercent:75,errorCount:1,errors:1,critical:0,warnings:0,blocking:1,runStatus:"BLOCKED",weightCoverageComplete:true,allRequiredScoringCalculable:false,readyForSubmit:false},
- evaluations:[{...saved.inputs[0],rawAchievementPercent:"114.600000",compliancePercent:"91.234567",goalMet:true,trafficLight:"GREEN",weightedContribution:"13.685185",status:"CALCULATED"},
+ evaluations:[{...saved.inputs[0],extraPoints:"14.600000",rawAchievementPercent:"114.600000",compliancePercent:"91.234567",goalMet:true,trafficLight:"GREEN",weightedContribution:"13.685185",status:"CALCULATED"},
  {...saved.inputs[1],rawAchievementPercent:"83.333333",compliancePercent:"83.333333",goalMet:false,trafficLight:"GREEN",weightedContribution:"8.333333",status:"CALCULATED"},
  {...saved.inputs[2],rawAchievementPercent:null,compliancePercent:"100.000000",goalMet:true,trafficLight:"YELLOW",weightedContribution:"20.000000",status:"CALCULATED"},
  {...saved.inputs[3],entityLabel:"Ana",rawAchievementPercent:null,compliancePercent:null,goalMet:null,trafficLight:null,weightedContribution:null,status:"NOT_CALCULABLE"}],
@@ -27,10 +27,10 @@ describe("Check Results UI",()=>{
   open();fireEvent.click(await screen.findByRole("button",{name:"Check Results"}));
   await screen.findByText("CURRENT · Check #12 · Results v4");
   expect(manualResultEntryService.check).toHaveBeenCalledWith("1",4,undefined);
-  expect(screen.getByText("114.60%")).toBeVisible();expect(screen.getByText("91.23%")).toBeVisible();expect(screen.getByText("13.69%")).toBeVisible();
+  expect(screen.getByText("+14.60 pts")).toBeVisible();expect(screen.getByText("91.23%")).toBeVisible();expect(screen.getByText("13.69%")).toBeVisible();
  });
  it("renders boolean/null Goal Met, explicit Traffic and partial findings",async()=>{
-  open();fireEvent.click(await screen.findByRole("button",{name:"Check Results"}));await screen.findByText("Raw Achievement");
+  open();fireEvent.click(await screen.findByRole("button",{name:"Check Results"}));await screen.findByText("Extra Points");
   const lower=screen.getAllByText("Lower costs").find(e=>e.closest("tr")?.textContent?.includes("83.33"))!.closest("tr")!;
   expect(within(lower).getByText("No")).toBeVisible();expect(within(lower).getByText("Green")).toBeVisible();
   expect(within(lower).getByText("Green")).toHaveClass("traffic-status", "green");
@@ -38,10 +38,10 @@ describe("Check Results UI",()=>{
   expect(screen.getByText(/Partial Score: 42.50/)).toBeVisible();expect(screen.getByText("RESULT_MISSING")).toBeVisible();expect(screen.getByText(/Blocks future Submit/)).toBeVisible();
  });
  it("hides stale scoring after save and checks again against the new Results version",async()=>{
-  open();fireEvent.click(await screen.findByRole("button",{name:"Check Results"}));await screen.findByText("Raw Achievement");
+  open();fireEvent.click(await screen.findByRole("button",{name:"Check Results"}));await screen.findByText("Extra Points");
   fireEvent.click(screen.getByRole("button",{name:"Back: Result Entry"}));
   fireEvent.change(screen.getByLabelText("Result for Greater sales"),{target:{value:"60000"}});
-  expect(screen.getByRole("button",{name:"Run Check Results again"})).toBeDisabled();expect(screen.queryByText("Raw Achievement")).not.toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"Run Check Results again"})).toBeDisabled();expect(screen.queryByText("Extra Points")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button",{name:"Save Results"}));await screen.findByText("Results or baseline changed. Run Check Results again.");
   expect(screen.queryByText("13.69%")).not.toBeInTheDocument();fireEvent.click(screen.getByRole("button",{name:"Run Check Results again"}));
   await screen.findByText("CURRENT · Check #12 · Results v5");expect(manualResultEntryService.check).toHaveBeenLastCalledWith("1",5,undefined);
@@ -57,7 +57,7 @@ describe("Check Results UI",()=>{
  it("disables duplicate Check while running",async()=>{
   let resolve!:(value:any)=>void;vi.mocked(manualResultEntryService.check).mockImplementation(()=>new Promise(r=>{resolve=r;}));
   open();fireEvent.click(await screen.findByRole("button",{name:"Check Results"}));expect(screen.getByRole("button",{name:"Checking Results…"})).toBeDisabled();
-  resolve({...saved,check:report()});await screen.findByText("Raw Achievement");
+  resolve({...saved,check:report()});await screen.findByText("Extra Points");
  });
  it.each(["SUBMITTED","VALIDATED","CLOSED"])("keeps %s read-only",async status=>{
   saved.monitoringPeriod.status=status;open();await screen.findByLabelText("Result for Greater sales");expect(screen.queryByRole("button",{name:"Check Results"})).not.toBeInTheDocument();

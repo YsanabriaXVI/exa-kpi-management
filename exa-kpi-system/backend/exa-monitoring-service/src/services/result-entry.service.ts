@@ -1,4 +1,5 @@
 import { contributionContractError, isContributingEvaluation } from "../contracts/entity-participation.js";
+import { extraPoints } from "./scoring-engine.js";
 import { sumContributorResults } from "./contributor-results.js";
 import { calculateDivision, divisionDefinition } from "./result-calculation.js";
 import { baselineContext } from "./historical-baseline.service.js";
@@ -36,6 +37,7 @@ function serialize(row: any) {
   const checkStatus = !latestValidationRun ? "NOT_CHECKED" : isCurrentRun(latestValidationRun, row) ? "CURRENT" : "STALE";
   const snapshot = checkStatus === "CURRENT" ? latestValidationRun?.scoringSnapshot : null;
   const inputs = row.inputs.filter((input: any) => input.evaluationKindSnapshot !== "GROUP").map((input: any) => ({
+    singleResult: input.effectiveSettingsSnapshot?.scoringRuleConfig?.model === "SINGLE_RESULT_V1",
     id: input.id.toString(),
     scorecardId: input.scorecard.scorecardExternalId.toString(),
     scorecardCode: input.scorecard.scorecardCodeSnapshot,
@@ -76,11 +78,12 @@ function serialize(row: any) {
       errorCode: input.result.calculationErrorCode,
       version: input.result.calculationVersion,
       rawAchievementPercent: input.result.rawAchievementPercent?.toString() ?? null,
+      extraPoints: extraPoints(input.result.rawAchievementPercent, input.result.compliancePercent)?.toString() ?? null,
       compliancePercent: input.result.compliancePercent?.toString() ?? null,
       weightedScorePoints: input.result.weightedScorePoints?.toString() ?? null,
       trafficLight: input.result.trafficLightCode,
     } : null,
-  }));
+  })).filter((input: any, index: number, all: any[]) => !input.singleResult || all.findIndex(candidate => candidate.singleResult && candidate.kpiConfigurationId === input.kpiConfigurationId) === index);
   const entered = inputs.filter((input: any) => input.entryStatus === "ENTERED").length;
   return {
     check: { status: checkStatus, runId: latestValidationRun?.id.toString() ?? null, runNo: latestValidationRun?.runNo ?? null, basedOnResultsVersion: latestValidationRun?.basedOnResultsVersion ?? null, basedOnBaselineVersion: latestValidationRun?.basedOnBaselineVersion ?? null,
@@ -178,10 +181,27 @@ export const resultEntryService = {
       const legacyExcel = await tx.resultEntryBatch.findFirst({ where: { monitoringPeriodId: periodId, method: { code: "EXCEL" } }, select: { id: true } });
       if (legacyExcel) throw new AppError(409, "ENTRY_METHOD_CONFLICT", "This existing draft contains Excel batches and cannot switch to Manual");
 
-      const inputs = await tx.monitoringPeriodInput.findMany({ where: { id: { in: inputIds }, monitoringPeriodId: periodId }, include: { result: true } });
+      let inputs = await tx.monitoringPeriodInput.findMany({ where: { id: { in: inputIds }, monitoringPeriodId: periodId }, include: { result: true } });
       if (inputs.length !== inputIds.length) throw new AppError(422, "MONITORING_INPUT_NOT_IN_PERIOD", "Every changed input must belong to the requested Monitoring Period");
+      const changes = [...body.changes];
+      const singleInputs = inputs.filter(input => (input.effectiveSettingsSnapshot as any)?.scoringRuleConfig?.model === "SINGLE_RESULT_V1");
+      if (singleInputs.length) {
+        // Scorecards have distinct weighted contributions but share one captured Result.
+        const siblings = await tx.monitoringPeriodInput.findMany({ where: { monitoringPeriodId: periodId, kpiConfigurationExternalId: { in: singleInputs.map(i => i.kpiConfigurationExternalId) } }, include: { result: true } });
+        for (const sibling of siblings) {
+          if ((sibling.effectiveSettingsSnapshot as any)?.scoringRuleConfig?.model !== "SINGLE_RESULT_V1") continue;
+          const sourceInput = singleInputs.find(i => i.kpiConfigurationExternalId === sibling.kpiConfigurationExternalId)!;
+          const sourceChange = body.changes.find(c => c.monitoringPeriodInputId === String(sourceInput.id))!;
+          const submitted = body.changes.find(c => c.monitoringPeriodInputId === String(sibling.id));
+          if (submitted && !sameDecimal(submitted.resultValue == null ? null : new Prisma.Decimal(submitted.resultValue), sourceChange.resultValue == null ? null : new Prisma.Decimal(sourceChange.resultValue))) throw new AppError(422, "SINGLE_RESULT_CONFLICT", "A KPI accepts one Result per period across its Scorecards");
+          if (!submitted) {
+            inputs.push(sibling);
+            changes.push({ ...sourceChange, monitoringPeriodInputId: String(sibling.id), version: sibling.result?.version ?? null });
+          }
+        }
+      }
       const byId = new Map(inputs.map((input) => [input.id.toString(), input]));
-      const normalized = body.changes.map((change) => {
+      const normalized = changes.map((change) => {
         const input = byId.get(change.monitoringPeriodInputId)!;
         const blocked = entryBlock(input);
         if (blocked) throw new AppError(409, blocked, "This frozen evaluation does not support Manual Result Entry V1");
@@ -198,6 +218,7 @@ export const resultEntryService = {
         if (!division && change.inputValues) throw new AppError(422, "RESULT_INPUTS_NOT_ALLOWED", "This evaluation requires a direct Result");
         const nextInputs = contribution ? { aggregation: "SUM", contributors: contribution.values } : division ? change.inputValues! : null;
         const nextValue = contribution ? contribution.value : division ? calculateDivision(change.inputValues!).value : change.resultValue === null ? null : new Prisma.Decimal(change.resultValue);
+        if (settings?.scoringRuleConfig?.model === "SINGLE_RESULT_V1" && settings.negativeResultPolicy === "DISALLOW" && nextValue?.lt(0)) throw new AppError(422, "NEGATIVE_RESULT_NOT_ALLOWED", "This KPI does not allow negative Results");
         if (!division && settings?.resultSemantics === "BINARY" && nextValue !== null && !nextValue.eq(0) && !nextValue.eq(1)) throw new AppError(422, "BINARY_RESULT_INVALID", "Select Yes (1) or No (0)");
         const nextComment = input.result?.comment ?? null;
         if (change.comment !== undefined && change.comment !== nextComment) throw new AppError(422, "RESULT_ONLY_EDITABLE", "Only Result can be edited in Manual Entry V1");

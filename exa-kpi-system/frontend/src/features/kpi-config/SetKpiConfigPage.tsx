@@ -1,3 +1,4 @@
+import { isSingleResultConfig } from "./single-result-model";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMonitoringProfile } from "./MonitoringProfile";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -145,7 +146,7 @@ export function SetKpiConfigPage() {
   const [goal, setGoal] = useState("");
   const [showGoalErrors, setShowGoalErrors] = useState(false);
   const [periodScope, setPeriodScope] = useState<PeriodScope>("CURRENT_PERIOD");
-  const [inputFrequencyCode, setInputFrequencyCode] = useState("MONTHLY");
+  const [inputFrequencyCode, setInputFrequencyCode] = useState("");
   const [entityEvaluationMode, setEntityEvaluationMode] = useState<EntityEvaluationMode>("INDIVIDUAL");
   const [contributorSubjects, setContributorSubjects] = useState<SubjectSelection[]>([]);
   const [goalMode, setGoalMode] = useState<GoalMode>("SINGLE");
@@ -454,6 +455,14 @@ export function SetKpiConfigPage() {
     setDataSource(config.dataSource);
     setIsActive(config.isActive ?? config.status !== "INACTIVE");
     setRanges({ ...config.ranges });
+    if (editMode !== "POOL_PERIOD_EDIT") {
+      setPeriodScope("CURRENT_PERIOD"); setEvaluationScope("OVERALL"); setGoalMode("SINGLE");
+      setGoalType("SINGLE_VALUE"); setGoalAssignment("SAME_GOAL_FOR_ALL");
+      setResultMethod("DIRECT"); setMeasurementInputs([]); setCalculationTemplate(null);
+      setTargetKind("ABSOLUTE_TARGET"); setSubjectType(""); setSubjectGoals([]); setContributorSubjects([]); setGroupGoal(null);
+      setMeasurementUnit(config.goalUnit || config.measurementUnit);
+      if (config.evaluationScope === "BY_SUBJECT" || config.periodScope !== "CURRENT_PERIOD") setGoal("");
+    }
   }, [editConfigQuery.data, isEditing]);
 
   useEffect(() => {
@@ -481,7 +490,7 @@ export function SetKpiConfigPage() {
   }, [editMode, poolEffectiveQuery.data]);
 
   useEffect(() => {
-    if (editMode !== "CREATE" || !analysis) return;
+    if (editMode !== "CREATE" || !selected || !analysis) return;
     const unitAliases: Record<string, string[]> = {
       CONTAINERS: ["containers", "count"],
       COUNT: ["count", "units"],
@@ -504,7 +513,7 @@ export function SetKpiConfigPage() {
       );
       if (match) setMeasurementUnit(match.symbol);
     }
-    if (analysis.cadenceHint && inputFrequencyCode === "MONTHLY")
+    if (analysis.cadenceHint && (!inputFrequencyCode || inputFrequencyCode === "MONTHLY"))
       setInputFrequencyCode(analysis.cadenceHint);
     if (
       goalMode === "SINGLE" &&
@@ -516,6 +525,7 @@ export function SetKpiConfigPage() {
     }
   }, [
     analysis,
+    selected,
     editMode,
     lookupsQuery.data,
     measurementUnit,
@@ -1022,12 +1032,35 @@ export function SetKpiConfigPage() {
     }, 4000);
   };
 
+  const clearConfigurationFields = () => {
+    setGoal("");
+    setGoalUnit("");
+    setMeasurementUnit("");
+    setInputFrequencyCode("");
+    setDataSource("");
+    setRangeMinGoal("");
+    setRangeMaxGoal("");
+    clearSubjectGoalSetup();
+    setContributorSubjects([]);
+    setMeasurementInputs([]);
+    setCalculationTemplate(null);
+    setChangeReason("");
+    setRanges(defaultRanges);
+    setShowGoalErrors(false);
+    setMeasurementUnitToastVisible(false);
+    setResultUnitErrorVisible(false);
+    setResultUnitToastVisible(false);
+    setValidationToast("");
+    setError("");
+  };
+
   const clearDefinition = () => {
     if (definitionLocked) {
       showLockedFieldNotice("definition");
       return;
     }
     setSelected(null);
+    clearConfigurationFields();
     setLastSelectedDefinitionId(null);
     window.localStorage.removeItem("exa:last-kpi-definition");
     window.localStorage.removeItem("exa:kpi-config-selected-draft");
@@ -1423,6 +1456,7 @@ export function SetKpiConfigPage() {
                   );
                   if (selected && !isCompatibleWithSelection(value, selected)) {
                     setSelected(null);
+                    clearConfigurationFields();
                     window.localStorage.removeItem(
                       "exa:kpi-config-selected-draft",
                     );
@@ -1514,83 +1548,15 @@ export function SetKpiConfigPage() {
           </div>
         </section>
 
+        {isEditing && !isSingleResultConfig(editConfigQuery.data) && <p role="status">Configuracion legacy: define una sola meta y revisa las bandas para la nueva revision. Los resultados historicos se conservan.</p>}
         {editMode !== "POOL_PERIOD_EDIT" && (
           <KpiSemanticSetup
-            showGoalErrors={showGoalErrors}
-            periodScope={periodScope}
-            setPeriodScope={setPeriodScope}
-            evaluationScope={evaluationScope}
-            setEvaluationScope={(value) => {
-              setEvaluationScope(value);
-              setGoalMode(value === "BY_SUBJECT" ? "BY_SUBJECT" : "SINGLE");
-              setGoalType("SINGLE_VALUE");
-              setGoalAssignment(
-                value === "BY_SUBJECT"
-                  ? "DIFFERENT_GOAL_PER_SUBJECT"
-                  : "SAME_GOAL_FOR_ALL",
-              );
-              if (value === "OVERALL") {
-                setGroupGoal(null);
-                setGoalUnit(periodScope === "CURRENT_PERIOD" ? goalUnit || measurementUnit : "%");
-                if (periodScope === "CURRENT_PERIOD") setMeasurementUnit(goalUnit || measurementUnit);
-              }
-            }}
-            entityEvaluationMode={entityEvaluationMode}
-            setEntityEvaluationMode={(mode) => {
-              setEntityEvaluationMode(mode);
-              setGoalAssignment("DIFFERENT_GOAL_PER_SUBJECT");
-              setGroupGoal(null);
-              if (mode === "CONTRIBUTE_TO_OVERALL") {
-                if (!contributorSubjects.length) setContributorSubjects(subjectGoals.map(({subjectExternalId,subjectCode,subjectLabel}) => ({subjectExternalId,subjectCode,subjectLabel})));
-                setResultMethod("DIRECT"); setCalculationTemplate(null); setMeasurementInputs([]);
-                if (periodScope === "CURRENT_PERIOD") setMeasurementUnit(goalUnit || measurementUnit);
-                else setGoalUnit("%");
-              }
-            }}
-            contributorSubjects={contributorSubjects}
-            setContributorSubjects={setContributorSubjects}
-            goalAssignment="DIFFERENT_GOAL_PER_SUBJECT"
-            setGoalAssignment={setGoalAssignment}
-            goal={goal}
-            setGoal={setGoal}
+            goal={goal} setGoal={setGoal}
             goalUnit={goalUnit || measurementUnit}
-            setGoalUnit={(value) => { setGoalUnit(value); if (!individual && periodScope === "CURRENT_PERIOD") setMeasurementUnit(value); }}
-            resultUnit={measurementUnit}
-            setResultUnit={(value) => {
-              setMeasurementUnit(value);
-              if (!individual && periodScope === "CURRENT_PERIOD") setGoalUnit(value);
-              setResultUnitErrorVisible(false);
-              setResultUnitToastVisible(false);
-            }}
-            resultUnitError={
-              resultUnitErrorVisible
-                ? "Select the unit of the actual measured Result (for example USD, KM, Containers, or Gallons)."
-                : undefined
-            }
-            subjectType={subjectType}
-            setSubjectType={setSubjectType}
-            subjectGoals={subjectGoals}
-            setSubjectGoals={setSubjectGoals}
-            subjectGoalDrafts={subjectGoalDrafts}
-            setSubjectGoalDrafts={setSubjectGoalDrafts}
-            defaultGoal={defaultGoal}
-            setDefaultGoal={setDefaultGoal}
-            groupGoal={groupGoal}
-            setGroupGoal={setGroupGoal}
-            inputFrequencyCode={inputFrequencyCode}
-            setInputFrequencyCode={setInputFrequencyCode}
-            dataSource={dataSource}
-            setDataSource={setDataSource}
+            setGoalUnit={value => { setGoalUnit(value); setMeasurementUnit(value); }}
+            inputFrequencyCode={inputFrequencyCode} setInputFrequencyCode={setInputFrequencyCode}
+            dataSource={dataSource} setDataSource={setDataSource}
             units={measurementUnitOptions}
-            subjectTypes={subjectTypesQuery.data?.filter(type => type.isActive)}
-            subjects={(lookupsQuery.data?.subjectCatalogs ?? []).map(
-              (item) => ({
-                id: item.id,
-                subjectType: item.subjectType,
-                code: item.code,
-                name: item.name,
-              }),
-            )}
             frequencies={lookupsQuery.data?.inputFrequencies ?? []}
             dataSources={lookupsQuery.data?.dataSources ?? []}
           />
@@ -1641,642 +1607,7 @@ export function SetKpiConfigPage() {
               </label>
             </div>
           </section>
-        ) : (
-          <>
-            <section className="config-card evaluation-reference-card legacy-step5-section">
-              <div className="config-section-heading">
-                <span className="step-number">2</span>
-                <div>
-                  <h2>Evaluation Reference</h2>
-                  <p>
-                    Choose the period used as the reference when evaluating this
-                    KPI.
-                  </p>
-                </div>
-              </div>
-              <fieldset className="config-choice-fieldset evaluation-reference-fieldset">
-                <legend className="sr-only">
-                  Evaluation Reference options
-                </legend>
-                <p className="evaluation-reference-help">
-                  How should this KPI be evaluated?
-                </p>
-                <div className="period-scope-options">
-                  {(
-                    [
-                      [
-                        "CURRENT_PERIOD",
-                        "Current Period",
-                        "Evaluate the current Result directly against its Goal.",
-                      ],
-                      [
-                        "SAME_PERIOD_PREVIOUS_YEAR",
-                        "Same Period Previous Year",
-                        "Compare with the equivalent period one year earlier.",
-                      ],
-                      [
-                        "PREVIOUS_PERIOD",
-                        "Previous Period",
-                        "Compare with the immediately preceding period, including across years.",
-                      ],
-                    ] as const
-                  ).map(([value, label, detail]) => (
-                    <label className="config-radio-card" key={value}>
-                      <input
-                        type="radio"
-                        name="result-period-scope"
-                        checked={periodScope === value}
-                        onChange={() => setPeriodScope(value)}
-                      />
-                      <span>
-                        <strong>{label}</strong>
-                        <small>{detail}</small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            </section>
-            <section className="config-card result-setup-card legacy-step5-section">
-              <div className="config-section-heading">
-                <span className="step-number">4</span>
-                <div>
-                  <h2>Measurement Setup</h2>
-                  <p>
-                    Define the frequency, unit and source of the Result that
-                    will be captured later in Monitoring.
-                  </p>
-                </div>
-              </div>
-              {suggestionParts.length > 0 && (
-                <div className="config-hint" role="note">
-                  <strong>Suggested from Definition</strong>
-                  <span>{suggestionParts.join(" · ")}</span>
-                  <small>Suggestions remain editable.</small>
-                </div>
-              )}
-              <div className="config-fields-grid">
-                <label>
-                  <span>Measurement Frequency</span>
-                  <select
-                    value={inputFrequencyCode}
-                    onChange={(e) => setInputFrequencyCode(e.target.value)}
-                  >
-                    {lookupsQuery.data?.inputFrequencies.map((item) => (
-                      <option key={item.id} value={item.code}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Measurement Unit</span>
-                  <select
-                    ref={measurementUnitRef}
-                    className={
-                      goalHasValue && !measurementUnit
-                        ? "measurement-unit-required"
-                        : undefined
-                    }
-                    aria-invalid={goalHasValue && !measurementUnit}
-                    value={measurementUnit}
-                    onChange={(e) => setMeasurementUnit(e.target.value)}
-                  >
-                    <option value="">Select unit</option>
-                    {measurementUnit &&
-                      !measurementUnitOptions.some(
-                        (item) => item.symbol === measurementUnit,
-                      ) && (
-                        <option value={measurementUnit}>
-                          {measurementUnit}
-                        </option>
-                      )}
-                    {measurementUnitOptions.map((item) => (
-                      <option key={item.id} value={item.symbol}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                  <small>
-                    The Result unit; a percentage target does not automatically
-                    make this %.
-                  </small>
-                </label>
-                <label>
-                  <span>Data Source</span>
-                  <select
-                    value={dataSource}
-                    onChange={(e) => setDataSource(e.target.value)}
-                  >
-                    <option value="">Select source</option>
-                    {dataSource &&
-                      !lookupsQuery.data?.dataSources.some(
-                        (item) => item.name === dataSource,
-                      ) && <option value={dataSource}>{dataSource}</option>}
-                    {lookupsQuery.data?.dataSources.map((item) => (
-                      <option key={item.id} value={item.name}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </section>
-            <section className="config-card goal-setup-card legacy-step5-section">
-              <div className="config-section-heading">
-                <span className="step-number">3</span>
-                <div>
-                  <h2>Goal Setup</h2>
-                  <p>
-                    Use one Goal for the common case; expand structure only when
-                    needed.
-                  </p>
-                </div>
-              </div>
-              <div className="goal-mode-options">
-                <label className="config-radio-card">
-                  <input
-                    type="radio"
-                    name="goal-mode"
-                    checked={goalMode === "SINGLE"}
-                    onChange={() => {
-                      if (hasRangeGoalValue || hasSubjectGoalValue) {
-                        showValidationToast(
-                          "Remove the active Structured Goal before selecting Simple Goal.",
-                        );
-                        return;
-                      }
-                      setGoalMode("SINGLE");
-                      setStructuredGoal("");
-                    }}
-                  />
-                  <span>
-                    <strong>Simple Goal</strong>
-                    <small>One target for this KPI Configuration.</small>
-                  </span>
-                </label>
-                <label className="config-radio-card">
-                  <input
-                    type="radio"
-                    name="goal-mode"
-                    checked={goalMode !== "SINGLE"}
-                    onChange={() => {
-                      if (hasSimpleGoalValue) {
-                        showValidationToast(
-                          "Remove the Simple Goal value before selecting a Structured Goal.",
-                        );
-                        return;
-                      }
-                      setGoalMode(structuredGoal || "RANGE");
-                      if (!structuredGoal) setStructuredGoal("");
-                    }}
-                  />
-                  <span>
-                    <strong>Structured Goal</strong>
-                    <small>A range or different Goals by subject.</small>
-                  </span>
-                </label>
-              </div>
-              {goalMode === "SINGLE" ? (
-                <div className="goal-simple-field">
-                  <label>
-                    <span>{goalPresentation.label}</span>
-                    <div className="goal-value-control">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={goal}
-                        onChange={(e) => setGoal(e.target.value)}
-                      />
-                      <strong className="goal-unit-suffix">
-                        {goalPresentation.suffix || measurementUnit || ""}
-                      </strong>
-                      <button
-                        className="goal-clear-button"
-                        type="button"
-                        disabled={goal === ""}
-                        onClick={() => setGoal("")}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </label>
-                </div>
-              ) : (
-                <div className="structured-goal-layout">
-                  <div
-                    className="goal-structure-menu"
-                    role="radiogroup"
-                    aria-labelledby="goal-structure-title"
-                  >
-                    <h3 id="goal-structure-title">Goal Structure</h3>
-                    <label
-                      className={
-                        periodScope !== "CURRENT_PERIOD" ? "disabled" : ""
-                      }
-                      title={
-                        periodScope !== "CURRENT_PERIOD"
-                          ? "Range with historical comparison is not supported in V1."
-                          : undefined
-                      }
-                    >
-                      <input
-                        disabled={periodScope !== "CURRENT_PERIOD"}
-                        type="radio"
-                        name="goal-structure"
-                        checked={structuredGoal === "RANGE"}
-                        onChange={() => {
-                          if (hasSimpleGoalValue) {
-                            showValidationToast(
-                              "Remove the Simple Goal value before selecting Range.",
-                            );
-                            return;
-                          }
-                          if (hasSubjectGoalValue) {
-                            showValidationToast(
-                              "Remove the Goals by Entity / Subject values before selecting Range.",
-                            );
-                            return;
-                          }
-                          setStructuredGoal("RANGE");
-                          setGoalMode("RANGE");
-                        }}
-                      />{" "}
-                      Range
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="goal-structure"
-                        checked={structuredGoal === "BY_SUBJECT"}
-                        onChange={() => {
-                          if (hasSimpleGoalValue) {
-                            showValidationToast(
-                              "Remove the Simple Goal value before selecting Goals by Entity / Subject.",
-                            );
-                            return;
-                          }
-                          if (hasRangeGoalValue) {
-                            showValidationToast(
-                              "Remove the Range values before selecting Goals by Entity / Subject.",
-                            );
-                            return;
-                          }
-                          setStructuredGoal("BY_SUBJECT");
-                          setGoalMode("BY_SUBJECT");
-                        }}
-                      />{" "}
-                      Goals by Entity / Subject
-                    </label>
-                  </div>
-                  <div className="goal-structure-config">
-                    {!structuredGoal ? (
-                      <div className="structured-empty">
-                        Select Range or Goals by Entity / Subject first.
-                      </div>
-                    ) : structuredGoal === "RANGE" ? (
-                      <div>
-                        <h3>Range Goal</h3>
-                        <div className="range-goal-fields">
-                          <label>
-                            <span>Min Goal</span>
-                            <div className="goal-input-with-clear">
-                              <div className="range-goal-input">
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={rangeMinGoal}
-                                  onChange={(e) =>
-                                    setRangeMinGoal(e.target.value)
-                                  }
-                                />
-                                <strong>{measurementUnit || ""}</strong>
-                              </div>
-                              <button
-                                className="goal-clear-button"
-                                type="button"
-                                disabled={rangeMinGoal === ""}
-                                onClick={() => setRangeMinGoal("")}
-                              >
-                                Clear
-                              </button>
-                            </div>
-                          </label>
-                          <label>
-                            <span>Max Goal</span>
-                            <div className="goal-input-with-clear">
-                              <div className="range-goal-input">
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={rangeMaxGoal}
-                                  onChange={(e) =>
-                                    setRangeMaxGoal(e.target.value)
-                                  }
-                                />
-                                <strong>{measurementUnit || ""}</strong>
-                              </div>
-                              <button
-                                className="goal-clear-button"
-                                type="button"
-                                disabled={rangeMaxGoal === ""}
-                                onClick={() => setRangeMaxGoal("")}
-                              >
-                                Clear
-                              </button>
-                            </div>
-                          </label>
-                        </div>
-                        {isValidGoalNumber(rangeMinGoal) &&
-                          isValidGoalNumber(rangeMaxGoal) &&
-                          Number(rangeMinGoal) > Number(rangeMaxGoal) && (
-                            <p className="field-error">
-                              Min Goal must be less than or equal to Max Goal.
-                            </p>
-                          )}
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="subject-goal-heading">
-                          <h3>Goals by Entity / Subject</h3>
-                          <button
-                            type="button"
-                            className="goal-clear-all-button"
-                            disabled={!hasSubjectGoalValue && !subjectType}
-                            onClick={clearSubjectGoalSetup}
-                          >
-                            Clear all
-                          </button>
-                        </div>
-                        <div className="subject-flow">
-                          <label className="subject-type-field">
-                            <span>1. Subject Type</span>
-                            <select
-                              value={subjectType}
-                              onChange={(e) => {
-                                setSubjectType(
-                                  e.target.value as SubjectType | "",
-                                );
-                                setSubjectGoals([]);
-                                setSubjectGoalDrafts({});
-                              }}
-                            >
-                              <option value="">Select subject type</option>
-                              {subjectTypeOptions.map((item) => (
-                                <option
-                                  value={item.value}
-                                  key={item.value}
-                                  disabled={!item.available}
-                                >
-                                  {item.label}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <div>
-                            <span className="field-label">
-                              2. Select {subjectEntityLabel}
-                            </span>
-                            {!subjectType ? (
-                              <p className="field-help">
-                                Select a subject type first.
-                              </p>
-                            ) : subjectEntities.length > 0 ? (
-                              <div
-                                className="entity-selector"
-                                aria-label={`Select ${subjectEntityLabel}`}
-                              >
-                                {subjectEntities.map((entity) => {
-                                  const checked = subjectGoals.some(
-                                    (item) =>
-                                      item.subjectExternalId === entity.id,
-                                  );
-                                  return (
-                                    <label key={entity.id}>
-                                      <input
-                                        type="checkbox"
-                                        checked={checked}
-                                        onChange={() => {
-                                          if (checked) {
-                                            setSubjectGoals((current) =>
-                                              current.filter(
-                                                (item) =>
-                                                  item.subjectExternalId !==
-                                                  entity.id,
-                                              ),
-                                            );
-                                            setSubjectGoalDrafts((current) => {
-                                              const next = { ...current };
-                                              delete next[entity.id];
-                                              return next;
-                                            });
-                                          } else {
-                                            const initial = defaultGoal || "0";
-                                            setSubjectGoals((current) => [
-                                              ...current,
-                                              {
-                                                subjectExternalId: entity.id,
-                                                subjectCode: entity.code,
-                                                subjectLabel: entity.name,
-                                                goal: Number(initial),
-                                              },
-                                            ]);
-                                            setSubjectGoalDrafts((current) => ({
-                                              ...current,
-                                              [entity.id]: initial,
-                                            }));
-                                          }
-                                        }}
-                                      />
-                                      <span>{entity.name}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <p className="field-help">
-                                Catalog integration is not available for this
-                                subject type yet.
-                              </p>
-                            )}
-                          </div>
-                          <div className="default-goal-block">
-                            <label>
-                              <span>3. Default Goal</span>
-                              <div className="goal-input-with-clear">
-                                <input
-                                  className="default-goal-input"
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={defaultGoal}
-                                  onChange={(e) => {
-                                    const value = e.target.value;
-                                    setDefaultGoal(value);
-                                    if (
-                                      applyDefaultToAll &&
-                                      isValidGoalNumber(value)
-                                    ) {
-                                      setSubjectGoals((items) =>
-                                        items.map((item) => ({
-                                          ...item,
-                                          goal: Number(value),
-                                        })),
-                                      );
-                                      setSubjectGoalDrafts(
-                                        Object.fromEntries(
-                                          subjectGoals.map((item) => [
-                                            item.subjectExternalId,
-                                            value,
-                                          ]),
-                                        ),
-                                      );
-                                    }
-                                  }}
-                                />
-                                <button
-                                  className="goal-clear-button"
-                                  type="button"
-                                  disabled={defaultGoal === ""}
-                                  onClick={() => {
-                                    setDefaultGoal("");
-                                    setApplyDefaultToAll(false);
-                                  }}
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            </label>
-                            <label
-                              className={`apply-all-checkbox ${!subjectGoals.length || !isValidGoalNumber(defaultGoal) ? "disabled" : ""}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={applyDefaultToAll}
-                                disabled={
-                                  !subjectGoals.length ||
-                                  !isValidGoalNumber(defaultGoal)
-                                }
-                                onChange={(e) => {
-                                  const checked = e.target.checked;
-                                  setApplyDefaultToAll(checked);
-                                  if (checked) {
-                                    setSubjectGoals((items) =>
-                                      items.map((item) => ({
-                                        ...item,
-                                        goal: Number(defaultGoal),
-                                      })),
-                                    );
-                                    setSubjectGoalDrafts(
-                                      Object.fromEntries(
-                                        subjectGoals.map((item) => [
-                                          item.subjectExternalId,
-                                          defaultGoal,
-                                        ]),
-                                      ),
-                                    );
-                                  }
-                                }}
-                              />
-                              <span>Apply to all entities</span>
-                            </label>
-                          </div>
-                        </div>
-                        {subjectGoals.length > 0 && (
-                          <div className="subject-goal-table">
-                            <div className="subject-goal-row head">
-                              <span>Entity</span>
-                              <span>Goal</span>
-                              <span>Measurement Unit</span>
-                              <span />
-                            </div>
-                            {subjectGoals.map((item) => (
-                              <div
-                                className="subject-goal-row"
-                                key={item.subjectExternalId}
-                              >
-                                <strong>{item.subjectLabel}</strong>
-                                <div className="subject-goal-input-control">
-                                  <input
-                                    aria-label={`Goal for ${item.subjectLabel}`}
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={
-                                      subjectGoalDrafts[
-                                        item.subjectExternalId
-                                      ] ?? String(item.goal)
-                                    }
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      setApplyDefaultToAll(false);
-                                      setSubjectGoalDrafts((current) => ({
-                                        ...current,
-                                        [item.subjectExternalId]: value,
-                                      }));
-                                      if (isValidGoalNumber(value))
-                                        setSubjectGoals((items) =>
-                                          items.map((row) =>
-                                            row.subjectExternalId ===
-                                            item.subjectExternalId
-                                              ? { ...row, goal: Number(value) }
-                                              : row,
-                                          ),
-                                        );
-                                    }}
-                                  />
-                                  <button
-                                    className="goal-clear-button"
-                                    type="button"
-                                    disabled={
-                                      (subjectGoalDrafts[
-                                        item.subjectExternalId
-                                      ] ?? String(item.goal)) === ""
-                                    }
-                                    onClick={() => {
-                                      setApplyDefaultToAll(false);
-                                      setSubjectGoalDrafts((current) => ({
-                                        ...current,
-                                        [item.subjectExternalId]: "",
-                                      }));
-                                    }}
-                                  >
-                                    Clear
-                                  </button>
-                                </div>
-                                <span>
-                                  {selectedMeasurementUnitName || "—"}
-                                </span>
-                                <button
-                                  type="button"
-                                  aria-label={`Remove ${item.subjectLabel}`}
-                                  onClick={() => {
-                                    setSubjectGoals((items) =>
-                                      items.filter(
-                                        (row) =>
-                                          row.subjectExternalId !==
-                                          item.subjectExternalId,
-                                      ),
-                                    );
-                                    setSubjectGoalDrafts((current) => {
-                                      const next = { ...current };
-                                      delete next[item.subjectExternalId];
-                                      return next;
-                                    });
-                                  }}
-                                >
-                                  <X size={15} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </section>
-          </>
-        )}
+        ) : null}
 
         {editMode === "POOL_PERIOD_EDIT" && <section className="config-card traffic-light-card">
           <TrafficLightEditor

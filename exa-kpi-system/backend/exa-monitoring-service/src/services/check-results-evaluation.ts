@@ -6,7 +6,7 @@ import { historicalComparison } from "./historical-comparison.js";
 import { calculateDivision, divisionDefinition } from "./result-calculation.js";
 import { Prisma } from "@prisma/client";
 import { parseFrozenEffectiveKpiSettings } from "../contracts/frozen-effective-kpi-settings.js";
-import { calculateKpiScore, notCalculable, persistedDecimal } from "./scoring-engine.js";
+import { calculateKpiScore, notCalculable, persistedDecimal, extraPoints } from "./scoring-engine.js";
 
 const text = (value: any): string | null => value == null ? null : String(value);
 const decimal = (value: any) => new Prisma.Decimal(value);
@@ -92,7 +92,7 @@ export function evaluateCheck(inputs: any[], cards: any[], selectedEntryMethod: 
       goalUnit:evaluationUnits(input.effectiveSettingsSnapshot,input.subjectExternalIdSnapshot).goalUnit?.symbol??null,resultValue:text(saved),goal:text(input.goalValueSnapshot),unit:input.measurementUnitSymbolSnapshot??input.measurementUnitNameSnapshot,
       weight:text(input.weightPercentSnapshot),behavior:input.evaluationTypeCodeSnapshot,scoringMethod:frozen?.scoringMethod??input.scoringMethodCodeSnapshot,
       status:scored.status,errorCode:scored.errorCode,rawAchievementPercent:scored.rawAchievement?.toFixed(6)??null,
-      compliancePercent:scored.compliance?.toFixed(6)??null,goalMet:scored.goalMet,trafficLight:scored.trafficLight,
+      extraPoints:extraPoints(scored.rawAchievement, scored.compliance)?.toFixed(6)??null,compliancePercent:scored.compliance?.toFixed(6)??null,goalMet:scored.goalMet,trafficLight:scored.trafficLight,
       weightedContribution:scored.weightedScore?.toFixed(6)??null,groupEvaluation:input.effectiveSettingsSnapshot?.groupGoal?"NOT_AVAILABLE":null};
     for(const code of new Set([scored.errorCode,...(failure?[failure]:[])].filter((c):c is string=>c!==null))) {
       const message = code === "FROZEN_KPI_SETTINGS_INVALID" && !input.effectiveSettingsSnapshot

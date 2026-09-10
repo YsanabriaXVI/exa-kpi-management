@@ -151,7 +151,7 @@ describe("Set KPI Config setup contract", () => {
     ]);
     expect(units.map((unit) => unit.label)).toEqual([
       "USD",
-      "km — Kilometers",
+      "km · Kilometers",
       "%",
     ]);
   });

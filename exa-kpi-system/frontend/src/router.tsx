@@ -7,7 +7,6 @@ import { KpiDefinitionDetail } from "./features/kpi-definition/KpiDefinitionDeta
 import { KpiConfigOverview } from "./features/kpi-config/KpiConfigOverview";
 import { SetKpiConfigPage } from "./features/kpi-config/SetKpiConfigPage";
 import { KpiConfigDetail } from "./features/kpi-config/KpiConfigDetail";
-import { CatalogManagementPage } from "./features/kpi-config/CatalogManagementPage";
 import { KpiPoolOverview } from "./features/kpi-pool/KpiPoolOverview";
 import { KpiPoolInfo } from "./features/kpi-pool/KpiPoolInfo";
 import { KpiPoolDetail } from "./features/kpi-pool/KpiPoolDetail";
@@ -120,7 +119,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "kpi-management/config/catalogs",
-        element: <CatalogManagementPage />,
+        element: <Navigate to="/app/kpi-management/config/overview" replace />,
       },
       {
         path: "kpi-management/config/detail-record",

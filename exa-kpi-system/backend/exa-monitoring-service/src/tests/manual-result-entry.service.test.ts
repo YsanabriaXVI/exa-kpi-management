@@ -24,6 +24,22 @@ beforeEach(()=>{
 });
 const save=(values:Array<[string,string|null,number|null]>,resultsVersion=period.resultsVersion)=>resultEntryService.save("1",{resultsVersion,changes:values.map(([monitoringPeriodInputId,resultValue,version])=>({monitoringPeriodInputId,resultValue,version}))},7n);
 describe("Manual Results V1",()=>{
+ it("captures one single-model Result and shares it across Scorecard contributions",async()=>{
+  inputs.splice(2);
+  for (const input of inputs) { input.evaluationKindSnapshot="OVERALL";input.subjectLabelSnapshot=null;input.subjectExternalIdSnapshot=null;input.effectiveSettingsSnapshot={periodScope:"CURRENT_PERIOD",resultMethod:"DIRECT",negativeResultPolicy:"DISALLOW",scoringRuleConfig:{model:"SINGLE_RESULT_V1"}}; }
+  db.monitoringPeriodInput.findMany.mockImplementation(async({where}:any)=>where.id ? inputs.filter(input=>where.id.in.includes(input.id)) : inputs);
+  const result=await save([["1","115",null]]);
+  expect(result.inputs).toHaveLength(1);
+  expect(inputs.map(i=>i.result.resultValue.toString())).toEqual(["115","115"]);
+  expect(db.kpiResultRevision.create).toHaveBeenCalledTimes(2);
+  await expect(save([["1","-1",1]])).rejects.toMatchObject({code:"NEGATIVE_RESULT_NOT_ALLOWED"});
+ });
+ it("rejects conflicting Results for the same KPI in a batch",async()=>{
+  inputs.splice(2);for(const input of inputs)input.effectiveSettingsSnapshot={scoringRuleConfig:{model:"SINGLE_RESULT_V1"}};
+  db.monitoringPeriodInput.findMany.mockImplementation(async()=>inputs);
+  await expect(save([["1","100",null],["2","101",null]])).rejects.toMatchObject({code:"SINGLE_RESULT_CONFLICT"});
+  expect(db.kpiResult.create).not.toHaveBeenCalled();
+ });
  it("saves three independent entity Results, including zero, with frozen weights and no Group input",async()=>{
   const result=await save([["1","0",null],["2","58200",null],["3","52000",null]]);
   expect(result.summary).toEqual({expected:4,entered:3,pending:1,completionPercent:75});

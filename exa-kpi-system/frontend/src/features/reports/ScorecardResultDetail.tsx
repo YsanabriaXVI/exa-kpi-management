@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { AlertTriangle, ArrowLeft, Check, Layers3, Link2, Target, UsersRound, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useOfficialResults, ReportLoadState, OfficialAudit, OfficialTraffic, percent, numberOrNull, latestResults, resultLink, type OfficialEvaluation, type OfficialResult } from "./official-results";
+import { useOfficialResults, ReportLoadState, OfficialAudit, OfficialTraffic, percent, points, numberOrNull, latestResults, resultLink, type OfficialEvaluation, type OfficialResult } from "./official-results";
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
 import "./reports.css";
 import "./scorecard-result-detail.css";
@@ -130,7 +130,7 @@ export function ScorecardResultDetail() {
 }
 
 function ResultKpiTable({rows}:{rows:OfficialEvaluation[]}) {
-  return <section><header><Target size={19}/><strong>KPIs Included ({rows.length})</strong></header><div className="report-table-wrap"><table><thead><tr><th>KPI Code</th><th>KPI Name / Entity</th><th>Assigned Weight</th><th>Goal</th><th>Result</th><th>Score</th><th>Weighted Result</th><th>Goal Met</th><th>Traffic Light</th></tr></thead><tbody>{rows.map(kpi=><tr key={kpi.id}><td>{kpi.code}</td><td>{kpi.name}{kpi.entityLabel && " / " + kpi.entityLabel}</td><td>{percent(kpi.weight)}</td><td>{kpi.goal ?? "—"} {kpi.goalUnit}</td><td>{kpi.result ?? "—"} {kpi.unit}</td><td>{percent(kpi.score)}</td><td>{percent(kpi.weightedContribution)}</td><td>{kpi.goalMet===null?"—":kpi.goalMet?"Yes":"No"}</td><td><OfficialTraffic value={kpi.trafficLight}/></td></tr>)}</tbody></table></div></section>;
+  return <section><header><Target size={19}/><strong>KPIs Included ({rows.length})</strong></header><div className="report-table-wrap"><table><thead><tr><th>KPI Code</th><th>KPI Name / Entity</th><th>Assigned Weight</th><th>Goal</th><th>Result</th><th>Compliance %</th><th>Extra Points</th><th>Weighted Result</th><th>Goal Met</th><th>Traffic Light</th></tr></thead><tbody>{rows.map(kpi=><tr key={kpi.id}><td>{kpi.code}</td><td>{kpi.name}{kpi.entityLabel && " / " + kpi.entityLabel}</td><td>{percent(kpi.weight)}</td><td>{kpi.goal ?? "—"} {kpi.goalUnit}</td><td>{kpi.result ?? "—"} {kpi.unit}</td><td>{percent(kpi.score)}</td><td>{points(kpi.extraPoints)}</td><td>{percent(kpi.weightedContribution)}</td><td>{kpi.goalMet===null?"—":kpi.goalMet?"Yes":"No"}</td><td><OfficialTraffic value={kpi.trafficLight}/></td></tr>)}</tbody></table></div></section>;
 }
 function ResultLinkedTable({rows}:{rows:OfficialResult["links"]}) {
   return <section><header><Link2 size={19}/><strong>Linked ScoreCards ({rows.length})</strong></header><div className="report-table-wrap"><table><thead><tr><th>ScoreCard Code</th><th>Linked ScoreCard</th><th>Assigned Weight</th><th>Final Score</th><th>Details</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td>{r.code}</td><td>{r.name}</td><td>{percent(r.weight)}</td><td>{percent(r.score)}</td><td><Link to={resultLink(r)}>View Official Result</Link></td></tr>)}</tbody></table></div></section>;

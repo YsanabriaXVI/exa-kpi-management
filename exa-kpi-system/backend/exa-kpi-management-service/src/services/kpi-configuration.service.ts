@@ -309,7 +309,8 @@ export const kpiConfigurationService = {
       const now = new Date();
       const schedulingBase = latest && latest.effectiveFrom > now ? latest.effectiveFrom : now;
       const effectiveFrom = input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : nextPeriodStart(schedulingBase, c.frequency.monthsPerPeriod);
-      const pendingLatest = latest && input.effectiveFrom && effectiveFrom <= latest.effectiveFrom ? latest : null;
+      // New single-result revisions never replace or delete an earlier contract.
+      const pendingLatest = input.scoringRuleConfig?.model !== "SINGLE_RESULT_V1" && latest && input.effectiveFrom && effectiveFrom <= latest.effectiveFrom ? latest : null;
       let revisionNumber = (latest?.revisionNumber ?? 0) + 1;
       if (pendingLatest) {
         const previous = await tx.kpiConfigurationRevision.findFirst({ where: { kpiConfigurationId: id, revisionNumber: { lt: pendingLatest.revisionNumber } }, orderBy: { revisionNumber: "desc" } });
