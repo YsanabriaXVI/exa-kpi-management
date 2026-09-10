@@ -19,7 +19,7 @@ beforeEach(()=>{
  for(const catalog of [db.monitoringInputMethod,db.resultEntryBatchStatus,db.resultEntryRowStatus,db.kpiResultStatus])catalog.findUnique.mockResolvedValue({id:1n});
  db.resultEntryBatch.aggregate.mockResolvedValue({_max:{batchNo:0}});db.resultEntryBatch.create.mockResolvedValue({id:1n});db.resultEntryBatchRow.create.mockResolvedValue({id:1n});
  db.monitoringValidationRun.updateMany.mockResolvedValue({count:0});
- db.kpiResult.create.mockImplementation(async({data}:any)=>{const result={...data,id:data.monitoringPeriodInputId};inputs.find(i=>i.id===data.monitoringPeriodInputId).result=result;return result;});
+ db.kpiResult.create.mockImplementation(async({data}:any)=>{const result={...data,inputValues:data.inputValues === Prisma.JsonNull ? null : data.inputValues,id:data.monitoringPeriodInputId};inputs.find(i=>i.id===data.monitoringPeriodInputId).result=result;return result;});
  db.kpiResult.updateMany.mockImplementation(async({where,data}:any)=>{if(where.input){for(const input of inputs)if(input.result)Object.assign(input.result,data);return{count:inputs.length};}const input=inputs.find(i=>i.result?.id===where.id);if(input.result.version!==where.version)return{count:0};input.result={...input.result,resultValue:data.resultValue,version:input.result.version+1,revisionNo:input.result.revisionNo+1};return{count:1};});
 });
 const save=(values:Array<[string,string|null,number|null]>,resultsVersion=period.resultsVersion)=>resultEntryService.save("1",{resultsVersion,changes:values.map(([monitoringPeriodInputId,resultValue,version])=>({monitoringPeriodInputId,resultValue,version}))},7n);

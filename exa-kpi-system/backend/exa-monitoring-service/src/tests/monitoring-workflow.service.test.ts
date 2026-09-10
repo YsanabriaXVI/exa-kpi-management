@@ -19,6 +19,7 @@ import { monitoringWorkflowService } from "../services/monitoring-workflow.servi
 
 beforeEach(() => {
   vi.clearAllMocks();
+  tx.monitoringPeriodInput.findMany.mockResolvedValue([]);
   db.$transaction.mockImplementation((callback: (client: typeof tx) => unknown) => callback(tx));
 });
 
@@ -36,7 +37,7 @@ describe("Monitoring workflow", () => {
     await expect(monitoringWorkflowService[action]("1", { version: 4, withExceptions: true }, 7n)).rejects.toThrow();
     expect(tx.monitoringPeriod.updateMany).not.toHaveBeenCalled();
     await monitoringWorkflowService[action]("1", { version: 4, withExceptions: true, justification }, 7n);
-    expect(tx.monitoringPeriodWorkflowEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ comment: justification, metadata: { withExceptions: true, validationRunId: "8" } }) });
+    expect(tx.monitoringPeriodWorkflowEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ comment: justification, metadata: { withExceptions: true, validationRunId: "8", exceptionCodes: ["RESULT_MISSING"] } }) });
   });
   it.each(["submit", "approve", "close"] as const)("never waives scoring errors at %s", async action => {
     checked(action === "submit" ? "DRAFT" : action === "approve" ? "SUBMITTED" : "VALIDATED", [{ findingCode: "RESULT_MISSING", exceptionAllowed: true }, { findingCode: "SCORING_METHOD_NOT_CONFIGURED", exceptionAllowed: true }]);

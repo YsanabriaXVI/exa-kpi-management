@@ -1,3 +1,4 @@
+import { ClosedPeriodAudit } from "./ClosedPeriodAudit";
 import { HistoricalBaseline } from "./HistoricalBaseline";
 import { PeriodWorkflow, type WorkflowAction } from "./PeriodWorkflow";
 import { NextPeriod } from "./NextPeriod";
@@ -86,7 +87,7 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
       const result = await manualResultEntryService.workflow(periodId, action, loaded.monitoringPeriod.version, details);
       accept(result); client.setQueryData(["monitoring-result-entry", periodId], result);
       setStep(action === "return-for-correction" ? 1 : action === "submit" ? 4 : 5);
-      for (const key of ["monitoring-overview", "monitoring-detail", "monitoring-attached", "monitoring-periods", "monitoring-schedule", "monitoring-period-options", "monitoring-period-resolver"]) void client.invalidateQueries({ queryKey: [key] });
+      for (const key of ["official-closed-results", "monitoring-next-period", "monitoring-overview", "monitoring-detail", "monitoring-attached", "monitoring-periods", "monitoring-schedule", "monitoring-period-options", "monitoring-period-resolver"]) void client.invalidateQueries({ queryKey: [key] });
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Workflow action failed. Reload saved Results and try again."); }
     finally { setBusy(false); }
   }
@@ -97,11 +98,12 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
   const current = loaded.check?.status === "CURRENT" && !dirty;
   const ready = current && (loaded.check?.summary?.readyForSubmit === true || loaded.check?.summary?.readyForSubmitWithExceptions === true);
   const steps = ["Result Entry", "Check Results", "Review & Submit", "Approval", "Close Period"];
-  const available = (stage: number) => stage <= 2 || (stage === 3 ? current : stage === 4 ? period.status !== "DRAFT" : ["VALIDATED", "CLOSED"].includes(period.status));
+  const available = (stage: number) => period.status === "CLOSED" || stage <= 2 || (stage === 3 ? current : stage === 4 ? period.status !== "DRAFT" : ["VALIDATED", "CLOSED"].includes(period.status));
   const groups = new Map<string, typeof loaded.inputs>();
   for (const input of loaded.inputs) { const key = `${input.scorecardId}:${input.kpiConfigurationId}`; groups.set(key, [...(groups.get(key) ?? []), input]); }
   return <main className="monitor-page result-entry-page">
     <header className="result-entry-header"><Link to="/app/monitoring-results/overview">Monitoring Overview</Link><div><h1>Result Entry</h1><p>Enter what actually happened. Goals, units and weights are frozen.</p></div></header>
+    {period.status === "CLOSED" && <aside className="check-results-review" role="status"><strong>{period.closedWithExceptions ? "Closed with Exceptions" : "Closed"} · Read-only</strong><p>Results, checks and scores are preserved. You can navigate every step.</p></aside>}
     <section className="monitoring-period-sticky-context"><div><strong>{period.poolName}</strong><p>{period.periodLabel} · {period.status}</p></div><Link to="/app/monitoring-results/result-entry">Change Period</Link></section>
     <nav className="monitoring-wizard" aria-label="Results workflow steps">{steps.map((label, index) => <button key={label} aria-current={step === index + 1 ? "step" : undefined} disabled={busy || (dirty && index !== 0) || !available(index + 1)} onClick={() => setStep(index + 1)}><span>{index + 1}</span><strong>{label}</strong></button>)}</nav>
     <section className="entry-workspace manual-v1">
@@ -136,6 +138,7 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
       </div>
       {step === 2 && <CheckResultsReview report={loaded.check} dirty={dirty} busy={checking} readOnly={readOnly} selected={selected&&!busy} onCheck={checkResults}/>}
       {step >= 3 && <><h2>{steps[step - 1]}</h2><p>{loaded.summary.entered} / {loaded.summary.expected} Results entered · Check: {loaded.check?.status ?? "NOT_CHECKED"}</p><div className="wizard-scorecards">{loaded.check?.scorecards.map(card => <article className="check-scorecard" key={card.id}><strong>{card.name}</strong><p>{card.score === null ? "Score unavailable" : `${Number(card.score).toFixed(2)}%`} · {card.scoreStatus}</p></article>)}</div><PeriodWorkflow data={loaded} disabled={busy || dirty} onAction={workflow}/></>}
+      {period.status === "CLOSED" && <ClosedPeriodAudit periodId={periodId}/>}
       {step === 5 && period.status === "CLOSED" && <NextPeriod periodId={periodId}/>}
       {error && <div role="alert"><p>{error}</p><button disabled={busy} onClick={async () => { if (dirty && !window.confirm("Discard unsaved Results and reload persisted values?")) return; const response = await query.refetch(); if (response.data) {accept(response.data);setError("");} }}>Reload saved Results</button></div>}
       {saved && <p role="status">Results saved.</p>}
@@ -143,7 +146,7 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
         {step > 1 && <button className="entry-secondary" disabled={busy} onClick={() => setStep(step - 1)}>Back: {steps[step - 2]}</button>}
         {step === 1 && !readOnly && <><button className="entry-secondary" disabled={!selected || busy} onClick={() => save()}>{busy ? "Saving…" : "Save Results"}</button><button className="entry-primary" disabled={!selected || busy || dirty} onClick={checkResults}>{loaded.check?.runId ? "Run Check Results again" : "Check Results"}</button></>}
         {step === 1 && readOnly && <button className="entry-primary" onClick={() => setStep(2)}>View Check Results</button>}
-        {step === 2 && <button className="entry-primary" disabled={busy || !current} onClick={() => setStep(3)}>Next: Review & Submit</button>}
+        {step === 2 && <button className="entry-primary" disabled={busy || (period.status !== "CLOSED" && !current)} onClick={() => setStep(3)}>Next: Review & Submit</button>}
         {step === 3 && period.status === "DRAFT" && !ready && <span>Resolve blocking Check findings before submitting.</span>}
         {step >= 3 && step < 5 && available(step + 1) && <button className="entry-primary" disabled={busy} onClick={() => setStep(step + 1)}>Next: {steps[step]}</button>}
       </div></footer>

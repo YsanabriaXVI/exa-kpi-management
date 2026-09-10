@@ -53,7 +53,7 @@ const formatAuditDate = (value: string | null | undefined) =>
 export function ScorecardDetail() {
   const [params] = useSearchParams();
   const id = Number(params.get("scorecardId") ?? 0);
-  const [periodKey, setPeriodKey] = useState("");
+  const [periodKey, setPeriodKey] = useState(params.get("periodKey") ?? "");
   const [search, setSearch] = useState("");
   const [measurementUnits, setMeasurementUnits] = useState<string[]>([]);
   const [dataSources, setDataSources] = useState<string[]>([]);

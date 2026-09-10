@@ -1,7 +1,9 @@
+import { ReportExportButtons } from "./ReportExportButtons";
+import { exportPercent, type TableExport } from "./table-export";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Eye, FileText, Search, TrendingDown, TrendingUp, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { reportScorecards, scorecardHistory } from "./reports.data";
+import { useOfficialResults, ReportLoadState, departmentNames, numberOrNull, percent, averageOf, resultLink, type OfficialResult } from "./official-results";
 import { useMultiSelectVisibleCount } from "../../components/useMultiSelectVisibleCount";
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
@@ -107,11 +109,15 @@ const monthOptions = [
 type MonthKey = (typeof monthOptions)[number]["value"];
 const months = monthOptions.map((month) => month.label);
 const allMonthKeys = monthOptions.map((month) => month.value);
-const availableYears = ["2024", "2025", "2026"];
+
 const values = (items: string[]) => items.map((value) => ({ value, label: value }));
 
 export function ScorecardResultsHistory() {
   const navigate = useNavigate();
+  const query = useOfficialResults();
+  const scorecardHistory = useMemo(() => historyRows(query.items), [query.items]);
+  const availableYears = [...new Set(query.items.map(r=>r.periodEnd.slice(0,4)))].sort();
+
   const [pageSize, setPageSize] = useState(10);
   const [searchParams] = useSearchParams();
   const initialDepartments = useMemo(
@@ -122,7 +128,7 @@ export function ScorecardResultsHistory() {
   const currentYear = now.getFullYear();
   const currentMonth = allMonthKeys[now.getMonth()];
   const currentYearIsAvailable = availableYears.includes(String(currentYear));
-  const defaultYear = currentYearIsAvailable ? String(currentYear) : availableYears[availableYears.length - 1];
+  const defaultYear = currentYearIsAvailable ? String(currentYear) : availableYears[availableYears.length - 1] ?? String(currentYear);
   const initialFilteredScorecardCodes = useMemo(
     () => initialDepartments.length
       ? [...new Set(scorecardHistory
@@ -132,7 +138,7 @@ export function ScorecardResultsHistory() {
         ))
         .map((item) => item.code))]
       : [],
-    [defaultYear, initialDepartments],
+    [scorecardHistory, defaultYear, initialDepartments],
   );
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const scorecardSearchRef = useRef<HTMLElement>(null);
@@ -148,6 +154,16 @@ export function ScorecardResultsHistory() {
   const [statuses, setStatuses] = useState<string[]>([]);
   const [years, setYears] = useState<string[]>([defaultYear]);
   const [activeYear, setActiveYear] = useState(defaultYear);
+  const initialized = useRef(false);
+  useEffect(()=>{
+    if(initialized.current || !query.items.length)return;
+    initialized.current=true;
+    const requested=searchParams.get("scorecardId");
+    const matched=query.items.filter(r=>(!requested || r.scorecardId===requested) && (!initialDepartments.length || departmentNames(r).some(d=>initialDepartments.includes(d))));
+    setFilteredScorecardCodes([...new Set(matched.map(r=>r.code))]);
+    const year=[...matched].sort((a,b)=>b.periodEnd.localeCompare(a.periodEnd))[0]?.periodEnd.slice(0,4);
+    if(year){setYears([year]);setActiveYear(year);}
+  },[query.items,searchParams]);
   const [selectedMonths, setSelectedMonths] = useState<MonthKey[]>([...allMonthKeys]);
   const [focusMonth, setFocusMonth] = useState<MonthKey | null>(null);
   const [focusClearedManually, setFocusClearedManually] = useState(true);
@@ -161,7 +177,7 @@ export function ScorecardResultsHistory() {
     ...scorecardHistory
       .filter((item) => years.includes(item.year))
       .flatMap((item) => item.departments.split(",").map((department) => department.trim())),
-  ])], [initialDepartments, years]);
+  ])], [scorecardHistory, initialDepartments, years]);
   const scorecardSuggestions = useMemo<ScorecardSelectorOption[]>(() => {
     const query = scorecardQuery.trim().toLowerCase();
     return scorecardHistory
@@ -169,15 +185,30 @@ export function ScorecardResultsHistory() {
       .filter((item) => !selectedScorecardCodes.includes(item.code))
       .filter((item) => `${item.code} ${item.name} ${item.departments}`.toLowerCase().includes(query))
       .map((item) => ({ type: "scorecard" as const, value: item.code, label: item.name, detail: `${item.code} · ${item.departments}` }));
-  }, [scorecardQuery, selectedScorecardCodes, years]);
+  }, [scorecardHistory, scorecardQuery, selectedScorecardCodes, years]);
   const rows = useMemo(() => scorecardHistory.filter((item) =>
     (!tableSearch || `${item.code} ${item.name} ${item.departments}`.toLowerCase().includes(tableSearch.toLowerCase())) &&
     selectedScorecardCodes.includes(item.code) && item.year === activeYear,
-  ).sort((left, right) => compareSortValues(historySortValue(left, sort.key), historySortValue(right, sort.key), sort.direction)), [activeYear, selectedScorecardCodes, sort, tableSearch]);
+  ).sort((left, right) => compareSortValues(historySortValue(left, sort.key) ?? "", historySortValue(right, sort.key) ?? "", sort.direction)), [scorecardHistory, activeYear, selectedScorecardCodes, sort, tableSearch]);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * pageSize;
   const paginatedRows = rows.slice(pageStart, pageStart + pageSize);
+  const exportReport = (): TableExport => ({
+    title: "ScoreCard Results History", filename: "scorecard-results-history",
+    context: [
+      ["ScoreCards in matrix", selectedScorecardCodes.join(", ") || "None"],
+      ["Year shown", activeYear ?? "None"], ["Visible months", visibleMonths.map(month => month.label).join(", ") || "None"],
+      ["Search", tableSearch || "None"], ["Sort", `${sort.key} ${sort.direction}`],
+    ],
+    headers: ["ScoreCard Code", "ScoreCard", "Departments", "Input Frequency", "Duration", "Generated Inputs",
+      ...visibleMonths.map(month => `${month.label} ${activeYear}`), "Average", "Trend"],
+    rows: rows.map(r => [r.code, r.name, r.departments, r.frequency, r.duration, r.generated,
+      ...visibleMonths.map(month => {
+        const index = allMonthKeys.indexOf(month.value);
+        return exportPercent(r.scores[index], r.cells[index]?.status);
+      }), exportPercent(r.average), r.trend]),
+  });
   useEffect(() => setPage(1), [departments, frequencies, selectedScorecardCodes, statuses, tableSearch, years]);
   useEffect(() => {
     if (!addNotice) return;
@@ -255,10 +286,6 @@ export function ScorecardResultsHistory() {
     setSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" }));
     setPage(1);
   };
-  const openDetail = (name: string) => {
-    const scorecard = reportScorecards.find((item) => item.name.includes(name.replace("EXA ", "")));
-    navigate(scorecard ? `/app/reports/scorecard-result-detail?scorecardCode=${encodeURIComponent(scorecard.code)}&from=history` : "/app/reports/latest-scorecard-results");
-  };
   const addIndividualScorecard = (suggestion: ScorecardSelectorOption) => {
     const alreadySelected = selectedScorecardCodes.includes(suggestion.value);
     if (!alreadySelected) setIndividualScorecardCodes((current) => [...current, suggestion.value]);
@@ -306,18 +333,19 @@ export function ScorecardResultsHistory() {
   return <main className="reports-page history-page">
     <nav className="kpi-breadcrumb"><Link to="/app/reports">Reports</Link><span>/</span><span>ScoreCard Results History</span></nav>
     <header className="reports-header"><div><span>HISTORICAL RESULTS</span><h1>ScoreCard Results History</h1><p>Compare summarized ScoreCard results across generated periods and preserve the historical composition used for each calculation.</p></div></header>
+    <ReportLoadState query={query}/>
     <section className="history-filters" ref={scorecardSearchRef}>
       <header><h2>ScoreCard Result Filtering</h2><p>Use the filters to find and add matching ScoreCards to the historical matrix.</p></header>
       <label className="history-scorecard-filter"><span>ScoreCard</span><div className="history-scorecard-add-row"><div className="history-scorecard-autosuggest"><div className="history-input"><Search size={18}/><input value={scorecardQuery} onFocus={() => setSuggestionsOpen(true)} onChange={(event) => { setScorecardQuery(event.target.value); setSuggestionsOpen(true); }} onKeyDown={(event) => { if (event.key === "Enter" && scorecardSuggestions[0]) { event.preventDefault(); addIndividualScorecard(scorecardSuggestions[0]); } }} placeholder="Search Scorecards..." aria-autocomplete="list" aria-expanded={suggestionsOpen}/>{scorecardQuery && <button type="button" className="history-scorecard-clear" onClick={() => setScorecardQuery("")} title="Clear search" aria-label="Clear search"><X size={17}/></button>}</div>{suggestionsOpen && <div className="history-scorecard-suggestions" role="listbox">{scorecardSuggestions.length ? <div className="history-suggestion-group"><strong>INDIVIDUAL SCORECARDS</strong>{scorecardSuggestions.map((suggestion) => { const selected = selectedScorecardCodes.includes(suggestion.value); return <button type="button" className={selected ? "selected" : ""} key={suggestion.value} onMouseDown={(event) => event.preventDefault()} onClick={() => addIndividualScorecard(suggestion)}><span className="code-pill">{suggestion.value}</span><span className="history-suggestion-copy"><strong>{suggestion.label}</strong><small>{suggestion.detail}</small></span>{selected && <Check size={16}/>}</button>; })}</div> : <p>No matching individual ScoreCards.</p>}</div>}</div></div></label>
-      <label className="history-frequency-filter"><span>Input Frequency</span><HistoryMultiSelect key={`frequency-${filterMenuVersion}`} placeholder="All frequencies" options={values(["Monthly", "Quarterly", "Four-monthly", "Semiannual", "Annual"])} selected={frequencies} onChange={setFrequencies}/></label>
+      <label className="history-frequency-filter"><span>Input Frequency</span><HistoryMultiSelect key={`frequency-${filterMenuVersion}`} placeholder="All frequencies" options={values([...new Set(query.items.map(r=>r.frequency).filter((v):v is string=>v!==null))])} selected={frequencies} onChange={setFrequencies}/></label>
       <label className="history-department-filter"><span>Departments</span><HistoryMultiSelect key={`department-${filterMenuVersion}`} placeholder="All departments" options={values(availableDepartments)} selected={departments} onChange={setDepartments}/></label>
-      <label><span>Result Status</span><HistoryMultiSelect key={`status-${filterMenuVersion}`} placeholder="All statuses" options={values(["Closed", "Closed with Exceptions", "Validated"])} selected={statuses} onChange={setStatuses}/></label>
+      <label><span>Result Status</span><HistoryMultiSelect key={`status-${filterMenuVersion}`} placeholder="All statuses" options={values(["Closed", "Closed with Exceptions"])} selected={statuses} onChange={setStatuses}/></label>
       <label><span>Year</span><HistoryMultiSelect key={`year-${filterMenuVersion}`} placeholder="Select years" options={values(availableYears)} selected={years} onChange={changeYears}/></label>
       <div className="history-filter-actions"><button type="button" className="history-apply-filters" onClick={applyFilters}><Check size={15}/>Apply Filters</button><button type="button" onClick={clearFilters}><X size={15}/>Clear Filters</button></div>
     </section>
     {addNotice && <div className="history-add-notice" key={addNotice.id} role="status"><Check size={18}/><span>{addNotice.message}</span><button type="button" onClick={() => setAddNotice(null)} aria-label="Close notification"><i><X size={14}/></i></button></div>}
     <section className="history-matrix stable-table-panel" onDoubleClickCapture={(event) => { if ((event.target as HTMLElement).closest("[data-month]")) clearFocus(); }}>
-      <header><div><h2>ScoreCard History Summarized Matrix</h2><p>{selectedScorecardCodes.length} ScoreCards across {visibleMonths.length} visible periods.</p></div><div><button type="button" className="history-clear-scorecards" disabled={!selectedScorecardCodes.length} onClick={clearScorecardSelection}><X size={15}/>Clear ScoreCards</button><button className="xls" disabled={!selectedScorecardCodes.length}><Download size={15}/>Export XLS</button><button className="pdf" disabled={!selectedScorecardCodes.length}><FileText size={15}/>Export PDF</button></div></header>
+      <header><div><h2>ScoreCard History Summarized Matrix</h2><p>{selectedScorecardCodes.length} ScoreCards across {visibleMonths.length} visible periods.</p></div><div><button type="button" className="history-clear-scorecards" disabled={!selectedScorecardCodes.length} onClick={clearScorecardSelection}><X size={15}/>Clear ScoreCards</button><ReportExportButtons getReport={exportReport} disabled={query.isLoading || query.isError || !rows.length}/></div></header>
       <div className="history-matrix-tools">
         <label className="history-search"><Search size={16}/><input value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} placeholder="Search ScoreCard or department..." /></label>
         <div className="history-period-select history-month-select"><span>Visible months</span><HistoryMonthSelect options={monthOptions} selected={selectedMonths} years={years} onChange={changeMonths}/></div>
@@ -327,12 +355,10 @@ export function ScorecardResultsHistory() {
         {visibleMonths.map((month) => <th data-month={month.value} className={`history-period clickable ${month.value === focusMonth ? "focused" : ""}`} key={`${month.value}-${activeYear}`} onClick={() => { setFocusClearedManually(false); setFocusMonth(month.value); }}>{month.label} {activeYear}</th>)}
         <SortableTableHeader active={sort.key === "average"} direction={sort.direction} onSort={() => sortBy("average")}>Average</SortableTableHeader><SortableTableHeader active={sort.key === "trend"} direction={sort.direction} onSort={() => sortBy("trend")}>Trend</SortableTableHeader><th>Action</th>
       </tr></thead><tbody>{paginatedRows.map((item) => {
-        const durationParts = item.duration.split("-");
-        const periodEnd = durationParts[durationParts.length - 1]?.slice(0, 3) ?? "Jun";
-        const annualScores = months.map((month, index) => item.frequency === "Monthly" ? (item.scores[index] ?? null) : month.startsWith(periodEnd) ? item.average : null);
+        const annualScores = item.scores;
         return <tr key={item.code}><td><strong>{item.code}</strong></td><td>{item.name}</td><td>{item.departments}</td><td>{item.frequency}</td><td>{item.duration}</td><td>{item.generated}</td>
-          {visibleMonths.map((month) => { const monthIndex = allMonthKeys.indexOf(month.value); const score = annualScores[monthIndex]; return <td data-month={month.value} className={month.value === focusMonth ? "focused" : ""} key={`${month.value}-${activeYear}`}>{score === null ? <span className="history-no-result">—</span> : <span className="history-score"><strong>{score}%</strong><small>Closed</small></span>}</td>; })}
-          <td><strong>{item.average}%</strong></td><td><span className={`history-trend ${item.trend.toLowerCase()}`}>{item.trend === "Declined" ? <TrendingDown size={15}/> : <TrendingUp size={15}/>} {item.trend}</span></td><td><button className="history-view" onClick={() => openDetail(item.name)}><Eye size={15}/></button></td></tr>;
+          {visibleMonths.map((month) => { const monthIndex = allMonthKeys.indexOf(month.value); const score = annualScores[monthIndex]; return <td data-month={month.value} className={month.value === focusMonth ? "focused" : ""} key={`${month.value}-${activeYear}`}>{!item.cells[monthIndex] ? <span className="history-no-result">—</span> : <span className="history-score" role="link" tabIndex={0} onClick={()=>item.cells[monthIndex] && navigate(resultLink(item.cells[monthIndex]!))} onKeyDown={e=>{if(e.key==="Enter" && item.cells[monthIndex])navigate(resultLink(item.cells[monthIndex]!));}}><strong>{percent(score)}</strong><small>{item.cells[monthIndex]?.status}</small></span>}</td>; })}
+          <td><strong>{percent(item.average)}</strong></td><td><span className={`history-trend ${item.trend.toLowerCase()}`}>{item.trend === "Declined" ? <TrendingDown size={15}/> : <TrendingUp size={15}/>} {item.trend}</span></td><td><button className="history-view" onClick={() => navigate(resultLink(item.latest))}><Eye size={15}/></button></td></tr>;
       })}</tbody></table></div>
       <footer className="history-period-slider">
         <div className="history-record-summary"><span>Showing {rows.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, rows.length)} of {rows.length} records</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={currentPage} totalPages={totalPages} onPage={setPage} label="History records pagination" className="history-record-pagination" /></div>
@@ -344,6 +370,18 @@ export function ScorecardResultsHistory() {
   </main>;
 }
 
-type HistoryRow = (typeof scorecardHistory)[number];
+type HistoryRow = ReturnType<typeof historyRows>[number];
 type HistorySortKey = "code" | "name" | "departments" | "frequency" | "duration" | "generated" | "average" | "trend";
 function historySortValue(row: HistoryRow, key: HistorySortKey) { return row[key]; }
+
+function historyRows(items:OfficialResult[]) {
+  const groups=new Map<string,OfficialResult[]>();
+  for(const r of items){const key=r.scorecardId+":"+r.periodEnd.slice(0,4);groups.set(key,[...(groups.get(key)??[]),r]);}
+  return [...groups.values()].map(records=>{
+    const sorted=[...records].sort((a,b)=>a.periodEnd.localeCompare(b.periodEnd));const latest=sorted[sorted.length-1];
+    const cells=Array.from({length:12},(_,month)=>sorted.find(r=>Number(r.periodEnd.slice(5,7))===month+1)??null);
+    const scores=cells.map(r=>numberOrNull(r?.score));
+    const first=numberOrNull(sorted[0].score),last=numberOrNull(latest.score);
+    return {code:latest.code,name:latest.name,departments:departmentNames(latest).join(", "),frequency:latest.frequency ?? "—",duration:sorted[0].periodStart+" · "+latest.periodEnd,generated:records.length,scores,cells,average:averageOf(scores),trend:sorted.length<2||first===null||last===null?"Unavailable":last===first?"Stable":last>first?"Improved":"Declined",status:latest.status,year:latest.periodEnd.slice(0,4),latest};
+  });
+}

@@ -156,6 +156,13 @@ export const kpiConfigMockService = {
 const envelope = <T>(path: string, init?: RequestInit) => apiRequest<{ data: T }>(path, init).then((response) => response.data);
 
 export const kpiConfigService = {
+  async effectiveSnapshot(configurationId: string, periodStart: string, periodEnd: string) {
+    const snapshots = await envelope<Record<string, any>[]>("/v1/internal/kpi-configurations/effective-snapshots", {
+      method: "POST", body: JSON.stringify({ configurationIds: [configurationId], periodStart, periodEnd }),
+    });
+    if (!snapshots[0]) throw new Error("No KPI configuration covers the selected Input Period.");
+    return snapshots[0];
+  },
   lookups() { return envelope<KpiConfigLookups>("/v1/kpi-configurations/lookups"); },
   async list(): Promise<KpiConfigRecord[]> {
     const response = await apiRequest<{ data: KpiConfigRecord[] }>("/v1/kpi-configurations?page=1&pageSize=100");

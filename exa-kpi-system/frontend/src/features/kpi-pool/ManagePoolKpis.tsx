@@ -1,3 +1,4 @@
+import { kpiConfigService } from "../kpi-config/kpi-config.service";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, Check, CheckCircle2, ChevronLeft, Eye, EyeOff, Hourglass, Link2, LockKeyhole, Minus, Pencil, Plus, RefreshCw, Search, Settings2, TriangleAlert, Unlink, X } from "lucide-react";
@@ -19,7 +20,7 @@ import { PoolPeriodSelect } from "./PoolPeriodSelect";
 import { ConfigMultiSelect } from "../kpi-config/ConfigMultiSelect";
 import "../kpi-config/kpi-config-overview.css";
 import { scorecardService } from "../scorecards/scorecard.service";
-import { EntityGoalsModal, EntityGoalsSummary } from "../kpi-config/EntityGoalsDisplay";
+import { EntityGoalsModal, EntityGoalsSummary, entityGoalsFromSnapshot } from "../kpi-config/EntityGoalsDisplay";
 
 const availabilityCopy: Record<PoolKpiAvailability, string> = {
   AVAILABLE: "Available to Add",
@@ -61,7 +62,19 @@ export function ManagePoolKpis() {
   const catalogQuery = useQuery({ queryKey: ["pool-manage-kpis", poolId, targetPeriod], queryFn: () => periodIsEditable ? kpiPoolService.getManageableKpis(poolId, targetPeriod) : kpiPoolService.getManageableComposition(poolId, targetPeriod), enabled: poolId > 0 && Boolean(targetPeriod) && Boolean(editingPeriod) && editingPeriod?.workflowStatus !== "FUTURE", retry: false });
   const effectiveCompositionQuery = useQuery({ queryKey: ["kpi-pool-composition", poolId, targetPeriod], queryFn: () => kpiPoolService.getComposition(poolId, targetPeriod), enabled: poolId > 0 && Boolean(targetPeriod) && Boolean(editingPeriod) && editingPeriod?.workflowStatus !== "FUTURE", retry: false });
   const scorecardUsageQuery = useQuery({ queryKey:["scorecard-pool-usage",poolId,targetPeriod.slice(0,7)], queryFn:()=>scorecardService.poolUsage(poolId,targetPeriod.slice(0,7)), enabled:poolId>0 && Boolean(targetPeriod), retry:false });
-  const entityGoalsQuery = useQuery({ queryKey:["pool-entity-goals",poolId,editingPeriod?.poolPeriodId,entityGoalsId], queryFn:()=>kpiPoolService.getEffectiveSettings(poolId,editingPeriod!.poolPeriodId!,entityGoalsId!), enabled:Boolean(entityGoalsId && editingPeriod?.poolPeriodId), retry:false });
+  const previewRecord = catalogQuery.data?.find(record => record.configurationId === entityGoalsId);
+  const entityGoalsQuery = useQuery({
+    queryKey: ["pool-entity-goals", poolId, targetPeriod, entityGoalsId, previewRecord?.availability],
+    queryFn: async () => {
+      if (previewRecord?.availability === "IN_POOL" && editingPeriod?.poolPeriodId) {
+        const result = await kpiPoolService.getEffectiveSettings(poolId, editingPeriod.poolPeriodId, entityGoalsId!, true);
+        return entityGoalsFromSnapshot(result.effective);
+      }
+      return entityGoalsFromSnapshot(await kpiConfigService.effectiveSnapshot(entityGoalsId!, editingPeriod!.start, editingPeriod!.end));
+    },
+    enabled: Boolean(entityGoalsId && editingPeriod && previewRecord), retry: false,
+  });
+  useEffect(() => { setEntityGoalsId(null); }, [poolId, targetPeriod]);
   const refresh = async () => {
     setSelected([]);
     await Promise.all([
@@ -74,7 +87,11 @@ export function ManagePoolKpis() {
     ]);
   };
   const addMutation = useMutation({
-    mutationFn: (codes: string[]) => kpiPoolService.addKpis(poolId, codes, targetPeriod),
+    mutationFn: (codes: string[]) => {
+      const ids = codes.map(code => catalogQuery.data?.find(record => record.configCode === code)?.configurationId);
+      if (ids.some(id => !id)) throw new Error("Reload the catalog before adding the selected KPI Configurations.");
+      return kpiPoolService.addConfigurations(poolId, ids as string[], targetPeriod);
+    },
     onSuccess: async (_, codes) => { setNoticeTone("success"); setNotice(codes.length === 1 ? `${codes[0]} was linked to this Pool.` : `${codes.length} KPI Configurations were linked to this Pool.`); await refresh(); },
     onError: (mutationError) => { setNoticeTone("warning"); setNotice(mutationError instanceof Error ? mutationError.message.replace("KPI_DEFINITION_ALREADY_ASSIGNED: ", "") : "The selected KPI Configurations could not be linked."); },
   });
@@ -199,6 +216,7 @@ export function ManagePoolKpis() {
           <PoolOverviewMultiSelect label="All states" options={[{ value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }]} selected={statesSelected} onChange={setStatesSelected} />
         </div>
         {notice && <ActionToast message={notice} tone={noticeTone} onClose={() => setNotice("")} />}
+        {catalogQuery.isError && <section role="alert" className="coverage-error"><p>{catalogQuery.error.message}</p><button type="button" className="button secondary" onClick={() => void catalogQuery.refetch()}>Reload KPI catalog</button></section>}
         <div className="pool-inner-table manage-kpi-table-wrap stable-table-shell">
           <table className={`kpi-table manage-kpi-table ${isFinalized ? "snapshot-table" : "editable-table"}`}>
             <thead><tr>
@@ -216,7 +234,7 @@ export function ManagePoolKpis() {
             <tbody key={filterAnimationKey}>{catalogQuery.isLoading ? <tr><td colSpan={isFinalized ? 9 : 11} className="table-message">Loading KPI Configurations...</td></tr> : paginated.length ? paginated.map((record) => (
               <tr key={record.configCode} className={`${selected.includes(record.configCode) ? "selected-row" : ""} ${record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE" ? "definition-conflict-row" : ""}`}>
                 {!isFinalized && <><td><input type="checkbox" disabled={record.availability === "NOT_AVAILABLE"} checked={selected.includes(record.configCode)} onChange={() => toggle(record.configCode)} aria-label={`Select ${record.configCode}${record.reasonCode === "KPI_DEFINITION_ALREADY_EFFECTIVE" ? `. Another configuration of ${record.kpiCode} is already selected for this period.` : ""}`} title={availabilityReason(record)} /></td><td><span title={availabilityReason(record)} className={`availability-label ${record.availability.toLowerCase()}`}>{availabilityCopy[record.availability]}</span></td></>}
-                <td><span className="code-pill">{record.configCode}</span></td><td>{record.kpiCode}</td><td className="name-cell">{record.name}</td><td>{record.category}</td><td>{record.evaluationScope === "BY_SUBJECT" && record.entityEvaluationMode !== "CONTRIBUTE_TO_OVERALL" ? <EntityGoalsSummary count={record.subjectGoalCount ?? 0} groupGoal={record.groupGoal} onView={record.configurationId ? () => setEntityGoalsId(record.configurationId!) : undefined}/> : record.goal}</td><td>{record.measurementUnit}</td><td>{record.dataSource}</td>
+                <td><span className="code-pill">{record.configCode}</span></td><td>{record.kpiCode}</td><td className="name-cell">{record.name}</td><td>{record.category}</td><td>{record.evaluationScope === "BY_SUBJECT" ? <EntityGoalsSummary entityEvaluationMode={record.entityEvaluationMode} count={record.subjectGoalCount ?? 0} groupGoal={record.groupGoal} onView={record.configurationId ? () => setEntityGoalsId(record.configurationId!) : undefined}/> : record.goal}</td><td>{record.measurementUnit}</td><td>{record.dataSource}</td>
                 <td><span className={`status-chip ${record.status.toLowerCase()}`}><i />{record.status === "ACTIVE" ? "Active" : "Inactive"}</span></td>
                 <td><div className="table-actions">
                   <button className="icon-button view" title="View KPI Configuration detail" onClick={() => navigate(`/app/kpi-management/config/detail-record?kpiConfigCode=${encodeURIComponent(record.configCode)}&poolId=${poolId}&from=pool-manage`)}><Eye size={15} /></button>
@@ -248,7 +266,8 @@ export function ManagePoolKpis() {
 
       {finalizeConfirmationOpen && poolQuery.data && <div className="pool-modal-backdrop" role="presentation"><section className="finalize-composition-modal" role="dialog" aria-modal="true" aria-labelledby="finalize-composition-title"><header><span><LockKeyhole size={21}/></span><div><h2 id="finalize-composition-title">Finalize {formatMonthLong(targetPeriod)} Composition?</h2><p>{includedCount} KPI {includedCount === 1 ? "Configuration" : "Configurations"}</p></div><button type="button" aria-label="Close confirmation" onClick={() => setFinalizeConfirmationOpen(false)} disabled={finalizeMutation.isPending}><X size={18}/></button></header><p>These KPI Configurations will become available to Scorecards for {formatMonthLong(targetPeriod)}.</p><dl><div><dt>Pool</dt><dd>{poolQuery.data.code} · {poolQuery.data.name}</dd></div><div><dt>Input Period</dt><dd>{formatMonthLong(targetPeriod)}</dd></div><div><dt>KPI Configurations</dt><dd>{includedCount}</dd></div><div><dt>Companies</dt><dd>{poolQuery.data.companies.join(", ")}</dd></div><div><dt>Validity</dt><dd>{formatMonthLong(poolQuery.data.validFrom)} – {formatMonthLong(poolQuery.data.validTo)}</dd></div><div><dt>Frequency</dt><dd>{poolQuery.data.frequency}</dd></div></dl>{isFirstInputPeriod && <section className="finalize-next-steps"><h3>What happens next?</h3><ul><li>The Pool becomes Active.</li><li>These KPI Configurations become available to Scorecards for this Input Period.</li><li>Pool validity, frequency, companies and structural scope become locked.</li><li>The finalized composition becomes read-only.</li></ul><p>Future period compositions can still be prepared according to the Pool workflow.</p></section>}<footer><button className="button secondary" onClick={() => setFinalizeConfirmationOpen(false)} disabled={finalizeMutation.isPending}>Cancel</button><button className="button primary" onClick={() => finalizeMutation.mutate()} disabled={finalizeMutation.isPending}>{finalizeMutation.isPending ? "Finalizing…" : "Finalize Composition"}</button></footer></section></div>}
 
-      {entityGoalsId && entityGoalsQuery.data && <EntityGoalsModal data={{configCode:entityGoalsQuery.data.effective.configCode,kpiCode:entityGoalsQuery.data.effective.kpiCode,kpiName:entityGoalsQuery.data.effective.kpiName,subjectType:entityGoalsQuery.data.effective.subjectType,subjectGoals:entityGoalsQuery.data.effective.subjectGoals ?? [],groupGoal:entityGoalsQuery.data.effective.groupGoal,goalUnit:entityGoalsQuery.data.effective.goalUnit?.symbol,resultUnit:entityGoalsQuery.data.effective.measurementUnit?.symbol,historical:entityGoalsQuery.data.effective.periodScope !== "CURRENT_PERIOD"}} onClose={() => setEntityGoalsId(null)}/>}
+      {entityGoalsId && entityGoalsQuery.data && <EntityGoalsModal data={entityGoalsQuery.data} onClose={() => setEntityGoalsId(null)}/>}
+      {entityGoalsId && entityGoalsQuery.isError && <div className="entity-goals-modal-backdrop"><section className="entity-goals-dialog" role="alert"><h2>Entity preview unavailable</h2><p>{entityGoalsQuery.error.message}</p><footer><button type="button" onClick={() => void entityGoalsQuery.refetch()}>Retry</button><button type="button" onClick={() => setEntityGoalsId(null)}>Close</button></footer></section></div>}
       {entityGoalsId && entityGoalsQuery.isLoading && <div className="entity-goals-modal-backdrop" role="presentation"><section className="entity-goals-dialog" role="status">Loading frozen entity goals…</section></div>}
     </main>
   );

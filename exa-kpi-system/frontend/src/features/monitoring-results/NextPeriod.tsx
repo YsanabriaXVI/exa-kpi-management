@@ -1,31 +1,39 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { MonitoringApiError, monitoringRequest } from "./monitoring-results.service";
+import { monitoringRequest } from "./monitoring-results.service";
 
-const stages: Record<string,string> = { WAITING_FOR_PREVIOUS_CLOSE:"Waiting for previous close confirmation", POOL_COMPOSITION_PENDING:"Pool composition pending", POOL_COMPOSITION_READY:"Pool composition ready", SCORECARDS_PREPARED:"Scorecards prepared", MONITORING_MATERIALIZED:"Monitoring materialized", END_OF_SCHEDULE:"End of Pool schedule" };
-type NextPeriodResponse = { stage?: string; availability: string; reason: string | null; poolId: string; inputPeriod: { poolPeriodId: string | null; periodKey: string } | null; monitoringPeriod: { id: string } | null };
+type NextPeriodResponse = { stage: string; reason?: string | null; poolId: string; inputPeriod: { poolPeriodId: string | null; periodKey: string; start: string } | null; monitoringPeriod: { id: string } | null; scorecards: Array<{id:string;code:string;name:string;status:string}>; removedKpis?:Array<{configurationId:string;scorecardId:string;code:string;name:string}> };
 export function NextPeriod({ periodId }: { periodId: string }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [resumeStage, setResumeStage] = useState<string|null>(null);
-  const query = useQuery({ queryKey: ["monitoring-next-period", periodId], queryFn: () => monitoringRequest<NextPeriodResponse>(`/v1/monitoring-periods/${periodId}/next-period`), retry: false });
+  const [removed, setRemoved] = useState<NonNullable<NextPeriodResponse["removedKpis"]>>([]);
+  const path = "/v1/monitoring-periods/" + periodId + "/next-period";
+  const query = useQuery({ queryKey: ["monitoring-next-period", periodId], queryFn: () => monitoringRequest<NextPeriodResponse>(path), retry: false });
   const target = query.data;
-  return <section className="check-results-review" aria-label="Next Period"><h2>Next Period</h2>
-    {query.isLoading && <p>Loading next Input Period…</p>}
-    {query.isError && <p role="alert">{query.error.message}</p>}
-    {(resumeStage || target?.stage) && <p role="status">{stages[resumeStage ?? target!.stage!] ?? resumeStage ?? target?.stage}</p>}
-    {target && <><p>{target.inputPeriod?.periodKey}</p><p>{target.reason}</p>
-      {target.monitoringPeriod ? <Link className="entry-primary" to={`/app/monitoring-results/result-entry?monitoringPeriodId=${target.monitoringPeriod.id}`}>Open Next Period</Link> : target.inputPeriod?.poolPeriodId && <><p>Inherit Scorecards, KPI selections and weights, resolve the next period settings and start with empty Results.</p><button className="entry-primary" disabled={busy} onClick={async () => {
-        if (!target.inputPeriod?.poolPeriodId) return;
-        setBusy(true); setError(""); setResumeStage(null);
-        try { const created = await monitoringRequest<{id: string}>(`/v1/monitoring-periods/${periodId}/next-period`, { method: "POST" }); navigate(`/app/monitoring-results/result-entry?monitoringPeriodId=${created.id}`); }
-        catch (cause) { const details=cause instanceof MonitoringApiError ? cause.details as {stage?:string;retryable?:boolean}|undefined : undefined; setResumeStage(details?.stage ?? null); setError((cause instanceof Error ? cause.message : "Next Period could not be initialized.") + (details?.retryable ? " Retry Initialize Next Period to resume completed steps." : "")); }
-        finally { setBusy(false); }
-      }}>{busy ? "Initializing…" : "Initialize Next Period"}</button></>}
+  async function act(prepare: boolean) {
+    setBusy(true); setError("");
+    try {
+      if (prepare) { const result = await monitoringRequest<NextPeriodResponse>(path + "/prepare-scorecards", {method:"POST"}); setRemoved(result.removedKpis ?? []); await query.refetch(); }
+      else { const result = await monitoringRequest<{id:string}>(path, {method:"POST"}); navigate("/app/monitoring-results/result-entry?monitoringPeriodId=" + result.id); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Next Period could not be prepared"); }
+    finally { setBusy(false); }
+  }
+  return <section className="check-results-review" aria-label="Next Period"><h2>Prepare Next Period</h2>
+    <p>Review Pool → Finalize Pool → Review Scorecards → Finalize Scorecards → Monitoring Draft</p>
+    {query.isLoading && <p>Loading next period…</p>}{query.isError && <p role="alert">{query.error.message}</p>}
+    {target && <><h3>{target.inputPeriod?.periodKey}</h3><p>{target.reason}</p>
+      {target.monitoringPeriod ? <Link className="entry-primary" to={"/app/monitoring-results/result-entry?monitoringPeriodId=" + target.monitoringPeriod.id}>Open Next Period</Link> : target.inputPeriod && <>
+        <Link className="entry-secondary" to={"/app/pool-kpis/manage-kpis?poolId=" + target.poolId + "&period=" + encodeURIComponent(target.inputPeriod.start)}>Review Pool in Manage KPIs</Link>
+        <Link className="entry-secondary" to={"/app/pool-kpis/period-schedule?poolId=" + target.poolId + "&period=" + encodeURIComponent(target.inputPeriod.start)}>Pool Schedule / Finalize Pool</Link>
+        {target.stage === "SCORECARDS_REVIEW" && <><p>Pool finalized. Inherit applicable selections and weights as editable drafts. Review removed KPIs and adjust weights before finalizing each Scorecard.</p><button className="entry-primary" disabled={busy} onClick={() => act(true)}>Prepare Scorecard Drafts</button></>}
+        {target.scorecards.map(card => <p key={card.id}><Link to={"/app/scorecards/detail?scorecardId=" + card.id + "&periodKey=" + encodeURIComponent(target.inputPeriod!.periodKey)}>{card.code} · {card.name}</Link> · {card.status}</p>)}
+        <button className="entry-primary" disabled={busy || target.stage !== "READY_TO_MATERIALIZE"} onClick={() => act(false)}>Initialize Monitoring Draft</button>
+        <p>New KPIs remain available for selection. Results, scores, checks and baselines start empty.</p>
+      </>}
     </>}
-    {error && <p role="alert">{error}</p>}
-    <button className="entry-secondary" disabled={busy || query.isFetching} onClick={() => {setResumeStage(null);void query.refetch();}}>Refresh Next Period</button>
+    {removed.length > 0 && <aside><h3>Not inherited: removed from the new Pool</h3><ul>{removed.map(kpi => <li key={kpi.scorecardId + ":" + kpi.configurationId}>{kpi.code} · {kpi.name}</li>)}</ul></aside>}
+    {error && <p role="alert">{error}</p>}<button className="entry-secondary" disabled={busy || query.isFetching} onClick={() => void query.refetch()}>Refresh Readiness</button>
   </section>;
 }

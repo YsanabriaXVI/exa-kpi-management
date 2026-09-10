@@ -1,67 +1,77 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Download, Eye, EyeOff, FileText, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowLeft, BarChart3, Download, Eye, EyeOff, FileText, Search } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { reportKpis, reportScorecards } from "./reports.data";
+import { useOfficialResults, ReportLoadState, OfficialTraffic, latestResults, comparisonResult, departmentNames, percent, numberOrNull, averageOf, difference, resultLink, type OfficialEvaluation } from "./official-results";
 import { compareSortValues, SortableTableHeader, type SortDirection } from "../../components/SortableTableHeader";
 import { RowsPerPageSelect } from "../../components/RowsPerPageSelect";
 import { PaginationControls } from "../../components/PaginationControls";
+import { ReportExportButtons } from "./ReportExportButtons";
+import { exportPercent, type TableExport } from "./table-export";
 import "./reports.css";
 import "./analysis-screens.css";
 import "./report-table-refresh.css";
-
-type AnalysisType = "KPI Trend" | "KPI Benchmarking";
-type View = "Goal vs Result" | "Score Trend" | "Score Ranking";
-
-const trendRows = [
-  { period: "Jan 2026", result: 3500, goal: 3700, score: 82, compared: 3650 },
-  { period: "Feb 2026", result: 3790, goal: 3700, score: 94, compared: 3942 },
-  { period: "Mar 2026", result: 3720, goal: 3700, score: 91, compared: 3420 },
-  { period: "Apr 2026", result: 3610, goal: 3700, score: 86, compared: 3550 },
-  { period: "May 2026", result: 3932, goal: 3700, score: 100, compared: 3720 },
-];
-
+const identity=(e:OfficialEvaluation)=>[e.configurationId,e.evaluationKind,e.entityId??""].join(":");
+const raw=(value:string|number|null|undefined,unit:string|null)=>numberOrNull(value)===null?"—":Number(value).toLocaleString()+" "+(unit??"");
 export function KpiAnalysis() {
-  const navigate = useNavigate();
-  const [analysisType, setAnalysisType] = useState<AnalysisType>("KPI Trend");
-  const [view, setView] = useState<View>("Goal vs Result");
-  const [compare, setCompare] = useState("Previous Period");
-  const [selectedKpi, setSelectedKpi] = useState(reportKpis[1].code);
-  const [scorecard, setScorecard] = useState(reportScorecards[0].code);
-  const [showRaw, setShowRaw] = useState(false);
-  const [showGraphs, setShowGraphs] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [sort, setSort] = useState<{ key: KpiAnalysisSortKey; direction: SortDirection }>({ key: "period", direction: "asc" });
-  const kpi = reportKpis.find((item) => item.code === selectedKpi) ?? reportKpis[0];
-  const benchmarking = useMemo(() => reportScorecards.slice(0, 6).map((item, index) => ({ ...item, kpiScore: Math.max(52, Math.min(100, item.score + [3, -4, 6, -2, 1, -7][index])), result: 3400 + index * 115 })), []);
-  const sortedTrendRows = useMemo(() => [...trendRows].sort((a, b) => compareSortValues(trendSortValue(a, sort.key), trendSortValue(b, sort.key), sort.direction)), [sort]);
-  const sortedBenchmarking = useMemo(() => [...benchmarking].sort((a, b) => compareSortValues(benchmarkSortValue(a, sort.key), benchmarkSortValue(b, sort.key), sort.direction)), [benchmarking, sort]);
-  const totalRecords = analysisType === "KPI Trend" ? trendRows.length : sortedBenchmarking.length;
-  const pages = Math.max(1, Math.ceil(totalRecords / pageSize));
-  const currentPage = Math.min(page, pages);
-  const pageStart = (currentPage - 1) * pageSize;
-  const paginatedTrendRows = sortedTrendRows.slice(pageStart, pageStart + pageSize);
-  const paginatedBenchmarking = sortedBenchmarking.slice(pageStart, pageStart + pageSize);
-  const updateType = (value: AnalysisType) => { setAnalysisType(value); setView("Goal vs Result"); setPage(1); setSort({ key: value === "KPI Trend" ? "period" : "score", direction: value === "KPI Trend" ? "asc" : "desc" }); };
-  const sortBy = (key: KpiAnalysisSortKey) => { setSort((current) => ({ key, direction: current.key === key && current.direction === "asc" ? "desc" : "asc" })); setPage(1); };
-
+  const navigate=useNavigate(); const query=useOfficialResults();
+  const [analysisType,setAnalysisType]=useState("KPI Trend"); const [view,setView]=useState("Goal vs Result");
+  const [compare,setCompare]=useState("Previous Period"); const [selectedKpi,setSelectedKpi]=useState("");
+  const [scorecard,setScorecard]=useState("all"); const [period,setPeriod]=useState("all"); const [search,setSearch]=useState("");
+  const [showRaw,setShowRaw]=useState(false); const [showGraphs,setShowGraphs]=useState(false);
+  const [page,setPage]=useState(1); const [pageSize,setPageSize]=useState(10);
+  const [sort,setSort]=useState<{key:string;direction:SortDirection}>({key:"periodStart",direction:"asc"});
+  const options=useMemo(()=>[...new Map(query.items.flatMap(r=>r.evaluations).map(e=>[identity(e),e])).values()],[query.items]);
+  const activeKpi=selectedKpi || (options[0]?identity(options[0]):"");
+  const selected=options.find(e=>identity(e)===activeKpi);
+  const periods=[...new Set(query.items.map(r=>r.periodKey))].sort().reverse();
+  const effectivePeriod=analysisType === "KPI Benchmarking" && period === "all" ? periods[0] : period;
+  const rows=useMemo(()=>query.items.filter(r=>(scorecard==="all"||r.scorecardId===scorecard)&&(effectivePeriod==="all"||r.periodKey===effectivePeriod)).flatMap(card=>card.evaluations.filter(e=>identity(e)===activeKpi).map(e=>{
+    const comparedCard=comparisonResult(query.items,card,compare);
+    const previous=comparedCard?.evaluations.find(p=>identity(p)===identity(e));
+    const compatible=previous?.unit===e.unit;
+    return {...e,card,period:card.period,periodStart:card.periodStart,scorecardName:card.name,comparedPeriod:comparedCard?.period??null,compared:compatible?previous?.result??null:null,comparedScore:previous?.score??null,periodDifference:compatible?difference(e.result,previous?.result):null,goalDifference:e.historical?null:e.goalUnit===e.unit?difference(e.result,e.goal):null,scoreDifference:difference(e.score,previous?.score)};
+  })).filter(e=>!search||(e.code+" "+e.name+" "+e.card.name+" "+e.period).toLowerCase().includes(search.toLowerCase())).sort((a,b)=>compareSortValues(sort.key==="score"?numberOrNull(a.score):(a as any)[sort.key],sort.key==="score"?numberOrNull(b.score):(b as any)[sort.key],sort.direction)),[query.items,scorecard,effectivePeriod,activeKpi,compare,search,sort]);
+  const scored=rows.filter(r=>numberOrNull(r.score)!==null).sort((a,b)=>Number(b.score)-Number(a.score));
+  const best=scored[0],lowest=scored[scored.length-1];const average=averageOf(rows.map(r=>r.score));
+  const pages=Math.max(1,Math.ceil(rows.length/pageSize));const currentPage=Math.min(page,pages);const pageStart=(currentPage-1)*pageSize;const visible=rows.slice(pageStart,pageStart+pageSize);
+  const exportReport = (): TableExport => ({
+    title: "KPI Analysis", filename: "kpi-analysis",
+    context: [
+      ["Analysis", analysisType], ["View", view], ["KPI / Evaluation", selected ? `${selected.configCode} · ${selected.name}${selected.entityLabel ? " / " + selected.entityLabel : ""}` : "None"],
+      ["ScoreCard", scorecard === "all" ? "All" : query.items.find(r => r.scorecardId === scorecard)?.name ?? scorecard],
+      ["Period", effectivePeriod ?? "None"], ["Comparison", compare], ["Raw Results", showRaw ? "Visible" : "Hidden"],
+      ["Search", search || "None"], ["Sort", `${sort.key} ${sort.direction}`],
+    ],
+    headers: ["KPI Code", "KPI Name / Entity", "ScoreCard", "Period", "Goal", ...(showRaw ? ["Current Result"] : []),
+      view === "Score Trend" ? "Current Score" : "Difference vs Goal", "Compared Period", "Compared Result / Score", "Period Difference", "Goal Met", "Traffic Light"],
+    rows: rows.map(r => [r.code, r.name + (r.entityLabel ? " / " + r.entityLabel : ""),
+      [r.card.name, departmentNames(r.card).join(", ")].filter(Boolean).join("\n"), r.period,
+      `${r.goal ?? "—"} ${r.goalUnit ?? ""}`.trim(), ...(showRaw ? [raw(r.result, r.unit)] : []),
+      view === "Score Trend" ? exportPercent(r.score) : raw(r.goalDifference, r.unit), r.comparedPeriod,
+      view === "Score Trend" ? exportPercent(r.comparedScore) : raw(r.compared, r.unit),
+      view === "Score Trend" ? exportPercent(r.scoreDifference) : raw(r.periodDifference, r.unit),
+      r.goalMet === null ? null : r.goalMet ? "Yes" : "No", r.trafficLight]),
+  });
+  const header=(key:string,label:string)=><SortableTableHeader active={sort.key===key} direction={sort.direction} onSort={()=>{setSort({key,direction:sort.key===key&&sort.direction==="asc"?"desc":"asc"});setPage(1);}}>{label}</SortableTableHeader>;
   return <main className="reports-page report-analysis-page">
     <nav className="kpi-breadcrumb"><Link to="/app/reports">Reports</Link><span>/</span><Link to="/app/reports/analysis">Analysis</Link><span>/</span><span>KPI Analysis</span></nav>
-    <header className="reports-header"><div><span>KPI PERFORMANCE</span><h1>KPI Analysis</h1><p>Analyze one KPI over time or benchmark the same KPI between several ScoreCards.</p></div></header>
-    <section className="dynamic-filters"><header><h2>Dynamic Filters</h2><p>Available views and ScoreCard selection change according to the analysis type.</p></header><label><span>Analysis Type</span><select value={analysisType} onChange={(event) => updateType(event.target.value as AnalysisType)}><option>KPI Trend</option><option>KPI Benchmarking</option></select></label><label><span>Analysis View</span><select value={view} onChange={(event) => setView(event.target.value as View)}>{analysisType === "KPI Trend" ? <><option>Goal vs Result</option><option>Score Trend</option></> : <><option>Goal vs Result</option><option>Score Ranking</option></>}</select></label><label><span>Compare with</span><select value={compare} onChange={(event) => setCompare(event.target.value)}><option>Previous Period</option><option>Same Period Last Year</option><option>Custom Period</option></select></label><label><span>KPI</span><select value={selectedKpi} onChange={(event) => setSelectedKpi(event.target.value)}>{reportKpis.map((item) => <option value={item.code} key={item.code}>{item.code} · {item.name}</option>)}</select></label><label><span>ScoreCard{analysisType === "KPI Benchmarking" ? "s" : ""}</span><select value={scorecard} onChange={(event) => setScorecard(event.target.value)}><option value="all">{analysisType === "KPI Benchmarking" ? "All selected ScoreCards" : "Select ScoreCard"}</option>{reportScorecards.map((item) => <option value={item.code} key={item.code}>{item.name}</option>)}</select></label><label><span>Period Range</span><select><option>Jan - May 2026</option><option>Jun - Oct 2026</option><option>Last 3 Periods</option></select></label></section>
-    <section className="analysis-summary-cards">{analysisType === "KPI Trend" ? <><article><small>Above Goal</small><strong>3/5 Periods</strong></article><article><small>Best Period</small><strong>May 2026</strong><em>3,932 kms</em></article><article><small>Lowest Period</small><strong>Jan 2026</strong><em>3,500 kms</em></article><article><small>Trend</small><strong className="up"><TrendingUp size={18} />Improved</strong></article></> : <><article><small>ScoreCards Compared</small><strong>{benchmarking.length}</strong></article><article><small>Best Performer</small><strong>{benchmarking.sort((a, b) => b.kpiScore - a.kpiScore)[0].name}</strong></article><article><small>Average Score</small><strong>{(benchmarking.reduce((sum, item) => sum + item.kpiScore, 0) / benchmarking.length).toFixed(2)}%</strong></article><article><small>Lowest Performer</small><strong>{benchmarking.sort((a, b) => a.kpiScore - b.kpiScore)[0].name}</strong></article></>}</section>
-    <section className="analysis-result-section"><header><div><h2>{analysisType === "KPI Trend" ? "KPI Performance" : "KPI Benchmarking"} · {kpi.name}</h2><p>{view} · Compared with {compare}</p></div><div><button onClick={() => setShowRaw((value) => !value)}>{showRaw ? <EyeOff size={14} /> : <Eye size={14} />}{showRaw ? "Hide Raw Results" : "View Raw Results"}</button><button className="xls"><Download size={14} />Export XLS</button><button className="pdf"><FileText size={14} />Export PDF</button><button className="graphs" onClick={() => setShowGraphs((value) => !value)}><BarChart3 size={14} />{showGraphs ? "Hide Graphs" : "View Graphs"}</button></div></header>
-      {showGraphs && <div className="analysis-chart"><div className="chart-y-label">Score / Result</div><div className="chart-bars">{(analysisType === "KPI Trend" ? trendRows.map((row) => ({ label: row.period.split(" ")[0], current: view === "Score Trend" ? row.score : row.result / 40, compared: view === "Score Trend" ? row.score - 7 : row.compared / 40 })) : benchmarking.map((row) => ({ label: row.code, current: row.kpiScore, compared: row.score }))).map((item) => <div className="chart-group" key={item.label}><div><i className="current" style={{ height: `${Math.min(100, item.current)}%` }} /><i className="compared" style={{ height: `${Math.min(100, item.compared)}%` }} /></div><span>{item.label}</span></div>)}</div><footer><span><i className="current" />Current</span><span><i className="compared" />Compared</span></footer></div>}
-      <label className="analysis-search"><Search size={15} /><input placeholder="Search KPI, ScoreCard or period..." /></label>
-      <div className="report-table-wrap">{analysisType === "KPI Trend" ? <table><thead><tr><SortableTableHeader active={sort.key === "code"} direction={sort.direction} onSort={() => sortBy("code")}>KPI Code</SortableTableHeader><SortableTableHeader active={sort.key === "name"} direction={sort.direction} onSort={() => sortBy("name")}>KPI Name</SortableTableHeader><SortableTableHeader active={sort.key === "scorecard"} direction={sort.direction} onSort={() => sortBy("scorecard")}>ScoreCard</SortableTableHeader><SortableTableHeader active={sort.key === "period"} direction={sort.direction} onSort={() => sortBy("period")}>Period</SortableTableHeader><SortableTableHeader active={sort.key === "goal"} direction={sort.direction} onSort={() => sortBy("goal")}>Goal</SortableTableHeader>{showRaw && <SortableTableHeader active={sort.key === "result"} direction={sort.direction} onSort={() => sortBy("result")}>Current Result</SortableTableHeader>}<SortableTableHeader active={sort.key === "score"} direction={sort.direction} onSort={() => sortBy("score")}>{view === "Score Trend" ? "Current Score" : "Difference vs Goal"}</SortableTableHeader><SortableTableHeader active={sort.key === "comparedPeriod"} direction={sort.direction} onSort={() => sortBy("comparedPeriod")}>Compared Period</SortableTableHeader><SortableTableHeader active={sort.key === "compared"} direction={sort.direction} onSort={() => sortBy("compared")}>{view === "Score Trend" ? "Compared Score" : "Compared Result"}</SortableTableHeader><SortableTableHeader active={sort.key === "difference"} direction={sort.direction} onSort={() => sortBy("difference")}>Period Difference</SortableTableHeader><SortableTableHeader active={sort.key === "traffic"} direction={sort.direction} onSort={() => sortBy("traffic")}>Traffic Light</SortableTableHeader></tr></thead><tbody>{paginatedTrendRows.map((row) => <tr key={row.period}><td><strong>{kpi.code}</strong></td><td>{kpi.name}</td><td>{reportScorecards.find((item) => item.code === scorecard)?.name ?? "EXA Operations"}</td><td>{row.period}</td><td>{row.goal.toLocaleString()} kms</td>{showRaw && <td>{row.result.toLocaleString()} kms</td>}<td>{view === "Score Trend" ? `${row.score}%` : `${row.result - row.goal > 0 ? "+" : ""}${row.result - row.goal} kms`}</td><td>{row.period.replace("2026", "2025")}</td><td>{view === "Score Trend" ? `${Math.max(0, row.score - 7)}%` : `${row.compared.toLocaleString()} kms`}</td><td>{row.result - row.compared > 0 ? "+" : ""}{row.result - row.compared}</td><td><span className={`detail-traffic ${row.score >= 90 ? "excellent" : row.score >= 75 ? "warning" : "danger"}`}><i />{row.score >= 90 ? "Green" : row.score >= 75 ? "Yellow" : "Red"}</span></td></tr>)}</tbody></table> : <table><thead><tr><th>Rank</th><SortableTableHeader active={sort.key === "scorecard"} direction={sort.direction} onSort={() => sortBy("scorecard")}>ScoreCard</SortableTableHeader><SortableTableHeader active={sort.key === "departments"} direction={sort.direction} onSort={() => sortBy("departments")}>Departments</SortableTableHeader><th>Goal</th>{showRaw && <SortableTableHeader active={sort.key === "result"} direction={sort.direction} onSort={() => sortBy("result")}>Result</SortableTableHeader>}<SortableTableHeader active={sort.key === "compliance"} direction={sort.direction} onSort={() => sortBy("compliance")}>Compliance Rate</SortableTableHeader><SortableTableHeader active={sort.key === "score"} direction={sort.direction} onSort={() => sortBy("score")}>Score</SortableTableHeader><SortableTableHeader active={sort.key === "averageDifference"} direction={sort.direction} onSort={() => sortBy("averageDifference")}>Difference vs Average</SortableTableHeader><SortableTableHeader active={sort.key === "trend"} direction={sort.direction} onSort={() => sortBy("trend")}>Trend</SortableTableHeader></tr></thead><tbody>{paginatedBenchmarking.map((row, index) => <tr key={row.code}><td><strong>#{pageStart + index + 1}</strong></td><td>{row.name}</td><td>{row.departments.join(", ")}</td><td>3,700 kms</td>{showRaw && <td>{row.result.toLocaleString()} kms</td>}<td>{(row.result / 3700 * 100).toFixed(1)}%</td><td><strong>{row.kpiScore.toFixed(2)}%</strong></td><td>{(row.kpiScore - 84.3).toFixed(2)}%</td><td><span className={`history-trend ${row.kpiScore >= row.score ? "improved" : "declined"}`}>{row.kpiScore >= row.score ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{row.kpiScore >= row.score ? "Improved" : "Declined"}</span></td></tr>)}</tbody></table>}</div>
-      <footer className="reports-pagination analysis-table-pagination"><span>Showing {totalRecords ? pageStart + 1 : 0}–{Math.min(pageStart + pageSize, totalRecords)} of {totalRecords} records</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={currentPage} totalPages={pages} onPage={setPage} label="KPI analysis pagination" className="analysis-pagination-controls" /></footer>
+    <header className="reports-header"><div><span>KPI PERFORMANCE</span><h1>KPI Analysis</h1><p>Analyze official closed KPI results over time or across ScoreCards.</p></div></header>
+    <ReportLoadState query={query}/>
+    <section className="dynamic-filters"><header><h2>Dynamic Filters</h2><p>Goals, results and evaluation context come from the selected closed periods.</p></header>
+      <label><span>Analysis Type</span><select value={analysisType} onChange={e=>{setAnalysisType(e.target.value);setPage(1);setSort({key:e.target.value==="KPI Benchmarking"?"score":"periodStart",direction:e.target.value==="KPI Benchmarking"?"desc":"asc"});}}><option>KPI Trend</option><option>KPI Benchmarking</option></select></label>
+      <label><span>Analysis View</span><select value={view} onChange={e=>setView(e.target.value)}><option>Goal vs Result</option><option>Score Trend</option></select></label>
+      <label><span>Compare with</span><select value={compare} onChange={e=>setCompare(e.target.value)}><option>Previous Period</option><option>Same Period Last Year</option>{periods.map(p=><option key={p}>{p}</option>)}</select></label>
+      <label><span>KPI / Evaluation</span><select value={activeKpi} onChange={e=>{setSelectedKpi(e.target.value);setPage(1);}}>{options.map(e=><option key={identity(e)} value={identity(e)}>{e.configCode} · {e.name}{e.entityLabel?" / "+e.entityLabel:""}</option>)}</select></label>
+      <label><span>ScoreCards</span><select value={scorecard} onChange={e=>{setScorecard(e.target.value);setPage(1);}}><option value="all">All ScoreCards</option>{latestResults(query.items).map(r=><option key={r.scorecardId} value={r.scorecardId}>{r.code} · {r.name}</option>)}</select></label>
+      <label><span>Period Range</span><select value={period} onChange={e=>{setPeriod(e.target.value);setPage(1);}}><option value="all">{analysisType==="KPI Benchmarking"?"Latest closed period":"All closed periods"}</option>{periods.map(p=><option key={p}>{p}</option>)}</select></label>
     </section>
-    <button type="button" className="report-page-back" onClick={() => navigate(-1)}><ArrowLeft size={17}/>Back</button>
+    <section className="analysis-summary-cards"><article><small>Goal Met</small><strong>{rows.filter(r=>r.goalMet===true).length} / {rows.filter(r=>r.goalMet!==null).length}</strong></article><article><small>Best {analysisType==="KPI Trend"?"Period":"Performer"}</small><strong>{best?(analysisType==="KPI Trend"?best.period:best.card.name):"—"}</strong><em>{percent(best?.score)}</em></article><article><small>Lowest {analysisType==="KPI Trend"?"Period":"Performer"}</small><strong>{lowest?(analysisType==="KPI Trend"?lowest.period:lowest.card.name):"—"}</strong><em>{percent(lowest?.score)}</em></article><article><small>Average Score</small><strong>{percent(average)}</strong></article></section>
+    <section className="analysis-result-section"><header><div><h2>{analysisType} · {selected?.name ?? "No official results"}</h2><p>{view} · Compared with {compare}</p></div><div><button onClick={()=>setShowRaw(!showRaw)}>{showRaw?<EyeOff size={14}/>:<Eye size={14}/>} {showRaw?"Hide Raw Results":"View Raw Results"}</button><ReportExportButtons getReport={exportReport} disabled={query.isLoading || query.isError || !rows.length}/><button className="graphs" onClick={()=>setShowGraphs(!showGraphs)}><BarChart3 size={14}/>{showGraphs?"Hide Graphs":"View Graphs"}</button></div></header>
+      {showGraphs&&<div className="analysis-chart"><div className="chart-y-label">Official Score (%)</div><div className="chart-bars">{rows.map(r=><div className="chart-group" key={r.id}><div>{r.score!==null&&<i title={percent(r.score)} className="current" style={{height:Math.max(0,Math.min(100,Number(r.score)))+"%"}}/>}{r.comparedScore!==null&&<i title={percent(r.comparedScore)} className="compared" style={{height:Math.max(0,Math.min(100,Number(r.comparedScore)))+"%"}}/>}</div><span>{r.period} · {r.card.code}</span></div>)}</div><footer><span>Current Score</span><span>Compared Score</span></footer></div>}
+      <label className="analysis-search"><Search size={15}/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}} placeholder="Search KPI, ScoreCard or period…"/></label>
+      <div className="report-table-wrap"><table><thead><tr>{header("code","KPI Code")}{header("name","KPI Name / Entity")}{header("scorecardName","ScoreCard")}{header("periodStart","Period")}{header("goal","Goal")}{showRaw&&header("result","Current Result")}{header("score",view==="Score Trend"?"Current Score":"Difference vs Goal")}{header("comparedPeriod","Compared Period")}{header("compared","Compared Result / Score")}<th>Period Difference</th><th>Goal Met</th><th>Traffic Light</th><th>Details</th></tr></thead><tbody>{visible.map(r=><tr key={r.id}><td>{r.code}</td><td>{r.name}{r.entityLabel?" / "+r.entityLabel:""}</td><td>{r.card.name}<small>{departmentNames(r.card).join(", ")}</small></td><td>{r.period}</td><td>{r.goal ?? "—"} {r.goalUnit}</td>{showRaw&&<td>{raw(r.result,r.unit)}</td>}<td>{view==="Score Trend"?percent(r.score):raw(r.goalDifference,r.unit)}</td><td>{r.comparedPeriod ?? "—"}</td><td>{view==="Score Trend"?percent(r.comparedScore):raw(r.compared,r.unit)}</td><td>{view==="Score Trend"?percent(r.scoreDifference):raw(r.periodDifference,r.unit)}</td><td>{r.goalMet===null?"—":r.goalMet?"Yes":"No"}</td><td><OfficialTraffic value={r.trafficLight}/></td><td><Link to={resultLink(r.card)}>View</Link></td></tr>)}</tbody></table></div>
+      {!rows.length&&!query.isLoading&&<p className="reports-empty">No official closed results match these filters.</p>}
+      <footer className="reports-pagination analysis-table-pagination"><span>{rows.length} records</span><RowsPerPageSelect value={pageSize} onChange={v=>{setPageSize(v);setPage(1);}}/><PaginationControls page={currentPage} totalPages={pages} onPage={setPage} label="KPI analysis pagination" className="analysis-pagination-controls"/></footer>
+    </section><button className="report-page-back" onClick={()=>navigate(-1)}><ArrowLeft size={17}/>Back</button>
   </main>;
 }
-
-type TrendRow = (typeof trendRows)[number];
-type BenchmarkRow = (typeof reportScorecards)[number] & { kpiScore: number; result: number };
-type KpiAnalysisSortKey = "code" | "name" | "scorecard" | "departments" | "period" | "goal" | "result" | "score" | "comparedPeriod" | "compared" | "difference" | "traffic" | "compliance" | "averageDifference" | "trend";
-function trendSortValue(row: TrendRow, key: KpiAnalysisSortKey) { switch (key) { case "period": case "comparedPeriod": return new Date(row.period).getTime(); case "goal": return row.goal; case "result": return row.result; case "score": case "traffic": return row.score; case "compared": return row.compared; case "difference": return row.result - row.compared; default: return ""; } }
-function benchmarkSortValue(row: BenchmarkRow, key: KpiAnalysisSortKey) { switch (key) { case "scorecard": return row.name; case "departments": return row.departments.join(", "); case "result": case "compliance": return row.result; case "score": return row.kpiScore; case "averageDifference": return row.kpiScore - 84.3; case "trend": return row.kpiScore - row.score; default: return ""; } }

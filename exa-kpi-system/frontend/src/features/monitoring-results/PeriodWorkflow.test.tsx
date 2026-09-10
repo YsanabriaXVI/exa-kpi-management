@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PeriodWorkflow } from "./PeriodWorkflow";
 import type { ManualEntryResponse } from "./manual-result-entry.service";
 function fixture(status: string, current = true) {
-  return { monitoringPeriod: { status, poolName: "Sales", periodLabel: "September 2026" }, check: { status: current ? "CURRENT" : "STALE", summary: { readyForSubmit: true } }, summary: { pending: 0 }, scorecards: [] } as unknown as ManualEntryResponse;
+  return { monitoringPeriod: { status, poolName: "Sales", periodLabel: "September 2026" }, check: { findings: [], status: current ? "CURRENT" : "STALE", summary: { readyForSubmit: true } }, summary: { pending: 0 }, inputs: [], scorecards: [] } as unknown as ManualEntryResponse;
 }
 describe("Period workflow", () => {
   it.each(["DRAFT", "SUBMITTED", "VALIDATED"])("requires a justified exception in %s", async status => {

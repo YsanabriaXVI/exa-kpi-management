@@ -67,6 +67,7 @@ async function effectiveGoalsForPeriod(
   poolId: bigint,
   period: InputPeriod,
   memberships: KpiPoolKpi[],
+  unavailable?: Map<string, string>,
 ) {
   if (!memberships.length) return new Map<string, string>();
   const effectiveGoals = new Map<string, string>();
@@ -76,7 +77,14 @@ async function effectiveGoalsForPeriod(
         membership.kpiConfigurationExternalId.toString(),
         formatDateOnly(period.start),
         formatDateOnly(period.end),
-      ),
+      ).catch(error => {
+        // An obsolete test/legacy membership must not hide the entire catalog.
+        if (unavailable && error instanceof AppError && ["KPI_CONFIGURATION_NOT_FOUND", "KPI_EFFECTIVE_REVISION_NOT_FOUND", "KPI_EFFECTIVE_REVISION_OVERLAP", "KPI_MANAGEMENT_INVALID_RESPONSE", "HISTORICAL_CONTRACT_INVALID", "CONTRIBUTION_CONTRACT_INVALID"].includes(error.code)) {
+          unavailable.set(membership.kpiConfigurationExternalId.toString(), error.code);
+          return null;
+        }
+        throw error;
+      }),
     ),
   );
   memberships.forEach((membership, index) => {
@@ -363,10 +371,11 @@ export const kpiPoolMembershipService = {
     const effective = await prisma.kpiPoolKpi.findMany({ where: effectiveWhere(poolId, period) });
     const configurations = new Map(effective.map((row) => [row.kpiConfigurationExternalId.toString(), row]));
     const definitions = new Map(effective.map((row) => [row.kpiDefinitionExternalId.toString(), row]));
-    const effectiveGoals = await effectiveGoalsForPeriod(poolId, period, effective);
+    const unavailable = new Map<string, string>();
+    const effectiveGoals = await effectiveGoalsForPeriod(poolId, period, effective, unavailable);
     return { data: catalog.data.map((configuration) => {
       let availability = "AVAILABLE_TO_ADD"; let reasonCode: string | null = null; let conflict: string | null = null;
-      if (configurations.has(configuration.id)) availability = "ALREADY_IN_POOL";
+      if (configurations.has(configuration.id)) { availability = "ALREADY_IN_POOL"; reasonCode = unavailable.get(configuration.id) ?? null; }
       else if (definitions.has(configuration.definitionId)) { availability = "NOT_AVAILABLE"; reasonCode = "KPI_DEFINITION_ALREADY_EFFECTIVE"; conflict = definitions.get(configuration.definitionId)!.configurationCodeSnapshot; }
       else { reasonCode = eligibilityReason(configuration, pool.inputFrequencyExternalId) ?? null; if (reasonCode) availability = "NOT_AVAILABLE"; }
       const membership = configurations.get(configuration.id);

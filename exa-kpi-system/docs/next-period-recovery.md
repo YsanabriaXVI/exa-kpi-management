@@ -31,20 +31,19 @@ seconds. Pool separately retries the closure subscription if MONITORING_EVENTS
 is absent, or if the connection/subscription closes. Shutdown stops retries;
 the durable consumer is retained, not deleted.
 
-Initialize Next Period keeps the existing Pool → Scorecards → Monitoring order.
-Each transient retry resolves current persisted state again, reusing finalized
-compositions and any existing Monitoring period. It retries at most three times
-per explicit request. Business validation failures remain visible for correction.
-The user can retry the same action after a service recovers. No previous Results,
-scores, manual baselines or Checks are copied; newly materialized Monitoring
-periods still start DRAFT with empty Results. Existing periods are never reset.
+Next Period resolves the chronological successor after the source is CLOSED.
+The UI exposes explicit review checkpoints: POOL_EDITABLE, SCORECARDS_REVIEW,
+READY_TO_MATERIALIZE, MONITORING_MATERIALIZED, and END_OF_SCHEDULE.
+Review and finalize the Pool in Manage KPIs / Pool Schedule first. Then prepare
+Scorecard drafts, review inherited selections and weights, and finalize every
+Scorecard. Removed Pool KPIs are reported; existing drafts are preserved.
 
-Progress is returned by GET next-period and in failed initialization details:
-WAITING_FOR_PREVIOUS_CLOSE, POOL_COMPOSITION_PENDING, POOL_COMPOSITION_READY,
-SCORECARDS_PREPARED, MONITORING_MATERIALIZED. These describe persisted checkpoints,
-not a new business lifecycle or a background job. Error details include retryable,
-causeCode and attempts. Monitoring's existing reconciliation still repairs the
-last materialization step when Scorecards are ready.
+POST next-period only materializes Monitoring when both Pool and Scorecards are
+finalized, or returns the existing Monitoring identity. It does not finalize
+compositions on the user's behalf. Retry explicitly after service recovery;
+each request resolves persisted readiness again. No previous Results, scores,
+manual baselines or Checks are copied. Newly materialized periods start DRAFT
+with empty Results; existing periods are never reset.
 
 ## Local operator recovery
 

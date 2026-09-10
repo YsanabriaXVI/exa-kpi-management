@@ -107,11 +107,11 @@ run("Historical baseline MySQL acceptance",()=>{
   });
   it("supports manual provenance and semantic numeric no-op with exact required period and unit",async()=>{
     const before=await get();
-    await historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:before.monitoringPeriod.baselineVersion,value:"101000",reason:"ERP July source before EXA"},13n);
+    await historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:before.monitoringPeriod.baselineVersion,value:"101000",reason:"ERP July source before EXA",sourceReference:"ERP July export"},13n);
     const changed=await check();
     const history=await historicalBaselineService.history(current,currentInput);
-    expect(history.revisions[0]).toMatchObject({sourceType:"MANUAL",requiredPeriod:{key:"2096-07"},unit:{symbol:"USD"},reason:"ERP July source before EXA",resolvedBy:"13"});
-    await historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:changed.monitoringPeriod.baselineVersion,value:"101000.000000",reason:"ERP July source before EXA"},13n);
+    expect(history.revisions[0]).toMatchObject({sourceType:"MANUAL",requiredPeriod:{key:"2096-07"},unit:{symbol:"USD"},reason:"ERP July source before EXA",sourceReference:"ERP July export",resolvedBy:"13"});
+    await historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:changed.monitoringPeriod.baselineVersion,value:"101000.000000",reason:"ERP July source before EXA",sourceReference:"ERP July export"},13n);
     expect((await get()).check.status).toBe("CURRENT");
     expect((await historicalBaselineService.history(current,currentInput)).revisions.length).toBe(history.revisions.length);
   });
@@ -131,12 +131,12 @@ run("Historical baseline MySQL acceptance",()=>{
     const missing=await make("2096-08",f(true,"999"),"100");
     expect((await check(missing)).check.evaluations[0].errorCode).toBe("HISTORICAL_BASELINE_MISSING");
     const p=await get(missing);
-    await historicalBaselineService.save(missing,p.inputs[0].id,{expectedBaselineVersion:0,value:"0",reason:"Confirmed zero in the prior ERP"},11n);
+    await historicalBaselineService.save(missing,p.inputs[0].id,{expectedBaselineVersion:0,value:"0",reason:"Confirmed zero in the prior ERP",sourceReference:"ERP July export"},11n);
     expect((await check(missing)).check.evaluations[0]).toMatchObject({status:"NOT_CALCULABLE",errorCode:"HISTORICAL_BASELINE_ZERO_UNDEFINED",rawAchievementPercent:null});
   });
   it("serializes competing baseline writes and preserves current Result",async()=>{
     const before=await get();
-    const writes=await Promise.allSettled(["103000","104000"].map(value=>historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:before.monitoringPeriod.baselineVersion,value,reason:"Audited corrected ERP source"},11n)));
+    const writes=await Promise.allSettled(["103000","104000"].map(value=>historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:before.monitoringPeriod.baselineVersion,value,reason:"Audited corrected ERP source",sourceReference:"ERP July export"},11n)));
     expect(writes.filter(r=>r.status==="fulfilled")).toHaveLength(1);
     expect((writes.find(r=>r.status==="rejected") as PromiseRejectedResult).reason.code).toBe("BASELINE_VERSION_CONFLICT");
     expect((await get()).inputs[0].resultValue).toBe("115000");
@@ -159,7 +159,7 @@ run("Historical baseline MySQL acceptance",()=>{
     const before=await get();
     const results=await Promise.allSettled([
       checkResultsService.check(current,{expectedResultsVersion:before.monitoringPeriod.resultsVersion,expectedBaselineVersion:before.monitoringPeriod.baselineVersion},11n),
-      historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:before.monitoringPeriod.baselineVersion,value:"105000",reason:"Audited source during concurrent check"},11n)]);
+      historicalBaselineService.save(current,currentInput,{expectedBaselineVersion:before.monitoringPeriod.baselineVersion,value:"105000",reason:"Audited source during concurrent check",sourceReference:"ERP July export"},11n)]);
     expect(results.some(r=>r.status==="fulfilled")).toBe(true);
     for(const r of results)if(r.status==="rejected")expect(["RESULT_VERSION_CONFLICT","BASELINE_VERSION_CONFLICT"]).toContain(r.reason.code);
     const after=await get();

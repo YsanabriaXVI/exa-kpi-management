@@ -649,10 +649,19 @@ export const kpiPoolService = {
   ): Promise<ManageablePoolKpi[]> {
     const query = new URLSearchParams({ page: "1", pageSize: "100" });
     if (periodStart) query.set("periodStart", periodStart);
-    const response = await poolApiRequest<{ data: AvailabilityApiRecord[] }>(
-      `/v1/kpi-pools/${poolId}/available-kpi-configurations?${query}`,
-    );
-    return response.data.map((value) => ({
+    const records: AvailabilityApiRecord[] = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      query.set("page", String(page));
+      const response = await poolApiRequest<{ data: AvailabilityApiRecord[]; meta: { totalPages: number } }>(
+        `/v1/kpi-pools/${poolId}/available-kpi-configurations?${query}`,
+      );
+      records.push(...response.data);
+      totalPages = response.meta.totalPages;
+      page++;
+    } while (page <= totalPages);
+    return records.map((value) => ({
       configurationId: value.id,
       definitionId: value.definitionId,
       configCode: value.configCode,
@@ -686,6 +695,7 @@ export const kpiPoolService = {
     poolId: number,
     inputPeriodId: string,
     configurationId: string,
+    preview = false,
   ) {
     return poolApiRequest<{
       data: {
@@ -711,7 +721,7 @@ export const kpiPoolService = {
         };
       };
     }>(
-      `/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/effective-settings`,
+      `/v1/kpi-pools/${poolId}/input-periods/${inputPeriodId}/kpi-configurations/${configurationId}/effective-settings${preview ? "?preview=true" : ""}`,
     ).then((response) => response.data);
   },
   async saveConfigurationOverride(

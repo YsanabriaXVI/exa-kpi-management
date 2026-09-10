@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { reportScorecards } from "./reports.data";
+import { useOfficialResults, ReportLoadState, latestResults, departmentNames, numberOrNull, percent, averageOf, resultLink } from "./official-results";
 import { useMultiSelectVisibleCount } from "../../components/useMultiSelectVisibleCount";
 import "./reports.css";
 import "./latest-scorecard-results.css";
@@ -95,6 +95,9 @@ function ReportMultiSelect({ label, options, selected, onChange, searchable = fa
 
 export function LatestScorecardResults() {
   const navigate = useNavigate();
+  const query = useOfficialResults();
+  const reportScorecards = useMemo(() => query.items.map(r=>({...r, departments:departmentNames(r), score:numberOrNull(r.score), ownKpiWeight:numberOrNull(r.directScore), linkedWeight:numberOrNull(r.linkedScore), kpis:r.evaluations.length, green:r.evaluations.filter(e=>e.trafficLight === "GREEN").length, yellow:r.evaluations.filter(e=>e.trafficLight === "YELLOW").length, red:r.evaluations.filter(e=>e.trafficLight === "RED").length})), [query.items]);
+  const latestIds = new Set(latestResults(query.items).map(r=>r.id));
   const [scorecards, setScorecards] = useState<string[]>([]);
   const [departmentsSelected, setDepartmentsSelected] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
@@ -109,19 +112,19 @@ export function LatestScorecardResults() {
     () =>
       reportScorecards.filter(
         (item) =>
-          (!scorecards.length || scorecards.includes(item.code)) &&
+          (!scorecards.length || scorecards.includes(item.scorecardId)) &&
           (!departmentsSelected.length || item.departments.some((department) => departmentsSelected.includes(department))) &&
           (!statuses.length || statuses.includes(item.status)) &&
-          (period === "Latest Available Result" || period === "Last 3 Periods" || item.period === "Jun 2026"),
+          (period === "Latest Available Result" ? latestIds.has(item.id) : item.periodKey === period),
       ),
-    [departmentsSelected, period, scorecards, statuses],
+    [reportScorecards, departmentsSelected, period, scorecards, statuses],
   );
-  const visible = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const average = filtered.length
-    ? filtered.reduce((sum, item) => sum + item.score, 0) / filtered.length
-    : 0;
-  const best = [...filtered].sort((a, b) => b.score - a.score)[0];
-  const lowest = [...filtered].sort((a, b) => a.score - b.score)[0];
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const average = averageOf(filtered.map(r=>r.score));
+  const scored = filtered.filter((r): r is typeof r & {score:number} => r.score !== null);
+  const best = [...scored].sort((a, b) => b.score - a.score)[0];
+  const lowest = [...scored].sort((a, b) => a.score - b.score)[0];
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
   return (
@@ -141,6 +144,7 @@ export function LatestScorecardResults() {
           </p>
         </div>
       </header>
+      <ReportLoadState query={query}/>
       <section className="reports-filters">
         <header className="reports-filter-heading">
           <div>
@@ -153,7 +157,7 @@ export function LatestScorecardResults() {
         </header>
         <label>
           <span>ScoreCard Selection</span>
-          <ReportMultiSelect searchable label="Search or select ScoreCards..." options={reportScorecards.map((item) => ({ value: item.code, label: `${item.code} · ${item.name}` }))} selected={scorecards} onChange={(values) => { setScorecards(values); setPage(1); }} />
+          <ReportMultiSelect searchable label="Search or select ScoreCards..." options={latestResults(query.items).map((item) => ({ value: item.scorecardId, label: `${item.code} · ${item.name}` }))} selected={scorecards} onChange={(values) => { setScorecards(values); setPage(1); }} />
         </label>
         <label>
           <span>Departments</span>
@@ -161,14 +165,13 @@ export function LatestScorecardResults() {
         </label>
         <label>
           <span>Status</span>
-          <ReportMultiSelect label="All statuses" options={["Closed", "Closed with Exceptions", "Validated", "Submitted"].map((item) => ({ value: item, label: item }))} selected={statuses} onChange={(values) => { setStatuses(values); setPage(1); }} />
+          <ReportMultiSelect label="All statuses" options={["Closed", "Closed with Exceptions"].map((item) => ({ value: item, label: item }))} selected={statuses} onChange={(values) => { setStatuses(values); setPage(1); }} />
         </label>
         <label>
           <span>Period to Display</span>
           <select className="report-period-select" value={period} onChange={(event) => { setPeriod(event.target.value); setPage(1); }}>
             <option>Latest Available Result</option>
-            <option>Current Period</option>
-            <option>Last 3 Periods</option>
+            {[...new Set(query.items.map(r=>r.periodKey))].sort().reverse().map(key=><option key={key}>{key}</option>)}
           </select>
         </label>
       </section>
@@ -192,7 +195,7 @@ export function LatestScorecardResults() {
           </span>
           <div>
             <small>Average Score</small>
-            <strong>{average.toFixed(2)}%</strong>
+            <strong>{percent(average)}</strong>
           </div>
         </article>
         <article>
@@ -217,10 +220,10 @@ export function LatestScorecardResults() {
         </article>
       </section>
       <div className="chart-view-filter">
-        <span className="composition-view-label">Chart View <i className="report-tooltip" tabIndex={0} data-tooltip="Detailed divides the ring by Final Composition. Relative displays the Final Score using its performance color."><Info size={14} /></i></span>
+        <span className="composition-view-label">Chart View <i className="report-tooltip" tabIndex={0} data-tooltip="Detailed displays persisted contributions when available. Relative displays the official final score."><Info size={14} /></i></span>
         <div className="composition-view-toggle" role="group" aria-label="Composition view">
           {(["Detailed", "Relative"] as const).map((view) => (
-            <button type="button" title={view === "Detailed" ? "Ring divided into KPI Performance, Linked ScoreCards and Gap" : "Ring based on the Final Score performance range"} className={compositionView === view ? "active" : ""} key={view} onClick={() => setCompositionView(view)}>{view}</button>
+            <button type="button" title={view === "Detailed" ? "Ring divided into KPI Performance, Linked ScoreCards and Gap" : "Ring based on the official Final Score"} className={compositionView === view ? "active" : ""} key={view} onClick={() => setCompositionView(view)}>{view}</button>
           ))}
         </div>
       </div>
@@ -228,10 +231,10 @@ export function LatestScorecardResults() {
         {visible.map((scorecard) => {
           const gap = Math.max(
             0,
-            100 - scorecard.ownKpiWeight - scorecard.linkedWeight,
+            100 - (scorecard.score ?? 100),
           );
           return (
-            <article className="score-result-card" key={scorecard.code}>
+            <article className="score-result-card" key={scorecard.id}>
               <header>
                 <div>
                   <h2><span>{scorecard.code}</span> · {scorecard.name}</h2>
@@ -254,20 +257,20 @@ export function LatestScorecardResults() {
                 </div>
                 <div>
                   <small>KPI Pool Source</small>
-                  <strong>Corporate KPI Pool</strong>
+                  <strong>{scorecard.poolName}</strong>
                 </div>
               </div>
               <div className="score-result-body">
                 <div
                   className="score-donut"
                   style={{
-                    background: compositionView === "Detailed"
-                      ? `conic-gradient(#8b4fc1 0 ${scorecard.ownKpiWeight}%, #238fd1 ${scorecard.ownKpiWeight}% ${scorecard.ownKpiWeight + scorecard.linkedWeight}%, #cfd5dd ${scorecard.ownKpiWeight + scorecard.linkedWeight}% 100%)`
-                      : `conic-gradient(${scorecard.score < 65 ? "#e14b47" : scorecard.score <= 79 ? "#e7b51e" : "#1faf62"} 0 ${scorecard.score}%, var(--ems-border) ${scorecard.score}% 100%)`,
+                    background: compositionView === "Detailed" && scorecard.ownKpiWeight !== null && scorecard.linkedWeight !== null
+                      ? `conic-gradient(#8b4fc1 0 ${scorecard.ownKpiWeight ?? 0}%, #238fd1 ${scorecard.ownKpiWeight ?? 0}% ${(scorecard.ownKpiWeight ?? 0) + (scorecard.linkedWeight ?? 0)}%, #cfd5dd ${scorecard.ownKpiWeight + scorecard.linkedWeight}% 100%)`
+                      : `conic-gradient(#238fd1 0 ${scorecard.score ?? 0}%, var(--ems-border) ${scorecard.score ?? 0}% 100%)`,
                   }}
                 >
                   <span>
-                    <strong>{scorecard.score.toFixed(1)}%</strong>
+                    <strong>{percent(scorecard.score,1)}</strong>
                     <small>Final Score</small>
                   </span>
                 </div>
@@ -276,21 +279,21 @@ export function LatestScorecardResults() {
                   <p>
                     <i
                       className="own"
-                      style={{ width: `${scorecard.ownKpiWeight}%` }}
+                      style={{ width: `${scorecard.ownKpiWeight ?? 0}%` }}
                     />
                     <i
                       className="linked"
-                      style={{ width: `${scorecard.linkedWeight}%` }}
+                      style={{ width: `${scorecard.linkedWeight ?? 0}%` }}
                     />
                     <i className="gap" style={{ width: `${gap}%` }} />
                   </p>
                   <span>
                     <i className="own" />
-                    KPI Performance {scorecard.ownKpiWeight}%
+                    KPI Performance {percent(scorecard.ownKpiWeight)}
                   </span>
                   <span>
                     <i className="linked" />
-                    Linked ScoreCards {scorecard.linkedWeight}%
+                    Linked ScoreCards {percent(scorecard.linkedWeight)}
                   </span>
                   {gap > 0 && (
                     <span>
@@ -299,7 +302,7 @@ export function LatestScorecardResults() {
                     </span>
                   )}
                   <div className="composition-counts">
-                    <strong>{Math.max(1, Math.round(scorecard.linkedWeight / 10))} Linked ScoreCards</strong>
+                    <strong>{scorecard.links.length} Linked ScoreCards</strong>
                     <strong>{scorecard.kpis} KPIs Included</strong>
                   </div>
                 </div>
@@ -307,9 +310,9 @@ export function LatestScorecardResults() {
               <div className="traffic-summary">
                 <small>KPIs Traffic Light</small>
                 <p className="traffic-distribution">
-                  <i className="green" style={{ width: `${(scorecard.green / scorecard.kpis) * 100}%` }} />
-                  <i className="yellow" style={{ width: `${(scorecard.yellow / scorecard.kpis) * 100}%` }} />
-                  <i className="red" style={{ width: `${(scorecard.red / scorecard.kpis) * 100}%` }} />
+                  <i className="green" style={{ width: `${(scorecard.green / (scorecard.kpis || 1)) * 100}%` }} />
+                  <i className="yellow" style={{ width: `${(scorecard.yellow / (scorecard.kpis || 1)) * 100}%` }} />
+                  <i className="red" style={{ width: `${(scorecard.red / (scorecard.kpis || 1)) * 100}%` }} />
                 </p>
                 <span>
                   <span className="traffic-item"><i className="green" /><b>{scorecard.green}</b></span>
@@ -320,7 +323,7 @@ export function LatestScorecardResults() {
               <footer>
                 <button
                   onClick={() => {
-                    const historyParams = new URLSearchParams();
+                    const historyParams = new URLSearchParams({scorecardId:scorecard.scorecardId});
                     scorecard.departments.forEach((department) =>
                       historyParams.append("department", department),
                     );
@@ -335,7 +338,7 @@ export function LatestScorecardResults() {
                 <button
                   onClick={() =>
                     navigate(
-                      `/app/reports/scorecard-result-detail?scorecardCode=${encodeURIComponent(scorecard.code)}&from=overview`,
+                      resultLink(scorecard),
                     )
                   }
                 >
@@ -359,16 +362,16 @@ export function LatestScorecardResults() {
         </span>
         <div>
           <button
-            disabled={page === 1}
+            disabled={currentPage === 1}
             onClick={() => setPage((value) => value - 1)}
           >
             <ChevronLeft size={15} />
           </button>
           <span>
-            Page <strong>{page}</strong> of <strong>{pages}</strong>
+            Page <strong>{currentPage}</strong> of <strong>{pages}</strong>
           </span>
           <button
-            disabled={page === pages}
+            disabled={currentPage === pages}
             onClick={() => setPage((value) => value + 1)}
           >
             <ChevronRight size={15} />

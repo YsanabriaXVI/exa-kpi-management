@@ -18,7 +18,7 @@ export function PoolPeriodSchedule() {
   const initializedPoolId = useRef(0);
   const [poolSearch, setPoolSearch] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  const [selectedStart, setSelectedStart] = useState("");
+  const [selectedStart, setSelectedStart] = useState(params.get("period") ?? "");
   const poolsQuery = useQuery({ queryKey: ["kpi-pools", "period-schedule-options"], queryFn: () => kpiPoolService.list(), staleTime: 60 * 1000 });
   const poolQuery = useQuery({ queryKey: ["kpi-pool-basic", poolId], queryFn: () => kpiPoolService.getBasic(poolId), enabled: poolId > 0 });
   const periodsQuery = useQuery({ queryKey: ["kpi-pool-periods", poolId], queryFn: () => kpiPoolService.getInputPeriods(poolId), enabled: poolId > 0 });

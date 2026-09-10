@@ -1529,7 +1529,11 @@ export function SetKpiConfigPage() {
                   ? "DIFFERENT_GOAL_PER_SUBJECT"
                   : "SAME_GOAL_FOR_ALL",
               );
-              if (value === "OVERALL") setGroupGoal(null);
+              if (value === "OVERALL") {
+                setGroupGoal(null);
+                setGoalUnit(periodScope === "CURRENT_PERIOD" ? goalUnit || measurementUnit : "%");
+                if (periodScope === "CURRENT_PERIOD") setMeasurementUnit(goalUnit || measurementUnit);
+              }
             }}
             entityEvaluationMode={entityEvaluationMode}
             setEntityEvaluationMode={(mode) => {
@@ -1550,11 +1554,11 @@ export function SetKpiConfigPage() {
             goal={goal}
             setGoal={setGoal}
             goalUnit={goalUnit || measurementUnit}
-            setGoalUnit={(value) => { setGoalUnit(value); if (contributing && periodScope === "CURRENT_PERIOD") setMeasurementUnit(value); }}
+            setGoalUnit={(value) => { setGoalUnit(value); if (!individual && periodScope === "CURRENT_PERIOD") setMeasurementUnit(value); }}
             resultUnit={measurementUnit}
             setResultUnit={(value) => {
               setMeasurementUnit(value);
-              if (contributing && periodScope === "CURRENT_PERIOD") setGoalUnit(value);
+              if (!individual && periodScope === "CURRENT_PERIOD") setGoalUnit(value);
               setResultUnitErrorVisible(false);
               setResultUnitToastVisible(false);
             }}

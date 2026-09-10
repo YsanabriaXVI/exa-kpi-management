@@ -48,9 +48,15 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
       ...init, signal: controller.signal,
       headers: { "Content-Type": "application/json", "x-service-name": "exa-kpi-pool-service", ...init?.headers },
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null) as { error?: { code?: string; message?: string; details?: unknown } } | null;
+      if (response.status >= 400 && response.status < 500)
+        throw new AppError(response.status, payload?.error?.code ?? "KPI_MANAGEMENT_REQUEST_REJECTED", payload?.error?.message ?? "KPI Management could not resolve the selected configuration for this Input Period", payload?.error?.details);
+      throw new Error(`HTTP ${response.status}: ${payload?.error?.message ?? response.statusText}`);
+    }
     return await response.json();
   } catch (error) {
+    if (error instanceof AppError) throw error;
     logger.warn({ path, error: error instanceof Error ? error.message : String(error) }, "KPI Management request failed");
     throw new AppError(503, "KPI_MANAGEMENT_UNAVAILABLE", "KPI Management is temporarily unavailable");
   } finally { clearTimeout(timeout); }

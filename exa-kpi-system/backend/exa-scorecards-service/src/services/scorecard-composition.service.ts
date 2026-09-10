@@ -206,46 +206,32 @@ export const scorecardCompositionService = {
     const previous = await prisma.scorecardPeriodComposition.findMany({ where: { kpiPoolExternalId: poolId, periodKey: sourcePeriodKey, statusCode: "FINALIZED", scorecard: { deletedAt: null, statusCode: { not: "INACTIVE" } } }, include });
     if (!previous.length) throw new AppError(422, "NEXT_PERIOD_NO_SCORECARDS", "No active Scorecards can be inherited from the closed period");
     const memberships = new Map(period.memberships.map(row => [row.kpiConfigurationExternalId.toString(), row]));
+    const removedKpis = previous.flatMap(source => source.kpis.filter(row => !memberships.has(row.kpiConfigurationExternalId.toString())).map(row => ({ scorecardId: String(source.scorecardId), configurationId: String(row.kpiConfigurationExternalId), code: row.configurationCodeSnapshot, name: row.definitionNameSnapshot })));
     for (const source of previous) {
       const current = await findComposition(source.scorecardId, targetPeriodKey);
       // Preserve any composition already prepared by the user or an earlier attempt.
-      if (current && (current.statusCode === "FINALIZED" || current.kpis.length || current.links.length)) continue;
+      if (current) continue;
       const owner = await scorecard(source.scorecardId);
-      const selections = await Promise.all(source.kpis.map(async row => {
-        const membership = memberships.get(row.kpiConfigurationExternalId.toString());
-        if (!membership) throw new AppError(422, "NEXT_PERIOD_CONFIGURATION_UNAVAILABLE", `${row.configurationCodeSnapshot} is not in the next Pool composition; review the selected configurations.`);
+      const selections = await Promise.all(source.kpis.filter(row => memberships.has(row.kpiConfigurationExternalId.toString())).map(async row => {
+        const membership = memberships.get(row.kpiConfigurationExternalId.toString())!;
         const resolved = await kpiPoolClient.effectiveSettings(poolId.toString(), period.poolPeriodExternalId!.toString(), row.kpiConfigurationExternalId.toString());
-        const frozen = freezeWeightedSettings(resolved.effective, (row.entityWeights ?? []) as EntityWeight[]);
+        const frozen = resolved.effective; // Prefill only; freeze and validate when the user finalizes.
         return { row, membership, frozen };
       }));
       await prisma.$transaction(async tx => {
         let target = await tx.scorecardPeriodComposition.findFirst({ where: { scorecardId: owner.id, periodKey: targetPeriodKey }, include });
-        if (target && (target.statusCode !== "PREPARING" || target.kpis.length || target.links.length)) return;
+        if (target) return;
         if (!target) target = await tx.scorecardPeriodComposition.create({ data: { scorecardId: owner.id, kpiPoolExternalId: poolId, poolPeriodExternalId: period.poolPeriodExternalId, poolCompositionExternalId: period.poolCompositionExternalId, periodKey: targetPeriodKey, periodStart: period.periodStart, periodEnd: period.periodEnd, createdByUserId: actor }, include });
         await tx.scorecardPeriodComposition.update({ where: { id: target.id }, data: { poolPeriodExternalId: period.poolPeriodExternalId, poolCompositionExternalId: period.poolCompositionExternalId, updatedByUserId: actor } });
         if (!target.scopeCustomizedAt) {
           await tx.scorecardPeriodDepartmentScope.deleteMany({ where: { scorecardPeriodCompositionId: target.id } });
           for (const department of source.scopeDepartments) await tx.scorecardPeriodDepartmentScope.create({ data: { scorecardPeriodCompositionId: target.id, externalDepartmentId: department.externalDepartmentId, externalCompanyId: department.externalCompanyId, departmentCodeSnapshot: department.departmentCodeSnapshot, departmentNameSnapshot: department.departmentNameSnapshot, displayOrder: department.displayOrder, createdByUserId: actor, employees: { create: department.employees.map(employee => ({ externalEmployeeId: employee.externalEmployeeId, employeeCodeSnapshot: employee.employeeCodeSnapshot, employeeNameSnapshot: employee.employeeNameSnapshot, createdByUserId: actor })) } } });
         }
-        for (const { row, membership, frozen } of selections) await tx.scorecardPeriodKpi.create({ data: { scorecardPeriodCompositionId: target.id, kpiPoolMembershipExternalId: membership.poolMembershipExternalId, kpiDefinitionExternalId: membership.kpiDefinitionExternalId, kpiConfigurationExternalId: membership.kpiConfigurationExternalId, kpiPoolExternalId: poolId, periodKey: targetPeriodKey, definitionCodeSnapshot: membership.definitionCode, definitionNameSnapshot: membership.definitionName, configurationCodeSnapshot: membership.configurationCode, categoryNameSnapshot: membership.categoryName, goalSnapshot: frozen.goal, dataSourceSnapshot: membership.dataSourceSnapshot, measurementUnitSnapshot: membership.measurementUnitSnapshot, weightPercent: row.weightPercent, entityWeights: isIndividualEvaluation(frozen) ? (frozen.subjectGoals as Array<{ subjectExternalId: string; weight: string }>).map(({ subjectExternalId, weight }) => ({ subjectExternalId, weight })) : Prisma.DbNull, displayOrder: row.displayOrder, createdByUserId: actor } });
+        for (const { row, membership, frozen } of selections) await tx.scorecardPeriodKpi.create({ data: { scorecardPeriodCompositionId: target.id, kpiPoolMembershipExternalId: membership.poolMembershipExternalId, kpiDefinitionExternalId: membership.kpiDefinitionExternalId, kpiConfigurationExternalId: membership.kpiConfigurationExternalId, kpiPoolExternalId: poolId, periodKey: targetPeriodKey, definitionCodeSnapshot: membership.definitionCode, definitionNameSnapshot: membership.definitionName, configurationCodeSnapshot: membership.configurationCode, categoryNameSnapshot: membership.categoryName, goalSnapshot: frozen.goal, dataSourceSnapshot: membership.dataSourceSnapshot, measurementUnitSnapshot: membership.measurementUnitSnapshot, weightPercent: row.weightPercent, entityWeights: isIndividualEvaluation(frozen) ? ((row.entityWeights ?? []) as EntityWeight[]).filter(weight => frozen.subjectGoals.some(subject => subject.subjectExternalId === weight.subjectExternalId)) as unknown as Prisma.InputJsonValue : Prisma.DbNull, displayOrder: row.displayOrder, createdByUserId: actor } });
         for (const link of source.links) await tx.scorecardPeriodLink.create({ data: { scorecardPeriodCompositionId: target.id, linkedScorecardId: link.linkedScorecardId, weightPercent: link.weightPercent, displayOrder: link.displayOrder, createdByUserId: actor } });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     }
-    const pending = new Set(previous.map(row => row.scorecardId.toString()));
-    const visiting = new Set<string>();
-    const finalize = async (id: string): Promise<void> => {
-      if (!pending.has(id)) return;
-      if (visiting.has(id)) throw new AppError(422, "SCORECARD_DEPENDENCY_INVALID", "Linked Scorecards contain a cycle");
-      visiting.add(id);
-      const target = await findComposition(BigInt(id), targetPeriodKey);
-      if (target?.statusCode !== "FINALIZED") {
-        for (const link of target?.links ?? []) await finalize(link.linkedScorecardId.toString());
-        await this.finalize(BigInt(id), targetPeriodKey, actor);
-      }
-      visiting.delete(id); pending.delete(id);
-    };
-    for (const row of previous) await finalize(row.scorecardId.toString());
-    return this.monitoringMaterialization(poolId, period.poolPeriodExternalId!.toString());
+    return { ...(await this.monitoringMaterialization(poolId, period.poolPeriodExternalId!.toString())), removedKpis };
   },
   async frozenKpiUsage(poolId: bigint, periodKey: string, configurationId: bigint) {
     const row = await prisma.scorecardPeriodKpi.findFirst({ where: { kpiPoolExternalId: poolId, periodKey, kpiConfigurationExternalId: configurationId, composition: { statusCode: "FINALIZED" } }, select: { composition: { select: { id: true, scorecardId: true } } } });

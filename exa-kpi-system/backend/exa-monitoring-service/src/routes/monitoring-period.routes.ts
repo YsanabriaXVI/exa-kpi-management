@@ -18,3 +18,8 @@ monitoringPeriodRouter.post("/:id/next-period", async (request, response, next) 
   try { const { id } = monitoringPeriodIdParamsSchema.parse(request.params); const result = await nextPeriodService.initialize(id, request.identity.actorUserId); response.status(result.created ? 201 : 200).json({...result.data,initializationStage:result.stage}); }
   catch (error) { next(error); }
 });
+
+monitoringPeriodRouter.post("/:id/next-period/prepare-scorecards", async (request, response, next) => {
+  try { const { id } = monitoringPeriodIdParamsSchema.parse(request.params); response.json(await nextPeriodService.prepareScorecards(id)); }
+  catch (error) { next(error); }
+});
