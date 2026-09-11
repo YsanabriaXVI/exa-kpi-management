@@ -1,9 +1,10 @@
+import { existsSync } from "node:fs";
 import { additiveResultError } from "../contracts/additive-results.js";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../config/database/prisma.js";
 import type { BatchLookupKpiConfigurationsBody, EffectiveKpiConfigurationSnapshotsBody, InternalKpiConfigurationCatalogQuery, KpiConfigurationBody } from "../schemas/kpi-configuration.schema.js";
 import { AppError } from "../utils/app-error.js";
-import { toKpiConfigurationDto } from "../utils/kpi-configuration.dto.js";
+import { toKpiConfigurationDto, configurationDisplayName } from "../utils/kpi-configuration.dto.js";
 import { evaluateKpiExecutability } from "../domain/kpi-executability.js";
 
 const unitSnapshot = (unit: {id: bigint; code: string; name: string; symbol: string}) => ({id: unit.id.toString(), code: unit.code, name: unit.name, symbol: unit.symbol});
@@ -38,6 +39,7 @@ async function writeRevision(tx: Prisma.TransactionClient, configurationId: bigi
   const evaluationScope = input.evaluationScope === "BY_SUBJECT" || input.goalMode === "BY_SUBJECT" ? "BY_SUBJECT" : "OVERALL";
   const goalType = "SINGLE_VALUE" as const;
   const legacyGoalMode = evaluationScope === "BY_SUBJECT" ? "BY_SUBJECT" : "SINGLE";
+  if (input.configurationName || input.classification) input = {...input, scoringRuleConfig: {...input.scoringRuleConfig, configurationMetadata: {name: input.configurationName, classification: input.classification}}};
   const revision = await tx.kpiConfigurationRevision.create({ data: { kpiConfigurationId: configurationId, revisionNumber, targetValue: input.goal, evaluationTypeId: evaluationId, measurementUnitId, goalUnitId, groupGoalValue: input.groupGoal?.value ?? null, groupGoalUnitId, groupGoalLabel: input.groupGoal?.label ?? null, dataSourceId, resultSemantics: input.resultSemantics, periodScope: input.periodScope, comparisonMode: input.periodScope === "CURRENT_PERIOD" ? "NONE" : input.periodScope, comparisonDirection: input.comparisonDirection, calculationPattern: input.resultMethod === "DIRECT" ? "DIRECT" : "DERIVED", calculationTemplate: input.resultMethod === "DIRECT" ? null : input.calculationTemplate, evaluationScope, entityEvaluationMode: evaluationScope === "BY_SUBJECT" ? input.entityEvaluationMode ?? "INDIVIDUAL" : null, goalType, goalAssignment: evaluationScope === "BY_SUBJECT" && input.entityEvaluationMode !== "CONTRIBUTE_TO_OVERALL" ? input.goalAssignment : null, resultMethod: input.resultMethod, goalMode: legacyGoalMode, targetKind: input.targetKind, rangeMinValue: input.rangeMinGoal, rangeMaxValue: input.rangeMaxGoal, subjectType: evaluationScope === "BY_SUBJECT" ? input.subjectType : null, scoringMethod: input.scoringMethod, scoringRuleConfig: input.scoringRuleConfig === null ? Prisma.JsonNull : input.scoringRuleConfig as Prisma.InputJsonValue, scoringRuleConfigVersion: input.scoringRuleConfigVersion, negativeResultPolicy: input.negativeResultPolicy, scoringApprovalStatus: input.scoringApprovalStatus, effectiveFrom, changeReason: revisionNumber === 1 ? "Initial configuration" : input.changeReason } });
   await writeThresholds(tx, revision.id, input, levels);
   if (evaluationScope === "BY_SUBJECT") {
@@ -51,7 +53,7 @@ async function writeRevision(tx: Prisma.TransactionClient, configurationId: bigi
   }
   if (input.resultMethod === "CALCULATED_FROM_INPUTS") await tx.kpiConfigurationRevisionMeasurementInput.createMany({ data: input.measurementInputs.map((item, index) => ({ kpiConfigurationRevisionId: revision.id, inputName: item.name, inputUnitId: inputUnits.find((unit) => unit.symbol === item.unit)!.id, description: item.description || null, displayOrder: index + 1 })) });
 }
-const auditFields = ["goal","ranges","evaluationScope","entityEvaluationMode","goalType","goalAssignment","goalUnit","rangeMinGoal","rangeMaxGoal","subjectType","subjects","subjectGoals","groupGoal","measurementUnit","resultMethod","measurementInputs","calculationTemplate","dataSource","inputFrequencyCode","periodScope","comparisonDirection","calculationPattern","resultSemantics","evaluationTypeCode","targetKind","scoringMethod","scoringRuleConfig","negativeResultPolicy","isActive"] as const;
+const auditFields = ["configurationName","classification","goal","ranges","evaluationScope","entityEvaluationMode","goalType","goalAssignment","goalUnit","rangeMinGoal","rangeMaxGoal","subjectType","subjects","subjectGoals","groupGoal","measurementUnit","resultMethod","measurementInputs","calculationTemplate","dataSource","inputFrequencyCode","periodScope","comparisonDirection","calculationPattern","resultSemantics","evaluationTypeCode","targetKind","scoringMethod","scoringRuleConfig","negativeResultPolicy","isActive"] as const;
 function auditSnapshot(input: Record<string, any>) {
   const entityEvaluationMode = input.evaluationScope === "BY_SUBJECT" || input.goalMode === "BY_SUBJECT" ? input.entityEvaluationMode ?? "INDIVIDUAL" : null;
   const normalized = { ...input, entityEvaluationMode } as Record<string, any>;
@@ -59,12 +61,23 @@ function auditSnapshot(input: Record<string, any>) {
 }
 function revisionInputSnapshot(record: any, revision: any) {
   const level = (code: string) => revision?.thresholds?.find((item: any) => item.trafficLightLevel.code === code);
-  return auditSnapshot({ evaluationScope:revision?.evaluationScope, entityEvaluationMode:revision?.entityEvaluationMode ?? (revision?.evaluationScope === "BY_SUBJECT" ? "INDIVIDUAL" : null), goalAssignment:revision?.goalAssignment, groupGoal:revision?.groupGoalValue == null ? null : {value:Number(revision.groupGoalValue),unit:revision.groupGoalUnit?.symbol,label:revision.groupGoalLabel}, goal: Number(revision?.targetValue ?? 0), ranges: { redFrom:Number(level("RED")?.rangeMinPercent ?? 0),redTo:Number(level("RED")?.rangeMaxPercent ?? 0),yellowFrom:Number(level("YELLOW")?.rangeMinPercent ?? 0),yellowTo:Number(level("YELLOW")?.rangeMaxPercent ?? 0),greenFrom:Number(level("GREEN")?.rangeMinPercent ?? 0),greenTo:Number(level("GREEN")?.rangeMaxPercent ?? 0) }, goalMode:revision?.goalMode,rangeMinGoal:revision?.rangeMinValue === null ? null : Number(revision?.rangeMinValue),rangeMaxGoal:revision?.rangeMaxValue === null ? null : Number(revision?.rangeMaxValue),subjectType:revision?.subjectType,subjects:(revision?.subjects ?? []).map((item:any)=>({subjectExternalId:item.subjectExternalId,subjectCode:item.subjectCodeSnapshot,subjectLabel:item.subjectLabelSnapshot})),subjectGoals:(revision?.subjectGoals ?? []).map((item:any)=>({subjectExternalId:item.subjectExternalId,subjectCode:item.subjectCodeSnapshot,subjectLabel:item.subjectLabelSnapshot,goal:Number(item.goalValue),goalUnit:(item.goalUnit ?? revision.goalUnit)?.symbol,resultUnit:(item.resultUnit ?? revision.measurementUnit)?.symbol})),measurementUnit:revision?.measurementUnit?.symbol ?? record.measurementUnit.symbol,dataSource:revision?.dataSource?.name ?? record.primaryDataSource.name,inputFrequencyCode:record.inputFrequency.code,periodScope:revision?.periodScope,comparisonDirection:revision?.comparisonDirection,calculationPattern:revision?.calculationPattern,calculationTemplate:revision?.calculationTemplate,resultSemantics:revision?.resultSemantics,evaluationTypeCode:revision?.evaluationType?.code,targetKind:revision?.targetKind,scoringMethod:revision?.scoringMethod,scoringRuleConfig:revision?.scoringRuleConfig,negativeResultPolicy:revision?.negativeResultPolicy,isActive:record.status.code !== "INACTIVE" });
+  return auditSnapshot({ configurationName:revision?.scoringRuleConfig?.configurationMetadata?.name, classification:revision?.scoringRuleConfig?.configurationMetadata?.classification, evaluationScope:revision?.evaluationScope, entityEvaluationMode:revision?.entityEvaluationMode ?? (revision?.evaluationScope === "BY_SUBJECT" ? "INDIVIDUAL" : null), goalAssignment:revision?.goalAssignment, groupGoal:revision?.groupGoalValue == null ? null : {value:Number(revision.groupGoalValue),unit:revision.groupGoalUnit?.symbol,label:revision.groupGoalLabel}, goal: Number(revision?.targetValue ?? 0), ranges: { redFrom:Number(level("RED")?.rangeMinPercent ?? 0),redTo:Number(level("RED")?.rangeMaxPercent ?? 0),yellowFrom:Number(level("YELLOW")?.rangeMinPercent ?? 0),yellowTo:Number(level("YELLOW")?.rangeMaxPercent ?? 0),greenFrom:Number(level("GREEN")?.rangeMinPercent ?? 0),greenTo:Number(level("GREEN")?.rangeMaxPercent ?? 0) }, goalMode:revision?.goalMode,rangeMinGoal:revision?.rangeMinValue === null ? null : Number(revision?.rangeMinValue),rangeMaxGoal:revision?.rangeMaxValue === null ? null : Number(revision?.rangeMaxValue),subjectType:revision?.subjectType,subjects:(revision?.subjects ?? []).map((item:any)=>({subjectExternalId:item.subjectExternalId,subjectCode:item.subjectCodeSnapshot,subjectLabel:item.subjectLabelSnapshot})),subjectGoals:(revision?.subjectGoals ?? []).map((item:any)=>({subjectExternalId:item.subjectExternalId,subjectCode:item.subjectCodeSnapshot,subjectLabel:item.subjectLabelSnapshot,goal:Number(item.goalValue),goalUnit:(item.goalUnit ?? revision.goalUnit)?.symbol,resultUnit:(item.resultUnit ?? revision.measurementUnit)?.symbol})),measurementUnit:revision?.measurementUnit?.symbol ?? record.measurementUnit.symbol,dataSource:revision?.dataSource?.name ?? record.primaryDataSource.name,inputFrequencyCode:record.inputFrequency.code,periodScope:revision?.periodScope,comparisonDirection:revision?.comparisonDirection,calculationPattern:revision?.calculationPattern,calculationTemplate:revision?.calculationTemplate,resultSemantics:revision?.resultSemantics,evaluationTypeCode:revision?.evaluationType?.code,targetKind:revision?.targetKind,scoringMethod:revision?.scoringMethod,scoringRuleConfig:revision?.scoringRuleConfig,negativeResultPolicy:revision?.negativeResultPolicy,isActive:record.status.code !== "INACTIVE" });
 }
 function changeClassification(changedFields:string[]) { const structural = new Set(["goalMode","evaluationScope","entityEvaluationMode","subjects","subjectType","subjectGoals","measurementUnit","inputFrequencyCode","periodScope","calculationPattern","resultSemantics"]); return changedFields.some((field)=>structural.has(field)) ? "STRUCTURAL_CHANGE" : "VALUE_CHANGE"; }
 function nextPeriodStart(today: Date, monthsPerPeriod: number) {
   const periodStartMonth = Math.floor(today.getUTCMonth() / monthsPerPeriod) * monthsPerPeriod;
   return new Date(Date.UTC(today.getUTCFullYear(), periodStartMonth + monthsPerPeriod, 1));
+}
+async function hasPoolMembership(id: bigint): Promise<boolean> {
+  try {
+    const base = process.env.KPI_POOL_BASE_URL ?? (existsSync("/.dockerenv") ? "http://exa-kpi-pool-service:4002" : "http://localhost:4002");
+    const response = await fetch(base.replace(/\/$/, "") + "/api/v1/kpi-pools/kpi-configuration-usage", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({configurationIds:[id.toString()]}),signal:AbortSignal.timeout(5000)});
+    if(!response.ok) throw new Error("Pool usage unavailable");
+    const body = await response.json() as {data?:Array<{configurationId:string;usedIn:number}>};
+    const usage = body.data?.find(row=>row.configurationId===id.toString());
+    if(!usage || !Number.isInteger(usage.usedIn) || usage.usedIn < 0) throw new Error("Invalid pool usage");
+    return usage.usedIn > 0;
+  } catch { throw new AppError("Could not confirm Pool assignments. Retry when KPI Pools is available.",503,"KPI_POOL_USAGE_UNAVAILABLE"); }
 }
 async function nextConfigCode(tx: Prisma.TransactionClient, definitionId: bigint, definitionCode: string) {
   const definitionNumber = definitionCode.replace(/\D/g, "").padStart(3, "0");
@@ -75,7 +88,39 @@ async function nextConfigCode(tx: Prisma.TransactionClient, definitionId: bigint
   }, 0);
   return `KPC-${definitionNumber}-${String(highestSuffix + 1).padStart(2, "0")}`;
 }
+async function createConfiguration(tx: Prisma.TransactionClient, input: KpiConfigurationBody, actor: bigint | null) {
+  await tx.$queryRaw`SELECT kpi_definition_id FROM kpi_definitions WHERE kpi_definition_id = ${BigInt(input.definitionId)} FOR UPDATE`;
+  if(input.classification) {
+    const type = await tx.subjectTypeCatalog.findFirst({where:{code:input.classification.subjectType,isActive:true}});
+    const subject = await tx.kpiConfigurationSubjectCatalog.findFirst({where:{subjectType:input.classification.subjectType,externalId:input.classification.subjectExternalId,isActive:true}});
+    if(!type || !subject) throw new AppError("Select an active Subject Type and Subject Value",422,"SUBJECT_NOT_AVAILABLE");
+    const siblings = await tx.kpiConfiguration.findMany({
+      where: { kpiDefinitionId: BigInt(input.definitionId), deletedAt: null, status: { code: { not: "INACTIVE" } } },
+      select: { id: true, configCode: true, revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { scoringRuleConfig: true } } },
+    });
+    const duplicate = siblings.find(sibling => {
+      const classification = (sibling.revisions[0]?.scoringRuleConfig as any)?.configurationMetadata?.classification;
+      return classification?.subjectType === subject.subjectType && classification?.subjectExternalId === subject.externalId;
+    });
+    if (duplicate) throw new AppError(subject.name + " already has a configuration (" + duplicate.configCode + ")", 409, "SUBJECT_CONFIGURATION_ALREADY_EXISTS", { configurationId: duplicate.id.toString(), configCode: duplicate.configCode });
+    input = {...input, classification:{subjectType:subject.subjectType,subjectExternalId:subject.externalId,subjectCode:subject.code,subjectLabel:subject.name}};
+  }
+          const definition = await tx.kpiDefinition.findFirst({ where: { id: BigInt(input.definitionId), deletedAt: null, isActive: true } });
+          if (!definition) throw new AppError("Active KPI Definition not found",422,"KPI_DEFINITION_NOT_AVAILABLE");
+          const c = await catalogs(tx,input,definition.kpiName);
+          const configCode = await nextConfigCode(tx, definition.id, definition.kpiCode);
+          const created = await tx.kpiConfiguration.create({data:{kpiDefinitionId:definition.id,configCode,measurementUnitId:c.unit.id,inputFrequencyId:c.frequency.id,primaryDataSourceId:c.source.id,kpiConfigurationStatusId:c.status.id,createdByUserId:actor}});
+          await writeRevision(tx,created.id,1,input,c.evaluation.id,c.unit.id,c.goalUnit.id,c.groupGoalUnit?.id ?? null,c.inputUnits,c.source.id,c.levels,input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : new Date());
+          return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({where:{id:created.id},include}));
+}
 export const kpiConfigurationService = {
+  async quickConfigure(configurations: KpiConfigurationBody[], actor: bigint | null) {
+    return prisma.$transaction(async tx => {
+      const results = [];
+      for (const input of configurations) results.push(await createConfiguration(tx, input, actor));
+      return results;
+    }, {timeout:30000, isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
+  },
   async lookups() {
     const [measurementUnits, inputFrequencies, dataSources, subjectCatalogs] = await Promise.all([
       prisma.measurementUnit.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, code: true, name: true, symbol: true, isPercentage: true } }),
@@ -108,7 +153,7 @@ export const kpiConfigurationService = {
       const snapshot = {
         kpiConfigurationId: id, kpiConfigurationRevisionId: revision.id.toString(), revisionNumber: revision.revisionNumber,
         effectiveFrom: revision.effectiveFrom.toISOString().slice(0, 10), effectiveTo: revision.effectiveTo?.toISOString().slice(0, 10) ?? null,
-        configCode: record.configCode, kpiDefinitionId: record.definition.id.toString(), kpiCode: record.definition.kpiCode, kpiName: record.definition.kpiName, objective: record.definition.description,
+        configCode: record.configCode, kpiDefinitionId: record.definition.id.toString(), kpiCode: record.definition.kpiCode, kpiName: configurationDisplayName(record, revision), objective: record.definition.description,
         periodScope: revision.periodScope, comparisonMode: revision.comparisonMode, comparisonDirection: revision.comparisonDirection, targetKind: revision.targetKind,
         historicalCapabilityVersion: revision.periodScope === "CURRENT_PERIOD" ? null : "HISTORICAL_COMPARISON_V1",
         inputFrequency: { id: record.inputFrequency.id.toString(), code: record.inputFrequency.code, monthsPerPeriod: record.inputFrequency.monthsPerPeriod },
@@ -158,7 +203,7 @@ export const kpiConfigurationService = {
           inputFrequency: { select: { id: true, code: true, name: true, isActive: true, monthsPerPeriod: true } },
           measurementUnit: { select: { symbol: true, name: true } },
           primaryDataSource: { select: { name: true } },
-          revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { targetValue: true, evaluationScope: true, entityEvaluationMode: true, scoringApprovalStatus: true, groupGoalValue: true, measurementUnit: { select: { symbol: true, name: true } }, goalUnit: { select: { symbol: true } }, groupGoalUnit: { select: { symbol: true } }, subjects: { select: { id: true } }, subjectGoals: { select: { id: true } }, dataSource: { select: { name: true } } } },
+          revisions: { orderBy: { revisionNumber: "desc" }, take: 1, select: { scoringRuleConfig: true, targetValue: true, evaluationScope: true, entityEvaluationMode: true, scoringApprovalStatus: true, groupGoalValue: true, measurementUnit: { select: { symbol: true, name: true } }, goalUnit: { select: { symbol: true } }, groupGoalUnit: { select: { symbol: true } }, subjects: { select: { id: true } }, subjectGoals: { select: { id: true } }, dataSource: { select: { name: true } } } },
         },
       }),
       prisma.kpiConfiguration.count({ where }),
@@ -167,7 +212,7 @@ export const kpiConfigurationService = {
       data: records.map((record) => ({
         id: record.id.toString(), configCode: record.configCode,
         definitionId: record.kpiDefinitionId.toString(), definitionCode: record.definition.kpiCode,
-        definitionName: record.definition.kpiName, definitionIsActive: record.definition.isActive && record.definition.statusCode === "ACTIVE" && record.definition.deletedAt === null,
+        definitionName: configurationDisplayName(record), configurationName: configurationDisplayName(record), sourceDefinitionName: record.definition.kpiName, classification: (record.revisions[0]?.scoringRuleConfig as any)?.configurationMetadata?.classification ?? null, definitionIsActive: record.definition.isActive && record.definition.statusCode === "ACTIVE" && record.definition.deletedAt === null,
         categoryName: record.definition.category?.name ?? "Not specified",
         inputFrequencyId: record.inputFrequencyId.toString(), inputFrequencyCode: record.inputFrequency.code,
         inputFrequencyName: record.inputFrequency.name, inputFrequencyIsActive: record.inputFrequency.isActive,
@@ -179,7 +224,7 @@ export const kpiConfigurationService = {
         groupGoal: record.revisions[0]?.groupGoalValue == null ? null : { value: record.revisions[0].groupGoalValue.toString(), unit: record.revisions[0].groupGoalUnit?.symbol ?? "" },
         dataSource: record.revisions[0]?.dataSource?.name ?? record.primaryDataSource?.name ?? "Not specified",
         goal: record.revisions[0]?.targetValue?.toString() ?? null, scoringApprovalStatus: record.revisions[0]?.scoringApprovalStatus ?? "BLOCKED",
-        status: record.status.code, isActive: record.status.code === "CONFIGURED",
+        status: record.status.code, isActive: record.status.code !== "INACTIVE",
       })),
       meta: { page: query.page, pageSize: query.pageSize, totalItems, totalPages: Math.ceil(totalItems / query.pageSize) },
     };
@@ -212,7 +257,7 @@ export const kpiConfigurationService = {
           configCode: record.configCode,
           definitionId: record.kpiDefinitionId.toString(),
           definitionCode: record.definition.kpiCode,
-          definitionName: record.definition.kpiName,
+          definitionName: configurationDisplayName(record), configurationName: configurationDisplayName(record), sourceDefinitionName: record.definition.kpiName, classification: (record.revisions[0]?.scoringRuleConfig as any)?.configurationMetadata?.classification ?? null,
           categoryName: record.definition.category?.name ?? "Not specified",
           definitionIsActive: record.definition.isActive && record.definition.statusCode === "ACTIVE" && record.definition.deletedAt === null,
           inputFrequencyId: record.inputFrequencyId.toString(),
@@ -281,13 +326,7 @@ export const kpiConfigurationService = {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await prisma.$transaction(async (tx) => {
-          const definition = await tx.kpiDefinition.findFirst({ where: { id: BigInt(input.definitionId), deletedAt: null, isActive: true } });
-          if (!definition) throw new AppError("Active KPI Definition not found",422,"KPI_DEFINITION_NOT_AVAILABLE");
-          const c = await catalogs(tx,input,definition.kpiName);
-          const configCode = await nextConfigCode(tx, definition.id, definition.kpiCode);
-          const created = await tx.kpiConfiguration.create({data:{kpiDefinitionId:definition.id,configCode,measurementUnitId:c.unit.id,inputFrequencyId:c.frequency.id,primaryDataSourceId:c.source.id,kpiConfigurationStatusId:c.status.id,createdByUserId:actor}});
-          await writeRevision(tx,created.id,1,input,c.evaluation.id,c.unit.id,c.goalUnit.id,c.groupGoalUnit?.id ?? null,c.inputUnits,c.source.id,c.levels,input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : new Date());
-          return toKpiConfigurationDto(await tx.kpiConfiguration.findUniqueOrThrow({where:{id:created.id},include}));
+          return createConfiguration(tx, input, actor);
         });
       } catch (error) {
         const collision = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
@@ -298,7 +337,10 @@ export const kpiConfigurationService = {
   },
   async update(id: bigint, input: KpiConfigurationBody, actor: bigint | null) {
     const current = await existing(id);
-    const reason = input.changeReason?.trim();
+    const metadata = (current.revisions[0]?.scoringRuleConfig as any)?.configurationMetadata;
+    input = {...input, configurationName:input.configurationName ?? metadata?.name, classification:input.classification ?? metadata?.classification};
+    const assigned = await hasPoolMembership(id);
+    const reason = input.changeReason?.trim() || (!assigned ? "Updated unassigned configuration" : "");
     if (!reason || reason.length < 3) throw new AppError("Change Reason is required for a global edit", 422, "KPI_CONFIGURATION_CHANGE_REASON_REQUIRED");
     return prisma.$transaction(async (tx) => {
       const definition = await tx.kpiDefinition.findFirst({ where: { id: BigInt(input.definitionId), deletedAt: null } });
@@ -308,9 +350,9 @@ export const kpiConfigurationService = {
       await tx.kpiConfiguration.update({ where: { id }, data: { measurementUnitId: c.unit.id, inputFrequencyId: c.frequency.id, primaryDataSourceId: c.source.id, kpiConfigurationStatusId: c.status.id, updatedAt: new Date(), updatedByUserId: actor } });
       const now = new Date();
       const schedulingBase = latest && latest.effectiveFrom > now ? latest.effectiveFrom : now;
-      const effectiveFrom = input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : nextPeriodStart(schedulingBase, c.frequency.monthsPerPeriod);
-      // New single-result revisions never replace or delete an earlier contract.
-      const pendingLatest = input.scoringRuleConfig?.model !== "SINGLE_RESULT_V1" && latest && input.effectiveFrom && effectiveFrom <= latest.effectiveFrom ? latest : null;
+      const effectiveFrom = !assigned ? latest?.effectiveFrom ?? now : input.effectiveFrom ? new Date(`${input.effectiveFrom}T00:00:00.000Z`) : nextPeriodStart(schedulingBase, c.frequency.monthsPerPeriod);
+      // Unassigned configurations can replace their draft revision; assigned contracts keep revision history.
+      const pendingLatest = !assigned ? latest : input.scoringRuleConfig?.model !== "SINGLE_RESULT_V1" && latest && input.effectiveFrom && effectiveFrom <= latest.effectiveFrom ? latest : null;
       let revisionNumber = (latest?.revisionNumber ?? 0) + 1;
       if (pendingLatest) {
         const previous = await tx.kpiConfigurationRevision.findFirst({ where: { kpiConfigurationId: id, revisionNumber: { lt: pendingLatest.revisionNumber } }, orderBy: { revisionNumber: "desc" } });

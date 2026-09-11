@@ -11,7 +11,7 @@ const clamp = (value: number) => Math.min(100, Math.max(0, value));
 
 export function TrafficLightEditor({ value, onChange, disabled = false, stepNumber = 5 }: TrafficLightEditorProps) {
   const updateBox = (field: keyof TrafficLightRanges, raw: string) => {
-    const next = clamp(Number(raw) || 0);
+    const next = raw.trim() === "" ? NaN : clamp(Number(raw));
     onChange({ ...value, [field]: next });
   };
 
@@ -45,6 +45,11 @@ export function TrafficLightEditor({ value, onChange, disabled = false, stepNumb
     { key: "yellow", label: "Yellow", from: "yellowFrom", to: "yellowTo" },
     { key: "green", label: "Green", from: "greenFrom", to: "greenTo" },
   ];
+  const invalidRange = (row: typeof rangeRows[number]) => {
+    const from = value[row.from], to = value[row.to];
+    return !Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to > 100 || from > to ||
+      (row.key === "red" ? from !== 0 : row.key === "yellow" ? from !== value.redTo + 1 : from !== value.yellowTo + 1 || to !== 100);
+  };
 
   return (
     <section className="traffic-editor">
@@ -70,7 +75,9 @@ export function TrafficLightEditor({ value, onChange, disabled = false, stepNumb
                 type="number"
                 min="0"
                 max="100"
-                value={value[row.from]}
+                aria-label={`${row.label} From`}
+                data-config-invalid={invalidRange(row)}
+                value={Number.isFinite(value[row.from]) ? value[row.from] : ""}
                 onChange={(event) => updateBox(row.from, event.target.value)}
               />
               <input
@@ -78,7 +85,9 @@ export function TrafficLightEditor({ value, onChange, disabled = false, stepNumb
                 type="number"
                 min="0"
                 max="100"
-                value={value[row.to]}
+                aria-label={`${row.label} To`}
+                data-config-invalid={invalidRange(row)}
+                value={Number.isFinite(value[row.to]) ? value[row.to] : ""}
                 onChange={(event) => updateBox(row.to, event.target.value)}
               />
             </div>

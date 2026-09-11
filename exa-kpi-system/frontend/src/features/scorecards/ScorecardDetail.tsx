@@ -1,3 +1,4 @@
+import { usePoolPeriodFormatter } from "../monitoring-results/use-period-label";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -30,12 +31,7 @@ import "../kpi-pool/kpi-pool.css";
 import "./scorecard-assignment.css";
 import "./scorecards.css";
 
-const formatPeriod = (value: string) => {
-  const [year, month] = value.split("-").map(Number);
-  return year && month
-    ? `${new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)))} • ${year}`
-    : value;
-};
+
 const formatMonth = (value: string) =>
   new Intl.DateTimeFormat("en", {
     month: "short",
@@ -83,6 +79,7 @@ export function ScorecardDetail() {
     queryFn: () => scorecardService.getById(id),
     enabled: id > 0,
   });
+  const formatPeriod = usePoolPeriodFormatter(scorecard.data?.poolId);
   const periods = useQuery({
     queryKey: ["scorecard-periods", id],
     queryFn: () => scorecardService.periods(id),
@@ -696,7 +693,7 @@ export function ScorecardDetail() {
             <CompositionSection
               title="KPI Configurations"
               count={filteredKpis.length}
-              period={periodKey}
+              period={formatPeriod(periodKey)}
               icon={<Target size={17} />}
             >
               <table className="kpi-table scorecard-detail-table">
@@ -793,7 +790,7 @@ export function ScorecardDetail() {
             <CompositionSection
               title="Linked Scorecards"
               count={filteredLinks.length}
-              period={periodKey}
+              period={formatPeriod(periodKey)}
               icon={<Link2 size={17} />}
               linked
             >
@@ -1121,7 +1118,7 @@ function CompositionSection({
           <span>
             <strong>{title}</strong>
             <small>
-              {count} records for {formatPeriod(period)}
+              {count} records for {period}
             </small>
           </span>
         </div>

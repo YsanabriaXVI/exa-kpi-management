@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { scorecardCompositionService } from "../services/scorecard-composition.service.js";
-import { createScorecard, deactivateScorecard, eligiblePools, getScorecard, listScorecards, updateScorecard } from "../controllers/scorecard.controller.js";
+import { removeScorecard, createScorecard, deactivateScorecard, eligiblePools, getScorecard, listScorecards, updateScorecard } from "../controllers/scorecard.controller.js";
 import { addKpis, addLink, availableKpis, availableLinks, finalizeComposition, frozenKpiUsage, getComposition, listPeriods, monitoringMaterialization, poolUsage, poolUsageBatch, poolWorkflow, removeKpi, removeLink, updateScope, updateWeights } from "../controllers/scorecard-composition.controller.js";
 export const scorecardRouter = Router();
 scorecardRouter.post("/internal/prepare-next-period", async (request, response, next) => {
@@ -32,3 +32,5 @@ scorecardRouter.post("/:id/periods/:periodKey/finalize", finalizeComposition);
 scorecardRouter.get("/:id", getScorecard);
 scorecardRouter.patch("/:id", updateScorecard);
 scorecardRouter.patch("/:id/deactivate", deactivateScorecard);
+
+scorecardRouter.delete("/:id", removeScorecard);

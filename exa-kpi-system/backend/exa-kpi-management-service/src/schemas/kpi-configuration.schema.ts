@@ -1,5 +1,5 @@
 import { additiveResultError } from "../contracts/additive-results.js";
-import { validResultBands } from "../contracts/result-bands.js";
+import { validResultBands, validExactPoints } from "../contracts/result-bands.js";
 import { z } from "zod";
 import { paginationSchema } from "./pagination.schema.js";
 
@@ -61,6 +61,8 @@ const groupGoal = z.object({
   label: z.string().trim().min(1).max(200),
 }).strict();
 export const kpiConfigurationBodySchema = z.object({
+  configurationName: z.string().trim().max(240).optional(),
+  classification: z.object({subjectType:z.string().min(1).max(30),subjectExternalId:z.string().min(1).max(100),subjectCode:z.string().max(100).optional(),subjectLabel:z.string().min(1).max(200)}).strict().optional(),
   definitionId: z.union([id, z.number().int().positive().transform(String)]), goal: z.number().finite(),
   measurementUnit: z.string().trim().max(50).default(""), dataSource: z.string().trim().min(1).max(120), ranges: kpiConfigurationRangesSchema,
   isActive: z.boolean().default(true),
@@ -97,10 +99,12 @@ export const kpiConfigurationBodySchema = z.object({
     if (!["PROPORTIONAL", "RESULT_BANDS"].includes(value.scoringMethod ?? "")) issue("scoringMethod", "Choose no bands or result intervals");
     if (value.scoringMethod === "PROPORTIONAL" && value.evaluationTypeCode === "LOWER_IS_BETTER" && value.negativeResultPolicy === "ALLOW") issue("scoringRuleConfig", "Use result bands for Lower is better when negative results are allowed");
     if (value.scoringMethod === "RESULT_BANDS") {
-      if (value.scoringRuleConfig.bandMode !== "INTERVALS") issue("scoringRuleConfig", "Compliance levels must be stored as result intervals");
+      const exactPoints = value.scoringRuleConfig.bandMode === "EXACT_POINTS";
+      if (!exactPoints && value.scoringRuleConfig.bandMode !== "INTERVALS") issue("scoringRuleConfig", "Choose result intervals or exact points");
+      if (exactPoints && !validExactPoints(value.scoringRuleConfig.bands)) issue("scoringRuleConfig", "Exact points must be ordered unique results; only the first row may use N or lower and only the final row may use a non-negative N+");
       const bands = value.scoringRuleConfig.bands;
       if (validResultBands(bands)) {
-        if (bands[0]!.minResult !== null && (value.negativeResultPolicy === "ALLOW" || bands[0]!.minResult! > 0) || bands[bands.length - 1]!.maxResult != null || bands[0]!.includesMin !== true || bands.some((band, i) => i > 0 && (bands[i - 1]!.maxResult == null || band.minResult !== bands[i - 1]!.maxResult || band.includesMin === bands[i - 1]!.includesMax))) issue("scoringRuleConfig", "Intervals must cover all allowed results without gaps; each shared limit must belong to exactly one interval");
+        if (!exactPoints && (bands[0]!.minResult !== null && (value.negativeResultPolicy === "ALLOW" || bands[0]!.minResult! > 0) || bands[bands.length - 1]!.maxResult != null || bands[0]!.includesMin !== true || bands.some((band, i) => i > 0 && (bands[i - 1]!.maxResult == null || band.minResult !== bands[i - 1]!.maxResult || band.includesMin === bands[i - 1]!.includesMax)))) issue("scoringRuleConfig", "Intervals must cover all allowed results without gaps; each shared limit must belong to exactly one interval");
         const higher = ["HIGHER_IS_BETTER", "GREATER_IS_BETTER"].includes(value.evaluationTypeCode ?? "");
         if (value.evaluationTypeCode !== "ZERO_IS_BETTER" && bands.some((band, i) => i > 0 && (higher ? band.compliance < bands[i - 1]!.compliance : band.compliance > bands[i - 1]!.compliance))) issue("scoringRuleConfig", "Compliance intervals must respect the evaluation direction");
         if (value.evaluationTypeCode === "ZERO_IS_BETTER" && (value.goal !== 0 || !bands.some(b => (b.minResult == null || b.minResult < 0 || b.minResult === 0 && b.includesMin !== false) && (b.maxResult == null || b.maxResult >= 0) && b.compliance === 100))) issue("goal", "Zero is better requires Goal 0 and Compliance 100 percent at Result 0");
@@ -167,6 +171,7 @@ export const kpiConfigurationBodySchema = z.object({
     const coversZero = valid && bands.some(band => (band.minResult == null || Number(band.minResult) < 0 || Number(band.minResult) === 0 && band.includesMin !== false) && (band.maxResult == null || Number(band.maxResult) > 0 || Number(band.maxResult) === 0 && band.includesMax !== false));
     if (!valid || !coversZero) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig", "bands"], message: "ZERO_TARGET_BANDS requires non-overlapping explicit bands including Result = 0" });
   } else if (value.scoringMethod === "RESULT_BANDS") {
+    if (config.bandMode === "EXACT_POINTS" && !validExactPoints(config.bands)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig", "bands"], message: "Invalid exact points" });
     if (!validResultBands(config.bands)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scoringRuleConfig", "bands"], message: "Define valid non-overlapping result bands with Compliance between 0 and 100" });
     if (!["HIGHER_IS_BETTER","GREATER_IS_BETTER","LOWER_IS_BETTER","ZERO_IS_BETTER"].includes(value.evaluationTypeCode ?? "")) context.addIssue({code:z.ZodIssueCode.custom,path:["evaluationTypeCode"],message:"Select a supported behavior for result bands"});
   } else if (value.scoringMethod === "BINARY") {
@@ -183,3 +188,14 @@ export type KpiConfigurationBody = z.infer<typeof kpiConfigurationBodySchema>;
 export type BatchLookupKpiConfigurationsBody = z.infer<typeof batchLookupKpiConfigurationsBodySchema>;
 export type EffectiveKpiConfigurationSnapshotsBody = z.infer<typeof effectiveKpiConfigurationSnapshotsBodySchema>;
 export type InternalKpiConfigurationCatalogQuery = z.infer<typeof internalKpiConfigurationCatalogQuerySchema>;
+
+export const quickConfigureBodySchema = z.object({ configurations: z.array(kpiConfigurationBodySchema).min(1).max(100) }).strict().superRefine((value, ctx) => {
+  const first = value.configurations[0]!;
+  const ids = new Set<string>();
+  for (const [index, item] of value.configurations.entries()) {
+    if (item.definitionId !== first.definitionId || item.classification?.subjectType !== first.classification?.subjectType || !item.classification || !item.configurationName || item.scoringRuleConfig?.model !== "SINGLE_RESULT_V1" || item.scoringApprovalStatus !== "APPROVED") ctx.addIssue({code:z.ZodIssueCode.custom,path:["configurations",index],message:"Quick Configure requires one Definition, one Subject Type and approved single-result configurations"});
+    const id = item.classification?.subjectExternalId ?? "";
+    if(ids.has(id)) ctx.addIssue({code:z.ZodIssueCode.custom,path:["configurations",index],message:"Select each Subject Value once"});
+    ids.add(id);
+  }
+});

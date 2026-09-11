@@ -1,5 +1,5 @@
 import { additiveResultError } from "../contracts/additive-results.js";
-import { validResultBands } from "../contracts/result-bands.js";
+import { validResultBands, validExactPoints } from "../contracts/result-bands.js";
 import { historicalContractError } from "../contracts/historical-contract.js";
 
 export const KPI_EXECUTION_CAPABILITY_VERSION = "KPI_EXECUTION_V1" as const;
@@ -92,13 +92,13 @@ export function evaluateKpiExecutability(input: ExecutabilityInput): KpiExecutab
   add(!input.targetKind, "TARGET_KIND_REQUIRED");
   add(input.evaluationScope === "BY_SUBJECT" && input.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" && !!additiveResultError(input.resultSemantics, input.measurementUnit), "SUM_REQUIRES_ADDITIVE_RESULT");
   const behavior = input.evaluationType?.code;
-  const rule = input.scoringRuleConfig as { floorPercent?: number; capPercent?: number; bands?: Array<{ minResult?: number | null; maxResult?: number | null; compliance?: number; includesMin?: boolean; includesMax?: boolean }> } | null;
+  const rule = input.scoringRuleConfig as { bandMode?: string; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult?: number | null; maxResult?: number | null; compliance?: number; includesMin?: boolean; includesMax?: boolean }> } | null;
   const goals = input.evaluationScope === "BY_SUBJECT" && input.entityEvaluationMode !== "CONTRIBUTE_TO_OVERALL" ? (input.subjectGoals ?? []).map(row => row.goal) : [input.goal];
   const proportional = input.scoringMethod === "PROPORTIONAL" && (["GREATER_IS_BETTER", "HIGHER_IS_BETTER", "LOWER_IS_BETTER"].includes(behavior ?? "") || input.periodScope !== "CURRENT_PERIOD" && behavior === "ZERO_IS_BETTER");
   const zero = input.scoringMethod === "ZERO_TARGET_BANDS" && ["LOWER_IS_BETTER", "ZERO_IS_BETTER"].includes(behavior ?? "");
   const bandsMethod = input.scoringMethod === "RESULT_BANDS" && ["GREATER_IS_BETTER", "HIGHER_IS_BETTER", "LOWER_IS_BETTER", "ZERO_IS_BETTER"].includes(behavior ?? "");
   const binary = input.scoringMethod === "BINARY" && input.resultSemantics === "BINARY" && input.resultMethod === "DIRECT" && input.periodScope === "CURRENT_PERIOD";
-  add(bandsMethod && !validResultBands(rule?.bands), "SCORING_RULE_INVALID");
+  add(bandsMethod && (!validResultBands(rule?.bands) || rule?.bandMode === "EXACT_POINTS" && !validExactPoints(rule.bands)), "SCORING_RULE_INVALID");
   add(!proportional && !zero && !bandsMethod && !binary, "UNSUPPORTED_SCORING_COMBINATION");
   if (proportional) add(!rule || !Number.isFinite(rule.floorPercent) || !Number.isFinite(rule.capPercent) || rule.floorPercent! < 0 || rule.capPercent! > 100 || rule.floorPercent! > rule.capPercent! || goals.some(goal => goal == null || !Number.isFinite(Number(goal)) || Number(goal) <= 0), "SCORING_RULE_INVALID");
   if (zero) {

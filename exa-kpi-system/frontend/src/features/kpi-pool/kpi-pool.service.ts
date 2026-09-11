@@ -50,6 +50,9 @@ type AvailabilityApiRecord = {
   definitionId: string;
   definitionCode: string;
   definitionName: string;
+  configurationName?: string;
+  sourceDefinitionName?: string;
+  classification?: { subjectType: string; subjectExternalId: string; subjectLabel: string } | null;
   categoryName: string;
   goal: string | null;
   entityEvaluationMode?: "INDIVIDUAL" | "CONTRIBUTE_TO_OVERALL" | null; evaluationScope?: "OVERALL" | "BY_SUBJECT";
@@ -73,6 +76,9 @@ type MembershipApiRecord = {
   configCode: string;
   definitionCode: string;
   definitionName: string;
+  configurationName?: string;
+  sourceDefinitionName?: string;
+  classification?: { subjectType: string; subjectExternalId: string; subjectLabel: string } | null;
   inputFrequencyCode: string;
   effectiveFrom: string;
   effectiveTo: string | null;
@@ -611,6 +617,9 @@ export const kpiPoolService = {
       (response) => response.data,
     );
   },
+  async remove(id: number) {
+    return poolApiRequest(`/v1/kpi-pools/${id}`, { method: "DELETE" });
+  },
   async deactivate(id: number) {
     return poolApiRequest(`/v1/kpi-pools/${id}/deactivate`, { method: "POST" });
   },
@@ -666,7 +675,9 @@ export const kpiPoolService = {
       definitionId: value.definitionId,
       configCode: value.configCode,
       kpiCode: value.definitionCode,
-      name: value.definitionName,
+      name: value.configurationName ?? value.definitionName,
+      sourceDefinitionName: value.sourceDefinitionName,
+      subjectLabel: value.classification?.subjectLabel,
       category: value.categoryName,
       goal: value.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? `By Entity / Contributes to Overall / Target ${value.goal ?? "-"}` : value.evaluationScope === "BY_SUBJECT" ? `By Entity · ${value.subjectGoalCount ?? 0} goals${value.groupGoal ? ` · Group ${Number(value.groupGoal.value).toLocaleString("en-US")} ${value.groupGoal.unit}` : ""}` : value.goal ?? "—",
       measurementUnit: value.measurementUnit,
@@ -794,7 +805,9 @@ export const kpiPoolService = {
       definitionId: value.definitionId,
       configCode: value.configCode,
       kpiCode: value.definitionCode,
-      name: value.definitionName,
+      name: value.configurationName ?? value.definitionName,
+      sourceDefinitionName: value.sourceDefinitionName,
+      subjectLabel: value.classification?.subjectLabel,
       category: value.categoryName ?? "Not specified",
       goal: value.entityEvaluationMode === "CONTRIBUTE_TO_OVERALL" ? "By Entity / Contributes to Overall / Target " + (value.goal ?? "-") : value.goal ?? "Not specified",
       evaluationScope: value.evaluationScope, entityEvaluationMode: value.entityEvaluationMode, subjectGoalCount: value.subjectGoalCount, groupGoal: value.groupGoal,

@@ -1,0 +1,19 @@
+.quick-config-dialog { width: min(1080px, 94vw); max-height: 92vh; padding: 24px; border: 1px solid var(--ems-border, #d5dce5); border-radius: 14px; color: var(--ems-text, #273548); background: var(--ems-surface, #fff); }
+.quick-config-dialog::backdrop { background: #15263888; }
+.quick-config-dialog > header, .quick-config-dialog footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.quick-config-dialog h2 { margin: 0; font-size: 22px; }
+.quick-config-fields { border: 0; margin: 18px 0; padding: 0; min-width: 0; display: grid; gap: 16px; }
+.quick-config-dialog label { display: grid; gap: 8px; }
+.quick-config-dialog input:not([type="radio"]):not([type="checkbox"]), .quick-config-dialog select { min-height: 40px; border: 1px solid #cdd5df; border-radius: 6px; padding: 8px 10px; font: inherit; width: 100%; box-sizing: border-box; }
+.quick-config-dialog input[readonly] { background: var(--ems-surface-muted, #f1f4f7); }
+.quick-config-dialog table { width: 100%; border-collapse: collapse; }
+.quick-config-dialog th, .quick-config-dialog td { text-align: left; padding: 12px; border-bottom: 1px solid #dce2eb; }
+.quick-config-dialog td:last-child { width: 240px; }
+.quick-config-dialog td:last-child input { width: 140px !important; }
+.quick-copy-options, .quick-default-goal { display: flex; align-items: center; gap: 20px; margin-bottom: 14px; }
+.quick-config-dialog .quick-copy-options label, .quick-config-dialog .quick-customize { display: flex; align-items: center; gap: 8px; }
+.quick-config-dialog button { cursor: pointer; }
+.quick-config-dialog button:disabled { cursor: default; opacity: .55; }
+.definition-quick-bar { position: sticky; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 18px; padding: 16px 20px; background: var(--ems-surface, white); border: 1px solid #1680a5; border-radius: 10px; box-shadow: 0 5px 24px #15263822; }
+.definition-quick-bar strong { flex: 1; }
+@media(max-width:700px) { .quick-config-dialog .config-fields-grid { grid-template-columns: 1fr !important; } .definition-quick-bar { flex-wrap: wrap; } }

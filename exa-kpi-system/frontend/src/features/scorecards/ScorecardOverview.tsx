@@ -1,3 +1,4 @@
+import { usePoolPeriodFormatter } from "../monitoring-results/use-period-label";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
@@ -32,7 +33,7 @@ export function ScorecardOverview() {
   const query = useQuery({ queryKey: ["scorecards", { page, pageSize, search, departments, poolSources, statuses, years, backendSort, direction: sort.direction }], queryFn: () => scorecardService.listPage({ page, pageSize, search, department: departments, poolId: poolSources, status: statuses, year: years, sortBy: backendSort, sortOrder: sort.direction }), placeholderData: (previous) => previous });
   const [actionMessage, setActionMessage] = useState("");
   const [scorecardToRemove, setScorecardToRemove] = useState<{ id: number; code: string } | null>(null);
-  const remove = useMutation({ mutationFn: scorecardService.deactivate, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["scorecards"] }); setScorecardToRemove(null); setActionMessage("ScoreCard deactivated. Its historical records were preserved."); }, onError: (cause) => setActionMessage(cause instanceof Error ? cause.message : "The ScoreCard could not be deactivated.") });
+  const remove = useMutation({ mutationFn: scorecardService.remove, onSuccess: () => { queryClient.invalidateQueries(); setScorecardToRemove(null); setActionMessage("ScoreCard removed. History is preserved; it cannot be used in future periods."); }, onError: (cause) => setActionMessage(cause instanceof Error ? cause.message : "The ScoreCard could not be removed.") });
   const records = query.data?.data ?? [];
   const sortedRecords = useMemo(() => [...records].sort((left, right) => compareSortValues(scorecardSortValue(left, sort.key), scorecardSortValue(right, sort.key), sort.direction)), [records, sort]);
   const options = (values: string[]) => [...new Set(values)].sort().map((value) => ({ value, label: value }));
@@ -68,15 +69,15 @@ export function ScorecardOverview() {
       <SortableTableHeader active={sort.key === "linkedScorecards"} direction={sort.direction} onSort={() => sortBy("linkedScorecards")}>Linked SC</SortableTableHeader>
       <SortableTableHeader active={sort.key === "status"} direction={sort.direction} onSort={() => sortBy("status")}>Status</SortableTableHeader>
       <th>Actions</th>
-    </tr></thead><tbody>{query.isLoading ? <tr><td colSpan={10} className="table-message">Loading ScoreCards...</td></tr> : query.isError ? <tr><td colSpan={10} className="table-message">ScoreCards could not be loaded: {(query.error as Error).message}</td></tr> : sortedRecords.length ? sortedRecords.map((item) => <tr key={item.id}><td><span className="code-pill">{item.code}</span></td><td className="name-cell">{item.name}</td><td>{item.departments.join(", ")}</td><td>{item.poolSource}</td><td><PoolScheduleCell schedule={item.poolSchedule}/></td><td><CompositionCell composition={item.currentComposition}/></td><td className="scorecard-count">{item.currentComposition ? item.kpis : "—"}</td><td className="scorecard-count">{item.currentComposition ? item.linkedScorecards : "—"}</td><td><span className={`scorecard-status ${item.status.toLowerCase()}`}><i />{title(item.status)}</span></td><td><div className="table-actions">
+    </tr></thead><tbody>{query.isLoading ? <tr><td colSpan={10} className="table-message">Loading ScoreCards...</td></tr> : query.isError ? <tr><td colSpan={10} className="table-message">ScoreCards could not be loaded: {(query.error as Error).message}</td></tr> : sortedRecords.length ? sortedRecords.map((item) => <tr key={item.id}><td><span className="code-pill">{item.code}</span></td><td className="name-cell">{item.name}</td><td>{item.departments.join(", ")}</td><td>{item.poolSource}</td><td><PoolScheduleCell schedule={item.poolSchedule}/></td><td><CompositionCell composition={item.currentComposition} poolId={item.poolId}/></td><td className="scorecard-count">{item.currentComposition ? item.kpis : "—"}</td><td className="scorecard-count">{item.currentComposition ? item.linkedScorecards : "—"}</td><td><span className={`scorecard-status ${item.status.toLowerCase()}`}><i />{title(item.status)}</span></td><td><div className="table-actions">
       <button className="icon-button edit" title="Edit ScoreCard Info" onClick={() => navigate(`/app/scorecards/create-scorecard-info?scorecardId=${item.id}`)}><Pencil size={15} /></button>
-      <button className="icon-button delete" title="Deactivate ScoreCard (history is preserved)" disabled={remove.isPending || item.status === "INACTIVE"} onClick={() => setScorecardToRemove({ id: item.id, code: item.code })}><Trash2 size={15} /></button>
+      <button className="icon-button delete" title="Delete ScoreCard" aria-label={`Delete ${item.code}`} disabled={remove.isPending} onClick={() => setScorecardToRemove({ id: item.id, code: item.code })}><Trash2 size={15} /></button>
       <button className="icon-button configure" title="Open ScoreCard Assignment" onClick={() => navigate(`/app/scorecards/assignment?scorecardId=${item.id}&selector=1&source=overview`)}><Settings2 size={15} /></button>
       <button className="icon-button view" title="View Detail" onClick={() => navigate(`/app/scorecards/detail?scorecardId=${item.id}`)}><Eye size={15} /></button>
     </div></td></tr>) : <tr><td colSpan={10} className="table-message">No ScoreCards match the selected filters.</td></tr>}</tbody></table>
       <footer className="scorecard-results"><span>Showing <strong>{totalItems ? pageStart + 1 : 0}-{Math.min(pageStart + records.length, totalItems)}</strong> of <strong>{totalItems}</strong> ScoreCards</span><RowsPerPageSelect value={pageSize} onChange={(value) => { setPageSize(value); setPage(1); }} /><PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="ScoreCard pagination" className="scorecard-pagination" /></footer>
     </div>
-    {scorecardToRemove && <OverviewDeleteConfirmation title="Remove ScoreCard from Overview?" message={`${scorecardToRemove.code} will be deactivated and removed from active operations. Its database history and finalized compositions will remain unchanged.`} acceptLabel="Deactivate" pending={remove.isPending} onAccept={() => remove.mutate(scorecardToRemove.id)} onCancel={() => setScorecardToRemove(null)} />}
+    {scorecardToRemove && <OverviewDeleteConfirmation title="Remove ScoreCard from Overview?" message={`${scorecardToRemove.code} will be removed from the lists and cannot be used in future periods. Historical results and finalized compositions will be preserved.`} acceptLabel="Delete" pending={remove.isPending} onAccept={() => remove.mutate(scorecardToRemove.id)} onCancel={() => setScorecardToRemove(null)} />}
   </main>;
 }
 
@@ -96,9 +97,9 @@ function PoolScheduleCell({ schedule }: { schedule: import("./scorecard.types").
   if (!schedule) return <span className="overview-period-empty">Schedule unavailable</span>;
   return <div className="scorecard-schedule-cell"><strong>{formatScheduleDate(schedule.validFrom)} – {formatScheduleDate(schedule.validTo)}</strong><small>{schedule.frequency} · {schedule.inputPeriods} periods</small></div>;
 }
-function CompositionCell({ composition }: { composition: import("./scorecard.types").ScorecardRecord["currentComposition"] }) {
+function CompositionCell({ composition, poolId }: { poolId?: number; composition: import("./scorecard.types").ScorecardRecord["currentComposition"] }) {
+  const formatPeriodKey = usePoolPeriodFormatter(poolId);
   if (!composition) return <span className="overview-period-empty">Not started</span>;
   return <div className="overview-period-cell"><div className="overview-period-current"><strong>{formatPeriodKey(composition.periodKey)}</strong><span className={`overview-period-status ${composition.status.toLowerCase().replace("_", "-")}`}>{composition.status === "NOT_STARTED" ? "Not Started" : title(composition.status)}</span></div>{composition.previous && <small>Previous: {formatPeriodKey(composition.previous.periodKey, true)} · Finalized</small>}</div>;
 }
 function formatScheduleDate(value: string) { return new Intl.DateTimeFormat("en", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value)); }
-function formatPeriodKey(value: string, short = false) { const [year, month] = value.split("-").map(Number); return new Intl.DateTimeFormat("en", { month: "long", ...(short ? {} : { year: "numeric" }), timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1))); }

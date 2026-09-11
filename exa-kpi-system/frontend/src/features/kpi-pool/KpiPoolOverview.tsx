@@ -1,6 +1,7 @@
+import { OverviewDeleteConfirmation } from "../../components/OverviewDeleteConfirmation";
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Eye, Pencil, Plus, Search, Settings2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { kpiPoolService } from "./kpi-pool.service";
 import { PoolOverviewMultiSelect } from "./PoolOverviewMultiSelect";
@@ -11,6 +12,10 @@ import { scorecardService } from "../scorecards/scorecard.service";
 import "./kpi-pool.css";
 
 export function KpiPoolOverview() {
+  const queryClient = useQueryClient();
+  const [poolToRemove, setPoolToRemove] = useState<{ id: number; code: string } | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const remove = useMutation({ mutationFn: (id: number) => kpiPoolService.remove(id), onSuccess: async () => { setPoolToRemove(null); setActionMessage("Pool removed. History is preserved; it cannot be used in future periods."); await queryClient.invalidateQueries(); }, onError: (error) => { setPoolToRemove(null); setActionMessage(error instanceof Error ? error.message : "The Pool could not be removed."); } });
   const [pageSize, setPageSize] = useState(10);
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -62,6 +67,7 @@ export function KpiPoolOverview() {
         <PoolOverviewMultiSelect label="All years" options={years.map((item) => ({ value: item, label: item }))} selected={yearsSelected} onChange={setYearsSelected} />
       </section>
 
+      {actionMessage && <p role="status">{actionMessage}</p>}
       {poolsQuery.isError && <div className="pool-form-error" role="alert">{poolsQuery.error instanceof Error ? poolsQuery.error.message : "No se pudieron cargar los pools."} <button type="button" className="button secondary" onClick={() => void poolsQuery.refetch()}>Reintentar</button></div>}
       <div className="kpi-table-wrap pool-table-wrap stable-table-shell">
         <table className="kpi-table pool-table">
@@ -90,6 +96,7 @@ export function KpiPoolOverview() {
               <td><span className={`status-chip ${pool.status.toLowerCase()}`}><i />{pool.status.charAt(0) + pool.status.slice(1).toLowerCase()}</span></td>
               <td><div className="table-actions">
                 <button className="icon-button edit" title="Edit" aria-label={`Edit ${pool.code}`} onClick={() => navigate(`/app/pool-kpis/create-pool-info?poolId=${pool.id}`)}><Pencil size={15} /></button>
+                <button type="button" className="icon-button delete" title="Delete Pool" aria-label={`Delete ${pool.code}`} disabled={remove.isPending} onClick={() => setPoolToRemove({ id: pool.id, code: pool.code })}><Trash2 size={15} /></button>
                 <button className="icon-button configure" title="Manage KPIs" onClick={() => navigate(`/app/pool-kpis/manage-kpis?poolId=${pool.id}&source=overview`)}><Settings2 size={15} /></button>
                 <button className="icon-button view" title="View Details" aria-label={`View details for ${pool.code}`} onClick={() => navigate(`/app/pool-kpis/detail/${pool.id}`)}><Eye size={15} /></button>
               </div></td>
@@ -102,6 +109,7 @@ export function KpiPoolOverview() {
           <PaginationControls page={page} totalPages={totalPages} onPage={setPage} label="KPI Pool pagination" className="pool-pagination" />
         </footer>
       </div>
+      {poolToRemove && <OverviewDeleteConfirmation title="Delete Pool?" message={`${poolToRemove.code} will be removed from the lists and cannot be used in future periods. Historical results and finalized compositions will be preserved.`} acceptLabel="Delete" pending={remove.isPending} onAccept={() => remove.mutate(poolToRemove.id)} onCancel={() => setPoolToRemove(null)} />}
     </main>
   );
 }

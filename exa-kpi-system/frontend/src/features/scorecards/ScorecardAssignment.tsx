@@ -1,3 +1,4 @@
+import { usePoolPeriodFormatter } from "../monitoring-results/use-period-label";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowUpDown, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Eye, Link2, ListPlus, Pencil, RotateCcw, Save, Search, Target, UsersRound, X } from "lucide-react";
@@ -60,12 +61,6 @@ function AssignmentWeightInput({ value, onChange, disabled = false }: { value: n
   </div>;
 }
 
-function formatPeriodKey(value: string) {
-  const [year, month] = value.split("-").map(Number);
-  if (!year || !month) return "Select Input Period";
-  const date = new Date(Date.UTC(year, month - 1, 1));
-  return `${new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(date)} • ${year}`;
-}
 
 function formatMonthYear(value: string) {
   return new Intl.DateTimeFormat("en", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value));
@@ -106,6 +101,7 @@ export function ScorecardAssignment() {
   const scorecardId = requestedScorecardId || (selectorMode ? storedScorecardId : 0) || 0;
   const [selectorOpen, setSelectorOpen] = useState(false);
   const scorecardQuery = useQuery({ queryKey: ["scorecard", scorecardId], queryFn: () => scorecardService.getById(scorecardId), enabled: scorecardId > 0, retry: false });
+  const formatPeriodKey = usePoolPeriodFormatter(scorecardQuery.data?.poolId);
   const scorecardsQuery = useQuery({ queryKey: ["scorecards"], queryFn: scorecardService.list, enabled: selectorOpen, staleTime: 60 * 1000 });
   const periodsQuery = useQuery({ queryKey: ["scorecard-periods", scorecardId], queryFn: () => scorecardService.periods(scorecardId), enabled: scorecardQuery.isSuccess && scorecardId > 0 });
   const requestedPeriod = searchParams.get("period") ?? searchParams.get("periodKey") ?? "";
@@ -347,6 +343,7 @@ export function ScorecardAssignment() {
       <article className="assignment-scope-context"><span><UsersRound size={20}/></span><div><small>Scope</small><strong>{visibleScopeDepartments.length} Departments · {visibleScopeDepartments.reduce((total, department) => total + department.employees.length, 0)} Collaborators</strong><p>{isCustomizedScope ? `Customized for ${formatPeriodKey(periodKey).replace(" • ", " ")}` : previousPeriodKey ? "Inherited from previous period" : "Inherited from ScoreCard base scope"}</p><div className="assignment-scope-actions"><button type="button" onClick={() => { setActiveScopeDepartment(visibleScopeDepartments[0]?.name ?? ""); setScopeModalPosition({ x: 0, y: 0 }); setScopeDetailsOpen(true); }}><Eye size={15}/> View Details</button><button type="button" disabled={compositionReadOnly || !periodKey || !previousPeriodKey || previousScopeUnavailable} title={compositionReadOnly ? "Scope is locked because this period composition is finalized." : !previousPeriodKey ? "The first Input Period uses the ScoreCard base scope." : previousScopeUnavailable ? "Loading the previous Input Period scope." : undefined} onClick={() => { const sourceScope = isCustomizedScope ? currentPeriodScope : previousPeriodScope; const initialDepartments = [...sourceScope.departments]; const initialEligibleIds = new Set(scopeDepartments.filter((department) => initialDepartments.includes(department.id)).flatMap((department) => department.employees.map((employee) => employee.id))); const initialEmployees = sourceScope.employees.filter((id) => initialEligibleIds.has(id)); const previousDepartments = [...previousPeriodScope.departments]; const previousEligibleIds = new Set(scopeDepartments.filter((department) => previousDepartments.includes(department.id)).flatMap((department) => department.employees.map((employee) => employee.id))); setPersistedScopeAtOpen({ departments: initialDepartments, employees: initialEmployees }); setResetScopeAtOpen({ departments: previousDepartments, employees: previousPeriodScope.employees.filter((id) => previousEligibleIds.has(id)) }); setDraftScopeDepartments(initialDepartments); setDraftScopeEmployees(initialEmployees); setActiveEditDepartment(initialDepartments[0] ?? ""); setScopeEditStep(0); setScopeEditOpen(true); }}><Pencil size={14}/> Edit for Period</button></div></div></article>
     </section>
     {periodsQuery.isError && <section className="assignment-no-data"><h2>Input Periods could not be loaded</h2><p>{(periodsQuery.error as Error).message}</p></section>}
+    {compositionQuery.data?.status === "FINALIZED" && <section className="assignment-no-data"><h2>Composition finalized</h2><p>Complete and close Monitoring Results for this period before finalizing the next Pool composition.</p><Link to={`/app/monitoring-results/pool-input-schedule?poolId=${scorecard.poolId}`}>Open Monitoring schedule</Link></section>}
     {poolCompositionUnavailable && <section className="assignment-no-data"><Clock3 size={28}/><h2>Pool Composition not finalized</h2><p>{selectedPeriod?.dependency?.reasonCode === "PREVIOUS_INPUT_PERIOD_NOT_CLOSED" ? `Close Monitoring Results for ${formatPeriodKey(selectedPeriod.dependency.previousPeriodStart?.slice(0, 7) ?? "the previous period").replace(" â€¢ ", " ")} first. Then finalize the ${formatPeriodKey(periodKey).replace(" â€¢ ", " ")} Pool Composition before selecting KPIs.` : "Finalize the Pool Composition before Scorecard selection can begin for this Input Period."}</p></section>}
     {saveMutation.isError && <p role="alert">{(saveMutation.error as Error).message}</p>}
     {compositionQuery.isError && <section className="assignment-no-data"><AlertTriangle size={28}/><h2>Composition contract unavailable</h2><p>{(compositionQuery.error as Error).message}</p></section>}

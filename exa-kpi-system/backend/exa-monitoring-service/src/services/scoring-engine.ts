@@ -1,3 +1,4 @@
+import { validExactPoints } from "../contracts/result-bands.js";
 import { Prisma } from "@prisma/client";
 export const CALCULATION_VERSION = "CHECK_RESULTS_V1";
 const ZERO = new Prisma.Decimal(0);
@@ -6,7 +7,7 @@ type DecimalInput = Prisma.Decimal | string | number;
 type Band = { includesMin?: boolean; includesMax?: boolean; compliance: DecimalInput; minResult?: DecimalInput | null; maxResult?: DecimalInput | null; maxDistance?: DecimalInput };
 export type ScoringRuleConfig = {
   model?: string;
-  bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "INTERVALS";
+  bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "EXACT_POINTS" | "INTERVALS";
   bands?: Band[];
   tolerance?: DecimalInput;
   rangeMin?: DecimalInput;
@@ -82,6 +83,7 @@ export function calculateKpiScore(input: KpiScoringInput): KpiScoringResult {
       if(method === "ZERO_TARGET_BANDS" && !goal?.isZero())return notCalculable("ZERO_TARGET_REQUIRES_ZERO_GOAL",method);
       const bands=config?.bands;
       if(!Array.isArray(bands)||!bands.length)return notCalculable("SCORING_RULE_NOT_CONFIGURED",method);
+      if (config?.bandMode === "EXACT_POINTS" && !validExactPoints(bands)) return notCalculable("SCORING_BANDS_INVALID", method);
       const parsed=bands.map(b=>({includesMin:b.includesMin !== false,includesMax:b.includesMax !== false,unboundedMin:b.minResult===null,min:b.minResult===null?decimal(-Infinity):b.minResult===undefined?ZERO:decimal(b.minResult),max:b.maxResult==null?null:decimal(b.maxResult),value:decimal(b.compliance)})).sort((a,b)=>a.min.comparedTo(b.min));
       if(parsed.some((b,i)=>(!b.unboundedMin&&!b.min.isFinite())||b.max&&(!b.max.isFinite()||b.max.lt(b.min)||b.max.eq(b.min)&&!(b.includesMin&&b.includesMax))||!b.value.isFinite()||b.value.lt(0)||b.value.gt(100)||i>0&&(parsed[i-1]!.max===null||parsed[i-1]!.max!.gt(b.min)||parsed[i-1]!.max!.eq(b.min)&&parsed[i-1]!.includesMax&&b.includesMin)))return notCalculable("SCORING_BANDS_INVALID",method);
       const pointMode = config?.bandMode;

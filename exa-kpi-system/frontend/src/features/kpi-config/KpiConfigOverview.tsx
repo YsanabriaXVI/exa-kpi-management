@@ -1,7 +1,7 @@
 import { EntityGoalsModal } from "./EntityGoalsDisplay";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, CirclePause, Eye, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleHelp, CirclePause, Database, Eye, Pencil, Plus, Search, Send, Trash2, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ConfigMultiSelect } from "./ConfigMultiSelect";
 import {
@@ -27,7 +27,7 @@ export function KpiConfigOverview() {
   const [params] = useSearchParams();
   const [actionToast, setActionToast] = useState<{ message: string; tone: "success" | "info" | "warning"; duration?: number } | null>(() => params.get("created") ? { message: "KPI Configuration created successfully. It is now ready to be added to a KPI Pool.", tone: "success" } : null);
   const [search, setSearch] = useState("");
-  const [selectedKpis, setSelectedKpis] = useState<string[]>([]);
+  const [selectedKpis, setSelectedKpis] = useState<string[]>(() => params.get("definitionId") ? [params.get("definitionId")!] : []);
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [selectedDataSources, setSelectedDataSources] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -124,7 +124,10 @@ export function KpiConfigOverview() {
       <nav className="kpi-breadcrumb" aria-label="Breadcrumb"><Link to="/app/kpi-management">KPI Management</Link><span>/</span><Link to="/app/kpi-management/config/overview" aria-current="page">KPI Config Overview</Link></nav>
       <header className="config-page-header">
         <div><h1>KPI Config Overview</h1><p>Manage measurable variants created from reusable KPI Definitions.</p></div>
-        <button className="button primary" onClick={() => navigate("/app/kpi-management/config/set")}><Plus size={15} /> New KPI Config</button>
+        <div className="config-overview-header-actions">
+          <button type="button" className="button secondary config-catalog-button" onClick={() => navigate("/app/kpi-management/config/catalogs")}><Database size={16} /> Manage Catalogs</button>
+          <button className="button primary" onClick={() => navigate("/app/kpi-management/config/set")}><Plus size={15} /> New KPI Config</button>
+        </div>
       </header>
       {actionToast && <ActionToast message={actionToast.message} tone={actionToast.tone} duration={actionToast.duration} onClose={() => setActionToast(null)} />}
       <section className="config-overview-toolbar">
@@ -153,6 +156,7 @@ export function KpiConfigOverview() {
         </div>
       </section>}
       <div className="kpi-table-wrap config-table-wrap stable-table-shell">
+        <div className="config-table-scroll" role="region" aria-label="KPI Configurations" tabIndex={0}>
         <table className={`kpi-table config-table ${selectedConfigurations.length ? "bulk-selection-mode" : ""}`}>
           <thead><tr>
             <th className="config-selection-column"><button type="button" className={`config-row-checkbox ${allPageSelected ? "checked" : ""}`} onClick={togglePage} aria-label={allPageSelected ? "Deselect KPI Configurations on this page" : "Select KPI Configurations on this page"}>{allPageSelected && <Check size={13} />}</button></th>
@@ -193,6 +197,7 @@ export function KpiConfigOverview() {
             </tr>
           )) : <tr><td colSpan={12} className="table-message">No KPI Configurations found.</td></tr>}</tbody>
         </table>
+        </div>
         <footer className="config-table-footer">
           <span>
             Showing <strong>{filtered.length ? pageStart + 1 : 0}-{Math.min(pageStart + pageSize, filtered.length)}</strong> of <strong>{filtered.length}</strong> records

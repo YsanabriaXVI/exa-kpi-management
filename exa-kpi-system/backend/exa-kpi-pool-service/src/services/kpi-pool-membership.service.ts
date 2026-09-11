@@ -37,6 +37,7 @@ function effectiveWhere(poolId: bigint, period: InputPeriod): Prisma.KpiPoolKpiW
 }
 
 function eligibilityReason(configuration: KpiManagementConfiguration, frequencyId: bigint): string | undefined {
+  if (configuration.status === "INCOMPLETE") return "KPI_CONFIGURATION_INCOMPLETE";
   if (!configuration.isActive) return "KPI_CONFIGURATION_INACTIVE";
   if (!configuration.definitionIsActive) return "KPI_DEFINITION_INACTIVE";
   if (!configuration.inputFrequencyIsActive) return "INPUT_FREQUENCY_INACTIVE";
@@ -53,6 +54,7 @@ function membershipDto(value: KpiPoolKpi, configuration?: KpiManagementConfigura
     membershipId: value.id.toString(), id: value.kpiConfigurationExternalId.toString(), configurationId: value.kpiConfigurationExternalId.toString(),
     definitionId: value.kpiDefinitionExternalId.toString(), configCode: value.configurationCodeSnapshot,
     definitionCode: value.definitionCodeSnapshot, definitionName: value.definitionNameSnapshot,
+    configurationName: configuration?.configurationName ?? value.definitionNameSnapshot, sourceDefinitionName: configuration?.sourceDefinitionName, classification: configuration?.classification,
     inputFrequencyId: value.inputFrequencyExternalIdSnapshot.toString(), inputFrequencyCode: value.inputFrequencyCodeSnapshot,
     displayOrder: value.displayOrder, isRequired: value.isRequired,
     effectiveFrom: formatDateOnly(value.effectiveFrom), effectiveTo: value.effectiveTo ? formatDateOnly(value.effectiveTo) : null,
@@ -143,12 +145,12 @@ async function assertNotFinalized(poolId: bigint, periodStart: Date, tx: Prisma.
 async function lookupAndValidate(ids: string[], pool: KpiPool) {
   const lookup = await kpiManagementClient.batchLookup(ids);
   if (lookup.notFoundIds.length) throw new AppError(422, "KPI_CONFIGURATION_NOT_FOUND", "One or more KPI Configurations were not found", { ids: lookup.notFoundIds });
-  const definitions = new Set<string>();
+  const configurations = new Set<string>();
   for (const configuration of lookup.data) {
     const reason = eligibilityReason(configuration, pool.inputFrequencyExternalId);
     if (reason) throwEligibility(reason, configuration);
-    if (definitions.has(configuration.definitionId)) throw new AppError(422, "KPI_DEFINITION_ALREADY_EFFECTIVE", "The batch contains multiple Configurations from the same KPI Definition", { definitionId: configuration.definitionId });
-    definitions.add(configuration.definitionId);
+    if (configurations.has(configuration.id)) throw new AppError(422, "CONFIGURATION_ALREADY_EFFECTIVE", "The same KPI Configuration cannot appear twice in a batch", { configurationId: configuration.id });
+    configurations.add(configuration.id);
   }
   return lookup.data;
 }
@@ -157,13 +159,6 @@ export const kpiPoolMembershipService = {
   async assignmentEligibility(configurationIds: string[]) {
     const lookup = await kpiManagementClient.batchLookup(configurationIds);
     if (lookup.notFoundIds.length) throw new AppError(422, "KPI_CONFIGURATION_NOT_FOUND", "One or more KPI Configurations were not found", { ids: lookup.notFoundIds });
-    const duplicateDefinitions = new Set<string>();
-    const seenDefinitions = new Set<string>();
-    for (const configuration of lookup.data) {
-      if (seenDefinitions.has(configuration.definitionId)) duplicateDefinitions.add(configuration.definitionId);
-      seenDefinitions.add(configuration.definitionId);
-    }
-
     const pools = await prisma.kpiPool.findMany({
       where: { deletedAt: null },
       include: { companies: { orderBy: { displayOrder: "asc" } } },
@@ -195,14 +190,10 @@ export const kpiPoolMembershipService = {
       }
 
       const conflicts = period ? await prisma.kpiPoolKpi.findMany({
-        where: { ...effectiveWhere(pool.id, { start: period.start, end: pool.validTo }), kpiDefinitionExternalId: { in: lookup.data.map((item) => BigInt(item.definitionId)) } },
+        where: { ...effectiveWhere(pool.id, { start: period.start, end: pool.validTo }), kpiConfigurationExternalId: { in: lookup.data.map((item) => BigInt(item.id)) } },
       }) : [];
 
       for (const configuration of lookup.data) {
-        if (duplicateDefinitions.has(configuration.definitionId)) {
-          issues.push({ configurationId: configuration.id, code: "BATCH_DEFINITION_DUPLICATE", message: `${configuration.definitionCode} appears more than once in the selection.` });
-          continue;
-        }
         const reason = eligibilityReason(configuration, pool.inputFrequencyExternalId);
         if (reason) {
           const messages: Record<string, string> = {
@@ -214,9 +205,8 @@ export const kpiPoolMembershipService = {
           issues.push({ configurationId: configuration.id, code: reason, message: messages[reason] ?? `${configuration.configCode} is not eligible.` });
           continue;
         }
-        const conflict = conflicts.find((item) => item.kpiDefinitionExternalId === BigInt(configuration.definitionId));
+        const conflict = conflicts.find((item) => item.kpiConfigurationExternalId === BigInt(configuration.id));
         if (conflict?.kpiConfigurationExternalId === BigInt(configuration.id)) alreadyIncludedConfigurationIds.push(configuration.id);
-        else if (conflict) issues.push({ configurationId: configuration.id, code: "KPI_DEFINITION_ALREADY_EFFECTIVE", message: `${configuration.definitionCode} already has ${conflict.configurationCodeSnapshot} in this Pool.`, conflictingConfigurationCode: conflict.configurationCodeSnapshot });
         else availableConfigurationIds.push(configuration.id);
       }
 
@@ -292,10 +282,10 @@ export const kpiPoolMembershipService = {
       await assertNotFinalized(poolId, period.start, tx);
       const pool = await tx.kpiPool.findFirst({ where: { id: poolId, deletedAt: null } });
       if (!pool || pool.statusCode === "INACTIVE") throw new AppError(409, "POOL_INACTIVE", "Pool cannot accept KPI membership changes");
-      const conflicts = await tx.kpiPoolKpi.findMany({ where: { ...effectiveWhere(poolId, { start: period.start, end: pool.validTo }), kpiDefinitionExternalId: { in: configurations.map((item) => BigInt(item.definitionId)) } } });
+      const conflicts = await tx.kpiPoolKpi.findMany({ where: { ...effectiveWhere(poolId, { start: period.start, end: pool.validTo }), kpiConfigurationExternalId: { in: configurations.map((item) => BigInt(item.id)) } } });
       for (const configuration of configurations) {
-        const conflict = conflicts.find((item) => item.kpiDefinitionExternalId === BigInt(configuration.definitionId));
-        if (conflict) throw new AppError(409, conflict.kpiConfigurationExternalId === BigInt(configuration.id) ? "CONFIGURATION_ALREADY_EFFECTIVE" : "KPI_DEFINITION_ALREADY_EFFECTIVE", `${configuration.definitionCode} already has an effective Configuration in the requested interval`, { conflictingConfigurationCode: conflict.configurationCodeSnapshot });
+        const conflict = conflicts.find((item) => item.kpiConfigurationExternalId === BigInt(configuration.id));
+        if (conflict) throw new AppError(409, "CONFIGURATION_ALREADY_EFFECTIVE", `${configuration.configCode} is already effective in the requested interval`, { conflictingConfigurationCode: conflict.configurationCodeSnapshot });
       }
       const effectiveRows = await tx.kpiPoolKpi.findMany({ where: effectiveWhere(poolId, period) });
       const nextOrder = effectiveRows.reduce((max, row) => Math.max(max, row.displayOrder), 0) + 1;
@@ -350,8 +340,8 @@ export const kpiPoolMembershipService = {
       const old = await tx.kpiPoolKpi.findFirst({ where: { ...effectiveWhere(poolId, period), kpiConfigurationExternalId: BigInt(input.oldConfigurationId) }, orderBy: { effectiveFrom: "desc" } });
       if (!old) throw new AppError(404, "KPI_POOL_MEMBERSHIP_NOT_FOUND", "Configuration to replace is not effective in the target period");
       if (old.kpiDefinitionExternalId !== BigInt(replacement.definitionId)) throw new AppError(422, "REPLACEMENT_DEFINITION_MISMATCH", "Replacement must belong to the same KPI Definition");
-      const other = await tx.kpiPoolKpi.findFirst({ where: { ...effectiveWhere(poolId, { start: period.start, end: initial.validTo }), kpiDefinitionExternalId: old.kpiDefinitionExternalId, id: { not: old.id } } });
-      if (other) throw new AppError(409, "KPI_DEFINITION_ALREADY_EFFECTIVE", "Another Configuration already overlaps the replacement interval");
+      const other = await tx.kpiPoolKpi.findFirst({ where: { ...effectiveWhere(poolId, { start: period.start, end: initial.validTo }), kpiConfigurationExternalId: BigInt(replacement.id), id: { not: old.id } } });
+      if (other) throw new AppError(409, "CONFIGURATION_ALREADY_EFFECTIVE", "The replacement Configuration is already effective in this interval");
       const effectiveTo = previousDay(period.start);
       if (old.effectiveFrom >= period.start) await tx.kpiPoolKpi.delete({ where: { id: old.id } });
       else await tx.kpiPoolKpi.update({ where: { id: old.id }, data: { effectiveTo, updatedAt: new Date(), updatedByUserId: actor } });
@@ -368,16 +358,20 @@ export const kpiPoolMembershipService = {
     const period = await targetPeriod(pool, query.periodStart);
     await assertNotFinalized(poolId, period.start);
     const catalog = await kpiManagementClient.listConfigurations(query);
+    const eligibility = catalog.data.length ? await kpiManagementClient.batchLookup(catalog.data.map(configuration => configuration.id)) : { data: [], notFoundIds: [] };
+    const eligibilityById = new Map(eligibility.data.map(configuration => [configuration.id, configuration]));
     const effective = await prisma.kpiPoolKpi.findMany({ where: effectiveWhere(poolId, period) });
     const configurations = new Map(effective.map((row) => [row.kpiConfigurationExternalId.toString(), row]));
-    const definitions = new Map(effective.map((row) => [row.kpiDefinitionExternalId.toString(), row]));
     const unavailable = new Map<string, string>();
     const effectiveGoals = await effectiveGoalsForPeriod(poolId, period, effective, unavailable);
     return { data: catalog.data.map((configuration) => {
       let availability = "AVAILABLE_TO_ADD"; let reasonCode: string | null = null; let conflict: string | null = null;
       if (configurations.has(configuration.id)) { availability = "ALREADY_IN_POOL"; reasonCode = unavailable.get(configuration.id) ?? null; }
-      else if (definitions.has(configuration.definitionId)) { availability = "NOT_AVAILABLE"; reasonCode = "KPI_DEFINITION_ALREADY_EFFECTIVE"; conflict = definitions.get(configuration.definitionId)!.configurationCodeSnapshot; }
-      else { reasonCode = eligibilityReason(configuration, pool.inputFrequencyExternalId) ?? null; if (reasonCode) availability = "NOT_AVAILABLE"; }
+      else {
+        const candidate = eligibilityById.get(configuration.id);
+        reasonCode = candidate ? eligibilityReason(candidate, pool.inputFrequencyExternalId) ?? null : "KPI_CONFIGURATION_NOT_FOUND";
+        if (reasonCode) availability = "NOT_AVAILABLE";
+      }
       const membership = configurations.get(configuration.id);
       return { ...configuration, goal: membership ? effectiveGoals.get(membership.id.toString()) ?? configuration.goal : configuration.goal, availability, reasonCode, conflictingConfigurationCode: conflict };
     }), meta: { ...catalog.meta, targetPeriod: periodDto(period), configurationStatus: "EDITABLE", editabilitySource: "CONSERVATIVE_FUTURE_ONLY" } };
@@ -397,8 +391,8 @@ export const kpiPoolMembershipService = {
       await assertNotFinalized(poolId, period.start, tx);
       const memberships = await tx.kpiPoolKpi.findMany({ where: effectiveWhere(poolId, period), orderBy: [{ displayOrder: "asc" }, { id: "asc" }] });
       if (!memberships.length) throw new AppError(422, "POOL_PERIOD_COMPOSITION_EMPTY", "At least one KPI Configuration is required before finalization");
-      const definitions = new Set(memberships.map((value) => value.kpiDefinitionExternalId.toString()));
-      if (definitions.size !== memberships.length) throw new AppError(422, "KPI_DEFINITION_ALREADY_EFFECTIVE", "The period contains overlapping KPI Definitions");
+      const configurations = new Set(memberships.map((value) => value.kpiConfigurationExternalId.toString()));
+      if (configurations.size !== memberships.length) throw new AppError(422, "CONFIGURATION_ALREADY_EFFECTIVE", "The period contains the same KPI Configuration more than once");
       const lookup = await kpiManagementClient.batchLookup(memberships.map((value) => value.kpiConfigurationExternalId.toString()));
       const effective = await Promise.all(memberships.map(membership => kpiManagementClient.effectiveSnapshot(membership.kpiConfigurationExternalId.toString(), formatDateOnly(period.start), formatDateOnly(period.end))));
       const blocked = effective.filter(configuration => !configuration.executability.executable);

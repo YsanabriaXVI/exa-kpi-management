@@ -41,7 +41,9 @@ export function poolPeriods(validFrom: Date, validTo: Date, monthsPerPeriod: num
     throw new AppError(422, "POOL_VALIDITY_NOT_PERIOD_ALIGNED", "Pool validity must contain complete Input Periods");
   }
   const months = (validTo.getUTCFullYear() - validFrom.getUTCFullYear()) * 12 + validTo.getUTCMonth() - validFrom.getUTCMonth() + 1;
-  if (months > 12) throw new AppError(422, "POOL_VALIDITY_TOO_LONG", "Pool validity cannot exceed 12 months");
+  if (months > 24 || validTo.getUTCFullYear() - validFrom.getUTCFullYear() > 1) {
+    throw new AppError(422, "POOL_VALIDITY_TOO_LONG", "Pool validity cannot span more than two consecutive calendar years");
+  }
   const periods: InputPeriod[] = [];
   for (let start = validFrom; start <= validTo; start = addUtcMonths(start, monthsPerPeriod)) {
     periods.push({ start, end: previousDay(addUtcMonths(start, monthsPerPeriod)) });

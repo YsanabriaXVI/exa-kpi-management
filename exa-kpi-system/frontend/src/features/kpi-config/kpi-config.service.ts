@@ -163,10 +163,16 @@ export const kpiConfigService = {
     if (!snapshots[0]) throw new Error("No KPI configuration covers the selected Input Period.");
     return snapshots[0];
   },
+  quickConfigure(configurations: KpiConfigInput[]) { return envelope<KpiConfigRecord[]>("/v1/kpi-configurations/quick-configure", {method:"POST",body:JSON.stringify({configurations})}); },
   lookups() { return envelope<KpiConfigLookups>("/v1/kpi-configurations/lookups"); },
   async list(): Promise<KpiConfigRecord[]> {
-    const response = await apiRequest<{ data: KpiConfigRecord[] }>("/v1/kpi-configurations?page=1&pageSize=100");
-    return response.data;
+    const items: KpiConfigRecord[] = [];
+    let page = 1, totalPages = 1;
+    do {
+      const response = await apiRequest<{ data: KpiConfigRecord[]; meta?: {totalPages:number} }>(`/v1/kpi-configurations?page=${page}&pageSize=100`);
+      items.push(...response.data); totalPages = response.meta?.totalPages ?? 1; page += 1;
+    } while(page <= totalPages);
+    return items;
   },
   getDetail(id: number) { return envelope<KpiConfigRecord>(`/v1/kpi-configurations/${id}`); },
   create(input: KpiConfigInput, _definition: { code: string; name: string }) {

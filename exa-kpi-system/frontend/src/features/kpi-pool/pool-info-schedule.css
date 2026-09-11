@@ -1,5 +1,26 @@
 .pool-general-information,.pool-info-schedule{padding:20px;border:1px solid var(--ems-border);border-radius:11px;background:var(--ems-surface);box-shadow:0 3px 12px rgba(23,32,51,.05)}
 .pool-info-schedule{margin-top:22px}
+.pool-info-page .validity-selected-years{display:flex;flex-direction:column;align-items:stretch;gap:8px;width:100%}
+.pool-info-page .validity-selected-year{display:flex;align-items:flex-start;gap:8px}
+.pool-info-page .validity-selected-year>.validity-year-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:5px}
+.pool-info-page .validity-badge-remove,.pool-info-page .validity-toggle{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;padding:2px;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer}
+.pool-info-page .validity-badge-remove:hover{background:rgba(100,70,140,.14)}
+.pool-info-page .validity-badge-remove:focus-visible,.pool-info-page .validity-toggle:focus-visible{outline:2px solid #2a8bad;outline-offset:2px}
+.pool-info-page .validity-toggle:disabled{cursor:not-allowed}
+.pool-info-page .validity-selected-months{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.pool-info-page .validity-panel{position:static;width:100%;max-width:620px;max-height:none;margin-top:8px;overflow:visible;box-sizing:border-box}
+.pool-info-page .pool-schedule-validity-control:has(.validity-panel){grid-column:1/-1}
+.pool-info-page .validity-year-navigation{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ems-text)}
+.pool-info-page .validity-year-navigation button{display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid var(--ems-border);border-radius:7px;background:var(--ems-surface);color:var(--ems-text);cursor:pointer}
+.pool-info-page .validity-year-navigation button:disabled{opacity:.4;cursor:default}
+.pool-info-page .validity-year-navigation button:focus-visible,.pool-info-page .validity-selection-summary button:focus-visible,.pool-info-page .month-checkbox-grid label:has(input:focus-visible){outline:2px solid #2a8bad;outline-offset:2px}
+.pool-info-page .validity-selection-summary{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin:10px 0;color:var(--ems-muted);font-size:12px}
+.pool-info-page .validity-selection-summary button{border:0;background:transparent;color:var(--ems-text);font:inherit;text-decoration:underline;cursor:pointer}
+.pool-info-page .validity-selection-summary button:disabled{opacity:.4;cursor:default}
+.pool-info-page .validity-calendar-years{display:grid;gap:14px}
+.pool-info-page .validity-calendar-year{padding:12px;border:1px solid var(--ems-border);border-radius:9px;background:var(--ems-surface)}
+.pool-info-page .validity-calendar-year .validity-panel-header{align-items:center;flex-direction:row;flex-wrap:wrap;gap:8px}
+.pool-info-page .validity-calendar-year .month-checkbox-grid label:has(input:disabled),.pool-info-page .validity-select-all:has(input:disabled){opacity:.4;cursor:not-allowed}
 .pool-info-schedule .pool-form-heading{margin-bottom:19px}
 .pool-schedule-fields{display:grid;grid-template-columns:minmax(300px,1.3fr) minmax(180px,1fr) minmax(150px,.65fr);align-items:start;gap:20px}
 .pool-schedule-validity-control{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}

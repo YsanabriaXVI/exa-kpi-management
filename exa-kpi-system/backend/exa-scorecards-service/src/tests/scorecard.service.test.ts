@@ -40,3 +40,15 @@ describe("Scorecard Information service", () => {
   it("pushes schedule and Department filters into Prisma before pagination", async () => { db.poolReference.findMany.mockResolvedValueOnce([{ kpiPoolExternalId: 2n }]).mockResolvedValueOnce([]); db.scorecard.findMany.mockResolvedValue([]); db.scorecard.count.mockResolvedValue(0); await scorecardService.list({ page: 1, pageSize: 10, sortBy: "createdAt", sortOrder: "desc", frequency: ["MONTHLY"], year: [2026], department: ["Operations"] }); expect(db.scorecard.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ kpiPoolExternalId: { in: [2n] }, departments: { some: { departmentNameSnapshot: { in: ["Operations"] } } } }), skip: 0, take: 10 })); });
   it("searches code and name terms across middle-dot and dash separators", async () => { db.scorecard.findMany.mockResolvedValue([]); db.scorecard.count.mockResolvedValue(0); await scorecardService.list({ page: 1, pageSize: 10, sortBy: "createdAt", sortOrder: "desc", search: "SC-OPS · Operations" }); const where=db.scorecard.findMany.mock.calls[0]![0].where; expect(where.AND).toHaveLength(3); expect(where.AND.map((term:any)=>term.OR[0].code.contains)).toEqual(["sc","ops","operations"]); });
 });
+
+describe("Scorecard soft deletion", () => {
+  it.each(["DRAFT", "ACTIVE", "INACTIVE"])("removes a %s Scorecard regardless of the source Pool status", async statusCode => {
+    db.scorecard.findFirst.mockResolvedValue({ ...row, statusCode });
+    tx.scorecard.updateMany.mockResolvedValue({ count: 1 });
+    tx.scorecard.findUniqueOrThrow.mockResolvedValue({ ...row, statusCode: "INACTIVE", aggregateVersion: 2 });
+    await scorecardService.remove(1n, 7n);
+    expect(poolClient.getPool).not.toHaveBeenCalled();
+    expect(tx.scorecard.updateMany).toHaveBeenCalledWith({ where: { id: 1n, deletedAt: null }, data: expect.objectContaining({ deletedAt: expect.any(Date), statusCode: "INACTIVE", updatedByUserId: 7n }) });
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "scorecard.deactivated.v1" }) });
+  });
+});

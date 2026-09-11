@@ -20,6 +20,8 @@ async function scorecard(id: bigint) {
 }
 
 async function finalizedPeriod(poolId: bigint, periodKey: string) {
+  const sourcePool = await kpiPoolClient.getPool(poolId.toString());
+  if (sourcePool.status === "INACTIVE") throw new AppError(409, "KPI_POOL_INACTIVE", "The source Pool cannot be used for new compositions");
   let value = await prisma.poolPeriodReference.findFirst({
     where: { kpiPoolExternalId: poolId, periodKey, compositionStatusCode: "FINALIZED" },
     include: { memberships: { orderBy: { displayOrder: "asc" } } },
@@ -228,7 +230,7 @@ export const scorecardCompositionService = {
           for (const department of source.scopeDepartments) await tx.scorecardPeriodDepartmentScope.create({ data: { scorecardPeriodCompositionId: target.id, externalDepartmentId: department.externalDepartmentId, externalCompanyId: department.externalCompanyId, departmentCodeSnapshot: department.departmentCodeSnapshot, departmentNameSnapshot: department.departmentNameSnapshot, displayOrder: department.displayOrder, createdByUserId: actor, employees: { create: department.employees.map(employee => ({ externalEmployeeId: employee.externalEmployeeId, employeeCodeSnapshot: employee.employeeCodeSnapshot, employeeNameSnapshot: employee.employeeNameSnapshot, createdByUserId: actor })) } } });
         }
         for (const { row, membership, frozen } of selections) await tx.scorecardPeriodKpi.create({ data: { scorecardPeriodCompositionId: target.id, kpiPoolMembershipExternalId: membership.poolMembershipExternalId, kpiDefinitionExternalId: membership.kpiDefinitionExternalId, kpiConfigurationExternalId: membership.kpiConfigurationExternalId, kpiPoolExternalId: poolId, periodKey: targetPeriodKey, definitionCodeSnapshot: membership.definitionCode, definitionNameSnapshot: membership.definitionName, configurationCodeSnapshot: membership.configurationCode, categoryNameSnapshot: membership.categoryName, goalSnapshot: frozen.goal, dataSourceSnapshot: membership.dataSourceSnapshot, measurementUnitSnapshot: membership.measurementUnitSnapshot, weightPercent: row.weightPercent, entityWeights: isIndividualEvaluation(frozen) ? ((row.entityWeights ?? []) as EntityWeight[]).filter(weight => frozen.subjectGoals.some(subject => subject.subjectExternalId === weight.subjectExternalId)) as unknown as Prisma.InputJsonValue : Prisma.DbNull, displayOrder: row.displayOrder, createdByUserId: actor } });
-        for (const link of source.links) await tx.scorecardPeriodLink.create({ data: { scorecardPeriodCompositionId: target.id, linkedScorecardId: link.linkedScorecardId, weightPercent: link.weightPercent, displayOrder: link.displayOrder, createdByUserId: actor } });
+        for (const link of source.links.filter(link => !link.linkedScorecard.deletedAt && link.linkedScorecard.statusCode !== "INACTIVE")) await tx.scorecardPeriodLink.create({ data: { scorecardPeriodCompositionId: target.id, linkedScorecardId: link.linkedScorecardId, weightPercent: link.weightPercent, displayOrder: link.displayOrder, createdByUserId: actor } });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     }
     return { ...(await this.monitoringMaterialization(poolId, period.poolPeriodExternalId!.toString())), removedKpis };
@@ -440,7 +442,7 @@ export const scorecardCompositionService = {
     const allowed = new Set(period.memberships.map((row) => row.poolMembershipExternalId.toString()));
     if (current.kpis.some((row) => !allowed.has(row.kpiPoolMembershipExternalId.toString()))) throw new AppError(422, "KPI_NOT_IN_FINALIZED_POOL_COMPOSITION", "A KPI no longer belongs to this Pool Composition");
     await assertNoCycle(prisma, scorecardId, periodKey, current.links.map((row) => row.linkedScorecardId));
-    for (const link of current.links) if (!await prisma.scorecardPeriodComposition.findFirst({ where: { scorecardId: link.linkedScorecardId, periodKey, statusCode: "FINALIZED" } })) throw new AppError(422, "LINKED_SCORECARD_COMPOSITION_NOT_FINALIZED", `${link.linkedScorecard.code} is not finalized for ${periodKey}`);
+    for (const link of current.links) if (link.linkedScorecard.deletedAt || link.linkedScorecard.statusCode === "INACTIVE" || !await prisma.scorecardPeriodComposition.findFirst({ where: { scorecardId: link.linkedScorecardId, periodKey, statusCode: "FINALIZED" } })) throw new AppError(422, "LINKED_SCORECARD_COMPOSITION_NOT_FINALIZED", `${link.linkedScorecard.code} is not finalized for ${periodKey}`);
     const resolvedSettings = new Map(await Promise.all(current.kpis.map(async (row) => [row.id.toString(), await kpiPoolClient.effectiveSettings(owner.kpiPoolExternalId.toString(), period.poolPeriodExternalId!.toString(), row.kpiConfigurationExternalId.toString())] as const)));
     const frozenSettings = new Map(current.kpis.map(row => {
       const settings = resolvedSettings.get(row.id.toString())!.effective;

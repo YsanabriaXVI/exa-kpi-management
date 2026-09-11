@@ -254,6 +254,9 @@ export const scorecardService = {
       })).data,
     );
   },
+  async remove(id: number) {
+    await request(`/v1/scorecards/${id}`, { method: "DELETE" });
+  },
   async deactivate(id: number) {
     await request(`/v1/scorecards/${id}/deactivate`, { method: "PATCH" });
   },

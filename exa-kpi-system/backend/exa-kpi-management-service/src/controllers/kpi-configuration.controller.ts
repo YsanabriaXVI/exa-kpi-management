@@ -1,3 +1,4 @@
+import { quickConfigureBodySchema } from "../schemas/kpi-configuration.schema.js";
 import type { NextFunction,Request,Response } from "express";
 import { batchLookupKpiConfigurationsBodySchema,effectiveKpiConfigurationSnapshotsBodySchema,internalKpiConfigurationCatalogQuerySchema,kpiConfigurationBodySchema,kpiConfigurationIdParamsSchema,listKpiConfigurationsQuerySchema } from "../schemas/kpi-configuration.schema.js";
 import { kpiConfigurationService } from "../services/kpi-configuration.service.js";
@@ -11,3 +12,5 @@ export async function createKpiConfiguration(req:Request,res:Response,next:NextF
 export async function updateKpiConfiguration(req:Request,res:Response,next:NextFunction){try{const{id}=kpiConfigurationIdParamsSchema.parse(req.params);res.json({data:await kpiConfigurationService.update(BigInt(id),kpiConfigurationBodySchema.parse(req.body),req.identity.actorUserId)});}catch(e){next(e)}}
 export async function deactivateKpiConfiguration(req:Request,res:Response,next:NextFunction){try{const{id}=kpiConfigurationIdParamsSchema.parse(req.params);res.json({data:await kpiConfigurationService.deactivate(BigInt(id),req.identity.actorUserId)});}catch(e){next(e)}}
 export async function softDeleteKpiConfiguration(req:Request,res:Response,next:NextFunction){try{const{id}=kpiConfigurationIdParamsSchema.parse(req.params);res.json({data:await kpiConfigurationService.softDelete(BigInt(id),req.identity.actorUserId)});}catch(e){next(e)}}
+
+export async function quickConfigureKpis(req:Request,res:Response,next:NextFunction){try{const body=quickConfigureBodySchema.parse(req.body);res.status(201).json({data:await kpiConfigurationService.quickConfigure(body.configurations,req.identity.actorUserId)});}catch(e){next(e)}}

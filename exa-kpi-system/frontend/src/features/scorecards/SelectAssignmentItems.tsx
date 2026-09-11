@@ -1,3 +1,4 @@
+import { usePoolPeriodFormatter } from "../monitoring-results/use-period-label";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -45,15 +46,7 @@ type Conflict = {
   periodKey: string;
 };
 
-const formatPeriod = (periodKey: string, bullet = false) => {
-  const [year, month] = periodKey.split("-").map(Number);
-  if (!year || !month) return periodKey;
-  const monthName = new Intl.DateTimeFormat("en", {
-    month: "long",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(year, month - 1, 1)));
-  return `${monthName}${bullet ? " • " : " "}${year}`;
-};
+
 const title = (value: string) =>
   value
     .toLowerCase()
@@ -163,7 +156,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const scorecardId = Number(params.get("scorecardId") ?? 0);
-  const periodKey = params.get("period") ?? "";
+  const periodKey = params.get("period") ?? params.get("periodKey") ?? "";
   const type =
     (routeType ?? params.get("type")) === "linked" ? "linked" : "kpi";
   const isKpi = type === "kpi";
@@ -214,6 +207,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
     queryFn: () => scorecardService.getById(scorecardId),
     enabled: scorecardId > 0,
   });
+  const formatPeriod = usePoolPeriodFormatter(scorecard.data?.poolId);
   const scorecardDirectory = useQuery({
     queryKey: ["scorecards"],
     queryFn: scorecardService.list,
@@ -904,6 +898,8 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
           </div>
         </section>
       )}
+      {composition.isError && <section className="scorecard-empty-state" role="alert"><h2>Composition could not be loaded</h2><p>{composition.error.message}</p><button type="button" className="button secondary" onClick={() => void composition.refetch()}>Retry composition</button></section>}
+      {composition.isLoading && <p role="status">Loading period composition?</p>}
       {items.isError ? (
         <section className="scorecard-empty-state">
           <h2>{items.error instanceof ScorecardApiError && items.error.code === "POOL_COMPOSITION_NOT_FINALIZED" ? "Pool Composition not finalized" : "Eligible records could not be loaded"}</h2>
@@ -1096,10 +1092,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
                     const disabled =
                       state === "OCCUPIED" ||
                       state === "NOT_AVAILABLE" ||
-                      (!kpi && composition.data?.status !== "PREPARING") ||
-                      (kpi &&
-                        already &&
-                        composition.data?.status !== "PREPARING");
+                      composition.data?.status !== "PREPARING";
                     const checked =
                       kpi && already
                         ? !isRemoved
@@ -1340,7 +1333,7 @@ export function SelectAssignmentItems({ type: routeType }: { type?: string }) {
                   disabled={
                     !(isKpi ? changeCount : selected.length) ||
                     add.isPending ||
-                    (!isKpi && composition.data?.status !== "PREPARING")
+                    composition.data?.status !== "PREPARING"
                   }
                   onClick={() => add.mutate()}
                 >

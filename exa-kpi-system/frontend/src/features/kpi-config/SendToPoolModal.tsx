@@ -20,7 +20,7 @@ export function SendToPoolModal({ configurations, onClose, onAssigned }: {
   const [poolSearch, setPoolSearch] = useState("");
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ pool: KpiPoolRecord; addedCount: number; alreadyIncludedCount: number } | null>(null);
+  const [result, setResult] = useState<{ pool: KpiPoolRecord; addedCount: number; alreadyIncludedCount: number; periodStart: string; periodEnd: string } | null>(null);
   const [modalPosition, setModalPosition] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -43,7 +43,7 @@ export function SendToPoolModal({ configurations, onClose, onAssigned }: {
     mutationFn: async (pool: PoolAssignmentEligibility) => {
       if (!pool.targetPeriod || !pool.availableConfigurationIds.length) throw new Error("This Pool has no KPI Configurations available to add.");
       const assignment = await kpiPoolService.addConfigurations(Number(pool.poolId), pool.availableConfigurationIds, pool.targetPeriod.start);
-      return { ...assignment, alreadyIncludedCount: pool.alreadyIncludedConfigurationIds.length };
+      return { ...assignment, alreadyIncludedCount: pool.alreadyIncludedConfigurationIds.length, periodStart: pool.targetPeriod.start, periodEnd: pool.targetPeriod.end };
     },
     onSuccess: (assignment) => {
       setResult(assignment);
@@ -52,6 +52,11 @@ export function SendToPoolModal({ configurations, onClose, onAssigned }: {
       void queryClient.invalidateQueries({ queryKey: ["kpi-configurations"] });
       void queryClient.invalidateQueries({ queryKey: ["kpi-pool-configuration-usage"] });
       void queryClient.invalidateQueries({ queryKey: ["kpi-pools"] });
+      void queryClient.invalidateQueries({ queryKey: ["kpi-pool", assignment.pool.id] });
+      void queryClient.invalidateQueries({ queryKey: ["kpi-pool-basic", assignment.pool.id] });
+      void queryClient.invalidateQueries({ queryKey: ["kpi-pool-periods", assignment.pool.id] });
+      void queryClient.invalidateQueries({ queryKey: ["pool-manage-kpis", assignment.pool.id] });
+      void queryClient.invalidateQueries({ queryKey: ["kpi-pool-composition", assignment.pool.id] });
       void queryClient.invalidateQueries({ queryKey: ["kpi-pool-assignment-eligibility"] });
     },
     onError: (mutationError) => setError(mutationError instanceof Error ? mutationError.message : "The KPI Configurations could not be sent."),
@@ -91,7 +96,7 @@ export function SendToPoolModal({ configurations, onClose, onAssigned }: {
     <section className={`send-pool-modal ${dragging ? "dragging" : ""}`} style={{ transform: `translate(${modalPosition.x}px, ${modalPosition.y}px)` }} role="dialog" aria-modal="true" aria-labelledby="send-pool-title">
       <header onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} title="Drag to move">
         <div className="send-pool-heading-icon">{step === "success" ? <Check size={21} /> : <Send size={20} />}</div>
-        <div><span>KPI Config · Bulk action</span><h2 id="send-pool-title">{step === "success" ? "KPIs sent successfully" : "Send KPIs to a Pool"}</h2><p>{step === "success" ? "The selected configurations are now available in the Pool." : `${items.length} KPI ${items.length === 1 ? "Configuration is" : "Configurations are"} ready to send.`}</p></div>
+        <div><span>KPI Config · Bulk action</span><h2 id="send-pool-title">{step === "success" ? "KPIs sent successfully" : "Send KPIs to a Pool"}</h2><p>{step === "success" ? "The selected configurations are included in the target Pool period." : `${items.length} KPI ${items.length === 1 ? "Configuration is" : "Configurations are"} ready to send.`}</p></div>
         <button type="button" className="send-pool-close" onClick={onClose} disabled={pending} aria-label="Close"><X size={19} /></button>
       </header>
 
@@ -121,8 +126,8 @@ export function SendToPoolModal({ configurations, onClose, onAssigned }: {
       {step === "success" && result && <div className="send-pool-success">
         <div className="send-pool-success-mark"><Check size={30} /></div><h3>{result.pool.name}</h3>
         <p>{result.addedCount} KPI Configuration{result.addedCount === 1 ? " was" : "s were"} added{result.alreadyIncludedCount ? `; ${result.alreadyIncludedCount} already existed in this Pool` : ""}.</p>
-        <div><span>{result.pool.code}</span><span>{result.addedCount} new KPIs</span></div>
-        <footer><button type="button" className="button secondary" onClick={onClose}><ArrowLeft size={15} /> Back to KPI Config</button><button type="button" className="button primary" onClick={() => navigate(`/app/pool-kpis/detail/${result.pool.id}`)}>View KPI Pool</button></footer>
+        <div><span>{result.pool.code}</span><span>{result.periodStart} &ndash; {result.periodEnd}</span><span>{result.addedCount} new KPIs</span></div>
+        <footer><button type="button" className="button secondary" onClick={onClose}><ArrowLeft size={15} /> Back to KPI Config</button><button type="button" className="button primary" onClick={() => navigate(`/app/pool-kpis/manage-kpis?poolId=${result.pool.id}&period=${encodeURIComponent(result.periodStart)}&view=included`)}>Manage KPIs</button></footer>
       </div>}
     </section>
   </div>;

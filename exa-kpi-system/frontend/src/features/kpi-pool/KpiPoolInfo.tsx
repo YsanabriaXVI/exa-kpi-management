@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Building2, CalendarDays, CalendarPlus, CalendarRange, Check, CheckCircle2, ChevronDown, Clock3, FileText, Layers3, LockKeyhole, X } from "lucide-react";
+import { AlertTriangle, Building2, CalendarDays, CalendarPlus, CalendarRange, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, FileText, Layers3, LockKeyhole, X } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { kpiPoolService } from "./kpi-pool.service";
 import type { KpiPoolInput } from "./kpi-pool.types";
@@ -34,12 +34,13 @@ export function KpiPoolInfo() {
   const poolId = Number(params.get("poolId")) || undefined;
   const openedFromKpiConfig = params.get("from") === "kpi-config" && !poolId;
   const pendingConfigurationIds = openedFromKpiConfig ? readPendingConfigurationIds() : [];
+  const createdTransferPoolId = useRef<number>();
   const [form, setForm] = useState<KpiPoolInput>(emptyForm);
   const [error, setError] = useState("");
   const [companiesOpen, setCompaniesOpen] = useState(false);
   const [areasOpen, setAreasOpen] = useState(false);
   const [validityOpen, setValidityOpen] = useState(false);
-  const [validityYear, setValidityYear] = useState(2026);
+  const [validityYear, setValidityYear] = useState(() => new Date().getFullYear());
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const [extendValidityOpen, setExtendValidityOpen] = useState(false);
   const [extendThrough, setExtendThrough] = useState("");
@@ -57,12 +58,12 @@ export function KpiPoolInfo() {
     if (poolQuery.data) {
       const { name, companies, companyIds, areaIds, frequency, inputFrequencyId, validFrom, validTo, description } = poolQuery.data;
       setForm({ name, companies, companyIds: companyIds ?? [], poolAreaIds: areaIds ?? [], frequency, inputFrequencyId: inputFrequencyId ?? "", validFrom, validTo, description });
-      const start = new Date(`${validFrom}T00:00:00`);
-      const end = new Date(`${validTo}T00:00:00`);
-      setValidityYear(start.getFullYear());
-      if (start.getFullYear() === end.getFullYear()) {
-        setSelectedMonths(Array.from({ length: end.getMonth() - start.getMonth() + 1 }, (_, index) => start.getMonth() + index));
-      }
+      const start = new Date(`${validFrom}T00:00:00Z`);
+      const end = new Date(`${validTo}T00:00:00Z`);
+      setValidityYear(start.getUTCFullYear());
+      const firstMonth = start.getUTCFullYear() * 12 + start.getUTCMonth();
+      const lastMonth = end.getUTCFullYear() * 12 + end.getUTCMonth();
+      setSelectedMonths(Array.from({ length: lastMonth - firstMonth + 1 }, (_, index) => firstMonth + index));
     }
   }, [poolQuery.data]);
   useEffect(() => {
@@ -89,22 +90,36 @@ export function KpiPoolInfo() {
   useEffect(() => {
     if (!validityOpen || structureLocked) return;
     const revealTimer = window.setTimeout(() => {
-      validityRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      validityRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 120);
     return () => window.clearTimeout(revealTimer);
   }, [validityOpen, structureLocked]);
   const save = useMutation({
     mutationFn: async ({ manage }: { manage: boolean }) => {
-      const pool = await kpiPoolService.save(form, poolId);
-      return { pool, manage };
+      const pool = await kpiPoolService.save(form, poolId ?? createdTransferPoolId.current);
+      if (openedFromKpiConfig) createdTransferPoolId.current = pool.id;
+      let assignedPeriod: string | undefined;
+      if (pendingConfigurationIds.length) {
+        const calendar = await kpiPoolService.getInputPeriods(pool.id);
+        const period = calendar.data.find(item => item.canEditComposition);
+        if (!period) throw new Error("The Pool was saved, but has no editable period for the selected KPI Configurations.");
+        const included = await kpiPoolService.getComposition(pool.id, period.start);
+        const missingIds = pendingConfigurationIds.map(String).filter(id => !included.some(item => item.configurationId === id));
+        if (missingIds.length) await kpiPoolService.addConfigurations(pool.id, missingIds, period.start);
+        assignedPeriod = period.start;
+      }
+      return { pool, manage, assignedPeriod };
     },
     onError: (saveError) => setError(saveError instanceof Error ? saveError.message : "No se pudo guardar el pool."),
-    onSuccess: ({ pool, manage }) => {
-      window.localStorage.removeItem("exa:kpi-config:pool-draft-ids");
+    onSuccess: ({ pool, manage, assignedPeriod }) => {
+      if (openedFromKpiConfig) window.localStorage.removeItem("exa:kpi-config:pool-draft-ids");
       queryClient.invalidateQueries({ queryKey: ["kpi-configurations"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-pools"] });
       queryClient.invalidateQueries({ queryKey: ["kpi-pool", pool.id] });
-      navigate(manage ? `/app/pool-kpis/manage-kpis?poolId=${pool.id}` : `/app/pool-kpis/detail/${pool.id}`);
+      queryClient.invalidateQueries({ queryKey: ["pool-manage-kpis", pool.id] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-pool-composition", pool.id] });
+      queryClient.invalidateQueries({ queryKey: ["kpi-pool-configuration-usage"] });
+      navigate(assignedPeriod ? `/app/pool-kpis/manage-kpis?poolId=${pool.id}&period=${encodeURIComponent(assignedPeriod)}&view=included` : manage ? `/app/pool-kpis/manage-kpis?poolId=${pool.id}` : `/app/pool-kpis/detail/${pool.id}`);
     },
   });
   const extendValidity = useMutation({
@@ -125,23 +140,22 @@ export function KpiPoolInfo() {
   const generatedInputPeriods = deriveInputPeriods(form.validFrom, form.validTo, selectedFrequency?.code);
   const setField = <K extends keyof KpiPoolInput>(key: K, value: KpiPoolInput[K]) => setForm((current) => ({ ...current, [key]: value }));
   const monthsAreConsecutive = selectedMonths.every((month, index) => index === 0 || month === selectedMonths[index - 1] + 1);
-  const syncValidity = (year: number, monthSelection: number[]) => {
+  const selectedYears = [...new Set(selectedMonths.map(month => Math.floor(month / 12)))];
+  const syncValidity = (monthSelection: number[]) => {
     if (structureLocked) return;
     const sorted = [...monthSelection].sort((left, right) => left - right);
-    setValidityYear(year);
+    if (sorted.length && Math.floor(sorted[sorted.length - 1] / 12) - Math.floor(sorted[0] / 12) >= 2) return;
     setSelectedMonths(sorted);
     if (!sorted.length) {
-      setField("validFrom", "");
-      setField("validTo", "");
+      setForm(current => ({ ...current, validFrom: "", validTo: "" }));
       return;
     }
-    const first = sorted[0] + 1;
-    const last = sorted[sorted.length - 1] + 1;
-    const lastDay = new Date(year, last, 0).getDate();
-    setField("validFrom", `${year}-${String(first).padStart(2, "0")}-01`);
-    setField("validTo", `${year}-${String(last).padStart(2, "0")}-${lastDay}`);
+    const first = new Date(Date.UTC(Math.floor(sorted[0] / 12), sorted[0] % 12, 1));
+    const lastMonth = sorted[sorted.length - 1];
+    const last = new Date(Date.UTC(Math.floor(lastMonth / 12), lastMonth % 12 + 1, 0));
+    setForm(current => ({ ...current, validFrom: first.toISOString().slice(0, 10), validTo: last.toISOString().slice(0, 10) }));
   };
-  const toggleMonth = (month: number) => { if (!structureLocked) syncValidity(validityYear, selectedMonths.includes(month) ? selectedMonths.filter((item) => item !== month) : [...selectedMonths, month]); };
+  const toggleMonth = (month: number) => syncValidity(selectedMonths.includes(month) ? selectedMonths.filter(item => item !== month) : [...selectedMonths, month]);
   const toggleCompany = (id: string) => {
     if (structureLocked) return;
     const company = lookupsQuery.data?.companies.find((item) => item.id === id);
@@ -172,7 +186,7 @@ export function KpiPoolInfo() {
     <main className="pool-page pool-info-page">
       <nav className="kpi-breadcrumb" aria-label="Breadcrumb"><Link to="/app/pool-kpis/overview">KPI Pool</Link><span>/</span><Link to="/app/pool-kpis/create-pool-info" aria-current="page">{poolId ? "Edit Pool Info" : "Create Pool Info"}</Link></nav>
       <header className="pool-page-header"><div><h1>{poolId ? "Editing Pool Information" : "Pool Information"}</h1><p>Define the general context, validity and organizational scope of this KPI Pool.</p></div></header>
-      {openedFromKpiConfig && <div className="pool-config-transfer-notice"><CheckCircle2 size={19} /><div><strong>{pendingConfigurationIds.length} KPI Configuration{pendingConfigurationIds.length === 1 ? "" : "s"} pending</strong><span>Pool Info will be saved now. KPI membership remains in the separate Manage KPIs prototype.</span></div></div>}
+      {openedFromKpiConfig && <div className="pool-config-transfer-notice"><CheckCircle2 size={19} /><div><strong>{pendingConfigurationIds.length} KPI Configuration{pendingConfigurationIds.length === 1 ? "" : "s"} pending</strong><span>These KPI Configurations will be included in the first editable Pool period when you save.</span></div></div>}
       <form className="pool-info-card" onSubmit={submit}>
         {structureLocked && <div className="pool-structure-lock-note"><LockKeyhole size={18}/><span><strong>Pool structure is locked.</strong> Only Pool Name and Pool Description can be edited. Validity, frequency, companies, areas and the remaining structural scope cannot change after activation.</span></div>}
         <section className="pool-general-information" aria-labelledby="pool-general-information-title">
@@ -192,7 +206,43 @@ export function KpiPoolInfo() {
         <section className="pool-info-schedule" aria-labelledby="pool-info-schedule-title">
           <div className="pool-form-heading"><span><CalendarRange size={20}/></span><div><h2 id="pool-info-schedule-title">KPI Pool Schedule</h2><p>Input periods are generated automatically from the Pool validity and frequency.</p></div></div>
           <div className={structureLocked ? "pool-schedule-fields pool-structure-fields locked" : "pool-schedule-fields pool-structure-fields"}>
-            <div className="pool-schedule-validity-control"><div className="pool-field validity-field validity-popover" ref={validityRef}><span><CalendarDays size={15} /> Validity *</span><button type="button" className={`validity-trigger ${validityOpen ? "open" : ""}`} onClick={() => setValidityOpen((open) => !open)}><span className="validity-trigger-content">{structureLocked ? <strong className="locked-validity-range">{formatMonthYear(form.validFrom)} – {formatMonthYear(form.validTo)}</strong> : selectedMonths.length ? <><span className="validity-year-chip">{validityYear}</span>{selectedMonths.map((month) => <span className="company-chip" key={month}>{months[month]}<span className="chip-remove" role="button" tabIndex={0} aria-label={`Remove ${months[month]}`} onClick={(event) => { event.stopPropagation(); toggleMonth(month); }}><X size={12} /></span></span>)}</> : <span className="trigger-placeholder">Select year and consecutive months...</span>}</span><ChevronDown size={16} /></button>{validityOpen && !structureLocked && <div className="validity-panel"><div className="validity-selector"><div className="validity-panel-header"><label>Year<input type="number" min="2020" max="2100" value={validityYear} onChange={(event) => syncValidity(Number(event.target.value), selectedMonths)} /></label><label className="validity-select-all"><input type="checkbox" checked={selectedMonths.length === months.length} onChange={(event) => syncValidity(validityYear, event.target.checked ? months.map((_, index) => index) : [])} /><span>{selectedMonths.length === months.length && <Check size={12} />}</span>Select all months</label></div><div className="month-checkbox-grid">{months.map((month, index) => <label className={selectedMonths.includes(index) ? "selected" : ""} key={month}><input type="checkbox" checked={selectedMonths.includes(index)} onChange={() => toggleMonth(index)} /><span className="month-check">{selectedMonths.includes(index) && <Check size={12} />}</span>{month}</label>)}</div></div><div className={`validity-warning ${selectedMonths.length && !monthsAreConsecutive ? "error" : ""}`}><AlertTriangle size={15} /><span>{selectedMonths.length && !monthsAreConsecutive ? "The selected months are not consecutive. Adjust the selection before saving." : "You must select one or more consecutive months within the same year."}</span></div></div>}</div>{structureLocked && poolStatus === "ACTIVE" && <button type="button" className="button secondary extend-validity-button" disabled={!extensionOptions.length} onClick={() => { setExtendThrough(extensionOptions[0]?.value ?? ""); setExtendValidityOpen(true); }}><CalendarPlus size={16}/> Extend Validity</button>}</div>
+            <div className="pool-schedule-validity-control">
+              <div className="pool-field validity-field validity-popover" ref={validityRef}>
+                <span><CalendarDays size={15} /> Validity *</span>
+                <div className={"validity-trigger " + (validityOpen ? "open" : "")} onClick={() => { if (!structureLocked) setValidityOpen(open => !open); }}>
+                  <span className="validity-trigger-content validity-selected-years">
+                    {structureLocked ? <strong className="locked-validity-range">{formatMonthYear(form.validFrom)} &ndash; {formatMonthYear(form.validTo)}</strong>
+                      : selectedYears.length ? selectedYears.map(year => <span className="validity-selected-year" key={year}>
+                        <span className="validity-year-chip">{year}</span>
+                        <span className="validity-selected-months">{selectedMonths.filter(month => Math.floor(month / 12) === year).map(month => <span className="company-chip" key={month}>{months[month % 12]}<button type="button" className="validity-badge-remove" aria-label={"Remove " + months[month % 12] + " " + year} onClick={event => { event.stopPropagation(); toggleMonth(month); }}><X size={12}/></button></span>)}</span>
+                      </span>) : <span className="trigger-placeholder">Select consecutive months across up to two years...</span>}
+                  </span><button type="button" className="validity-toggle" aria-label="Select validity months" aria-expanded={validityOpen} disabled={structureLocked}><ChevronDown size={16} /></button>
+                </div>
+                {validityOpen && !structureLocked && <div className="validity-panel">
+                  <div className="validity-year-navigation">
+                    <button type="button" aria-label="Previous year" disabled={validityYear <= 2020} onClick={() => setValidityYear(year => year - 1)}><ChevronLeft size={18}/></button>
+                    <strong aria-live="polite">{validityYear} &ndash; {validityYear + 1}</strong>
+                    <button type="button" aria-label="Next year" disabled={validityYear >= 2099} onClick={() => setValidityYear(year => year + 1)}><ChevronRight size={18}/></button>
+                  </div>
+                  <div className="validity-selection-summary"><span aria-live="polite">{selectedYears.length} / 2 years &middot; {selectedMonths.length} months selected</span><button type="button" disabled={!selectedMonths.length} onClick={() => syncValidity([])}>Clear selection</button></div>
+                  <div className="validity-calendar-years">{[validityYear, validityYear + 1].map(year => {
+                    const yearMonths = months.map((_, index) => year * 12 + index);
+                    const allSelected = yearMonths.every(month => selectedMonths.includes(month));
+                    const yearAllowed = !selectedYears.length || Math.max(year, ...selectedYears) - Math.min(year, ...selectedYears) < 2;
+                    return <section className="validity-calendar-year" key={year} aria-label={"Months of " + year}>
+                      <div className="validity-panel-header"><span className="validity-year-chip">{year}</span><label className="validity-select-all"><input type="checkbox" checked={allSelected} disabled={!yearAllowed} onChange={event => syncValidity(event.target.checked ? [...new Set([...selectedMonths, ...yearMonths])] : selectedMonths.filter(month => Math.floor(month / 12) !== year))}/><span>{allSelected && <Check size={12}/>}</span>Select all months</label></div>
+                      <div className="month-checkbox-grid">{months.map((month, index) => {
+                        const monthId = year * 12 + index;
+                        const checked = selectedMonths.includes(monthId);
+                        return <label className={checked ? "selected" : ""} key={month}><input type="checkbox" aria-label={month + " " + year} checked={checked} disabled={!yearAllowed} onChange={() => toggleMonth(monthId)}/><span className="month-check">{checked && <Check size={12}/>}</span>{month}</label>;
+                      })}</div>
+                    </section>;
+                  })}</div>
+                  <div className={"validity-warning " + (selectedMonths.length && !monthsAreConsecutive ? "error" : "")}><AlertTriangle size={15}/><span>{selectedMonths.length && !monthsAreConsecutive ? "The selected months are not consecutive. Adjust the selection before saving." : "Select consecutive months across one or two adjacent years. Use the arrows to change years."}</span></div>
+                </div>}
+              </div>
+              {structureLocked && poolStatus === "ACTIVE" && <button type="button" className="button secondary extend-validity-button" disabled={!extensionOptions.length} onClick={() => { setExtendThrough(extensionOptions[0]?.value ?? ""); setExtendValidityOpen(true); }}><CalendarPlus size={16}/> Extend Validity</button>}
+            </div>
             <label className="pool-field"><span><Clock3 size={15} /> Input Frequency *</span><span className="pool-schedule-frequency-select"><select disabled={structureLocked} value={form.inputFrequencyId} onChange={(event) => { const selected = lookupsQuery.data?.inputFrequencies.find((item) => item.id === event.target.value); setForm((current) => ({ ...current, inputFrequencyId: event.target.value, frequency: selected?.name ?? "" })); }}><option value="">Select frequency...</option>{lookupsQuery.data?.inputFrequencies.map((frequency) => <option key={frequency.id} value={frequency.id}>{formatInputFrequencyOption(frequency.code)}</option>)}</select><ChevronDown size={16} aria-hidden="true"/></span></label>
             <label className="pool-field"><span><CalendarRange size={15}/> Generated Input Periods</span><input readOnly tabIndex={-1} value={generatedInputPeriods.length} aria-label="Generated Input Periods"/></label>
           </div>
@@ -244,7 +294,7 @@ function buildValidityExtensionOptions(validFrom: string, validTo: string, month
   if (!validFrom || !validTo) return [];
   const start = new Date(`${validFrom}T00:00:00.000Z`);
   const currentEnd = new Date(`${validTo}T00:00:00.000Z`);
-  const maximumEnd = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 12, 0));
+  const maximumEnd = new Date(Date.UTC(start.getUTCFullYear() + 2, 0, 0));
   const options: Array<{ value: string; label: string }> = [];
   let nextEnd = new Date(Date.UTC(currentEnd.getUTCFullYear(), currentEnd.getUTCMonth() + monthsPerPeriod + 1, 0));
   while (nextEnd <= maximumEnd) {

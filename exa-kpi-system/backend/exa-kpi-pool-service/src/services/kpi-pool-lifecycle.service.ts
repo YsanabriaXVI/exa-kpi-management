@@ -19,7 +19,7 @@ async function evaluate(poolId: bigint) {
     { code: "POOL_FREQUENCY_ACTIVE", passed: false, message: "Pool input frequency must be active" },
     { code: "POOL_KPIS_PRESENT", passed: initialKpis.length >= 1, message: "At least one KPI Configuration must be effective in the initial period" },
     { code: "KPI_CONFIGURATIONS_ELIGIBLE", passed: false, message: "All KPI Configurations and Definitions must remain active and frequency-compatible" },
-    { code: "KPI_DEFINITIONS_UNIQUE", passed: new Set(initialKpis.map((value) => value.kpiDefinitionExternalId.toString())).size === initialKpis.length, message: "KPI Definitions must be unique in the initial period" },
+    { code: "KPI_CONFIGURATIONS_UNIQUE", passed: new Set(initialKpis.map((value) => value.kpiConfigurationExternalId.toString())).size === initialKpis.length, message: "KPI Configurations must be unique in the initial period" },
   ];
   const frequency = await prisma.inputFrequencyReference.findFirst({ where: { externalInputFrequencyId: pool.inputFrequencyExternalId, isActive: true } });
   checks.find((check) => check.code === "POOL_FREQUENCY_ACTIVE")!.passed = Boolean(frequency);
@@ -64,6 +64,19 @@ export const kpiPoolLifecycleService = {
     return prisma.$transaction(async (tx) => {
       const updated = await tx.kpiPool.updateMany({ where: { id: poolId, statusCode: "ACTIVE", deletedAt: null }, data: { statusCode: "INACTIVE", aggregateVersion: { increment: 1 }, updatedAt: new Date(), updatedByUserId: actor } });
       if (!updated.count) throw new AppError(409, "KPI_POOL_STATUS_CONFLICT", "KPI Pool is no longer ACTIVE");
+      const eventId = randomUUID();
+      const payload = envelope(eventId, "kpi.pool.deactivated.v1", pool);
+      await tx.outboxEvent.create({ data: { eventId, eventType: payload.eventType, aggregateType: "kpi_pool", aggregateId: poolId.toString(), aggregateVersion: payload.version, subject: payload.eventType, payload, occurredAt: new Date(payload.occurredAt) } });
+      return { id: poolId.toString(), status: "INACTIVE", eventId };
+    });
+  },
+  async remove(poolId: bigint, actor: bigint) {
+    const pool = await prisma.kpiPool.findFirst({ where: { id: poolId, deletedAt: null } });
+    if (!pool) throw new AppError(404, "KPI_POOL_NOT_FOUND", "KPI Pool was not found");
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.kpiPool.updateMany({ where: { id: poolId, deletedAt: null }, data: { deletedAt: new Date(), statusCode: "INACTIVE", aggregateVersion: { increment: 1 }, updatedAt: new Date(), updatedByUserId: actor } });
+      if (!updated.count) throw new AppError(409, "KPI_POOL_STATUS_CONFLICT", "KPI Pool was already removed");
       const eventId = randomUUID();
       const payload = envelope(eventId, "kpi.pool.deactivated.v1", pool);
       await tx.outboxEvent.create({ data: { eventId, eventType: payload.eventType, aggregateType: "kpi_pool", aggregateId: poolId.toString(), aggregateVersion: payload.version, subject: payload.eventType, payload, occurredAt: new Date(payload.occurredAt) } });

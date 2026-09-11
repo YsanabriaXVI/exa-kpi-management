@@ -1,11 +1,14 @@
 type RecordWithRelations = any;
+export const configurationDisplayName = (record: any, revision = record.revisions?.[0]) => revision?.scoringRuleConfig?.configurationMetadata?.name || record.definition.kpiName;
 export function toKpiConfigurationDto(record: RecordWithRelations) {
   const revision = record.revisions?.[0];
   const byLevel = (code: string) => revision?.thresholds?.find((item: any) => item.trafficLightLevel.code === code);
   const red = byLevel("RED"), yellow = byLevel("YELLOW"), green = byLevel("GREEN");
   return {
     id: Number(record.id), code: record.configCode, definitionId: Number(record.definition.id),
-    definitionCode: record.definition.kpiCode, definitionName: record.definition.kpiName,
+    definitionCode: record.definition.kpiCode, definitionName: configurationDisplayName(record),
+    configurationName: revision?.scoringRuleConfig?.configurationMetadata?.name ?? null,
+    classification: revision?.scoringRuleConfig?.configurationMetadata?.classification ?? null,
     goal: revision ? Number(revision.targetValue ?? 0) : 0,
     inputFrequencyCode: record.inputFrequency?.code ?? "MONTHLY",
     inputFrequencyName: record.inputFrequency?.name ?? "Monthly",

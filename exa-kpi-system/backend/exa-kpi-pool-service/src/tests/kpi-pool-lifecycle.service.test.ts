@@ -47,3 +47,17 @@ describe("KPI Pool lifecycle", () => {
     expect(result.status).toBe("INACTIVE");
   });
 });
+
+describe("Pool soft deletion", () => {
+  it.each(["DRAFT", "ACTIVE", "INACTIVE"])("removes a %s Pool without deleting its history", async statusCode => {
+    db.kpiPool.findFirst.mockResolvedValue({ ...pool, statusCode });
+    await kpiPoolLifecycleService.remove(17n, 9n);
+    expect(tx.kpiPool.updateMany).toHaveBeenCalledWith({ where: { id: 17n, deletedAt: null }, data: expect.objectContaining({ deletedAt: expect.any(Date), statusCode: "INACTIVE", updatedByUserId: 9n }) });
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith({ data: expect.objectContaining({ eventType: "kpi.pool.deactivated.v1" }) });
+  });
+  it("does not emit an event when the Pool was already removed", async () => {
+    tx.kpiPool.updateMany.mockResolvedValue({ count: 0 });
+    await expect(kpiPoolLifecycleService.remove(17n, 9n)).rejects.toMatchObject({ code: "KPI_POOL_STATUS_CONFLICT" });
+    expect(tx.outboxEvent.create).not.toHaveBeenCalled();
+  });
+});

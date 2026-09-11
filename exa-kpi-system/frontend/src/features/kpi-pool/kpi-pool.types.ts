@@ -24,6 +24,8 @@ export type PoolListParams = {
 };
 
 export type PoolKpi = {
+  sourceDefinitionName?: string;
+  subjectLabel?: string;
   configurationId?: string;
   definitionId: string;
   configCode: string;

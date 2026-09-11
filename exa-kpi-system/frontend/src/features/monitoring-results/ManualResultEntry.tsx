@@ -1,3 +1,4 @@
+import { usePeriodLabel } from "./use-period-label";
 import { ClosedPeriodAudit } from "./ClosedPeriodAudit";
 import { HistoricalBaseline } from "./HistoricalBaseline";
 import { PeriodWorkflow, type WorkflowAction } from "./PeriodWorkflow";
@@ -15,6 +16,7 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
   const client = useQueryClient();
   const query = useQuery({ queryKey: ["monitoring-result-entry", periodId], queryFn: () => manualResultEntryService.get(periodId), retry: false, refetchOnWindowFocus: false });
   const [loaded, setLoaded] = useState<ManualEntryResponse | null>(null);
+  const periodLabel = usePeriodLabel(loaded?.monitoringPeriod);
   const [values, setValues] = useState<Record<string, string>>({});
   const [contributorValues, setContributorValues] = useState<Record<string, ContributorValue[]>>({});
   const [divisionValues, setDivisionValues] = useState<Record<string, DivisionValues>>({});
@@ -92,7 +94,7 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
     finally { setBusy(false); }
   }
   if (!loaded) return <main className="monitor-page result-entry-page"><h1>Result Entry</h1>{query.isError ? <p role="alert">{(query.error as Error).message} <button onClick={() => query.refetch()}>Retry</button></p> : <p>Loading frozen evaluations…</p>}</main>;
-  const period = loaded.monitoringPeriod;
+  const period = { ...loaded.monitoringPeriod, periodLabel };
   const readOnly = period.status !== "DRAFT" || (period.selectedEntryMethod !== null && period.selectedEntryMethod !== "MANUAL");
   const selected = period.selectedEntryMethod === "MANUAL";
   const current = loaded.check?.status === "CURRENT" && !dirty;
@@ -137,7 +139,7 @@ export function ManualResultEntry({ periodId }: { periodId: string }) {
       {current && !!loaded.check?.summary?.blocking && <p className="monitoring-score-blocked">Scoring is blocked by {loaded.check.summary.blocking} findings. Open Check Results to review the reasons.</p>}
       </div>
       {step === 2 && <CheckResultsReview report={loaded.check} dirty={dirty} busy={checking} readOnly={readOnly} selected={selected&&!busy} onCheck={checkResults}/>}
-      {step >= 3 && <><h2>{steps[step - 1]}</h2><p>{loaded.summary.entered} / {loaded.summary.expected} Results entered · Check: {loaded.check?.status ?? "NOT_CHECKED"}</p><div className="wizard-scorecards">{loaded.check?.scorecards.map(card => <article className="check-scorecard" key={card.id}><strong>{card.name}</strong><p>{card.score === null ? "Score unavailable" : `${Number(card.score).toFixed(2)}%`} · {card.scoreStatus}</p></article>)}</div><PeriodWorkflow data={loaded} disabled={busy || dirty} onAction={workflow}/></>}
+      {step >= 3 && <><h2>{steps[step - 1]}</h2><p>{loaded.summary.entered} / {loaded.summary.expected} Results entered · Check: {loaded.check?.status ?? "NOT_CHECKED"}</p><div className="wizard-scorecards">{loaded.check?.scorecards.map(card => <article className="check-scorecard" key={card.id}><strong>{card.name}</strong><p>{card.score === null ? "Score unavailable" : `${Number(card.score).toFixed(2)}%`} · {card.scoreStatus}</p></article>)}</div><PeriodWorkflow data={{ ...loaded, monitoringPeriod: period }} disabled={busy || dirty} onAction={workflow}/></>}
       {period.status === "CLOSED" && <ClosedPeriodAudit periodId={periodId}/>}
       {step === 5 && period.status === "CLOSED" && <NextPeriod periodId={periodId}/>}
       {error && <div role="alert"><p>{error}</p><button disabled={busy} onClick={async () => { if (dirty && !window.confirm("Discard unsaved Results and reload persisted values?")) return; const response = await query.refetch(); if (response.data) {accept(response.data);setError("");} }}>Reload saved Results</button></div>}

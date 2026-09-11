@@ -1,3 +1,4 @@
+import { usePeriodLabels } from "./use-period-label";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -355,7 +356,8 @@ export function MonitoringOverview() {
   const apiStatuses=statuses.flatMap((value)=>value==="ACTIVE"||value==="CONTINUE_ENTRY"?["DRAFT"]:value==="VALIDATED_WITH_WARNINGS"?["VALIDATED"]:[value]);
   const overviewQuery=useQuery({queryKey:["monitoring-overview",page,pageSize,search,companiesSelected,frequencies,periodYear,periodMonths,apiStatuses],queryFn:()=>monitoringReadService.overview({page,pageSize,search:search.trim()||undefined,company:companiesSelected,frequency:frequencies,status:apiStatuses,year:periodYear,month:periodMonths.map((month)=>String(month+1)),sortBy:"periodStart",sortOrder:"desc"}),retry:false});
   const companies=overviewQuery.data?.facets?.companies??[];
-  const paginatedPools:MonitoringPool[]=(overviewQuery.data?.items??[]).map((item)=>({id:Number(item.poolId),monitoringPeriodId:item.id,scorecards:item.scorecards,trafficLights:item.trafficLights,code:item.poolCode,name:item.poolName,companies:item.companies.map((company)=>company.name),duration:`${item.periodStart} - ${item.periodEnd}`,frequency:item.frequency??"Not available",currentPeriod:item.periodLabel,generatedInputs:1,closedInputs:item.status==="CLOSED"?1:0,kpiLines:item.expected,resultsEntered:item.entered,missing:item.pending,status:item.status==="DRAFT"?(item.entered?"CONTINUE_ENTRY":"ACTIVE"):item.status==="VALIDATED"&&item.validationStatus==="WITH_WARNINGS"?"VALIDATED_WITH_WARNINGS":item.status as MonitoringStatus} as MonitoringPool & {monitoringPeriodId:string}));
+  const displayPeriodLabel = usePeriodLabels(overviewQuery.data?.items ?? []);
+  const paginatedPools:MonitoringPool[]=(overviewQuery.data?.items??[]).map((item)=>({id:Number(item.poolId),monitoringPeriodId:item.id,scorecards:item.scorecards,trafficLights:item.trafficLights,code:item.poolCode,name:item.poolName,companies:item.companies.map((company)=>company.name),duration:`${item.periodStart} - ${item.periodEnd}`,frequency:item.frequency??"Not available",currentPeriod:displayPeriodLabel(item),generatedInputs:1,closedInputs:item.status==="CLOSED"?1:0,kpiLines:item.expected,resultsEntered:item.entered,missing:item.pending,status:item.status==="DRAFT"?(item.entered?"CONTINUE_ENTRY":"ACTIVE"):item.status==="VALIDATED"&&item.validationStatus==="WITH_WARNINGS"?"VALIDATED_WITH_WARNINGS":item.status as MonitoringStatus} as MonitoringPool & {monitoringPeriodId:string}));
   const filtered=paginatedPools;
   const totalPages=Math.max(1,overviewQuery.data?.meta.totalPages??1);const currentPage=Math.min(page,totalPages);const firstVisibleIndex=(currentPage-1)*pageSize;
   useEffect(

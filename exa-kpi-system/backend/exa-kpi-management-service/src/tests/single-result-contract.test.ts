@@ -16,3 +16,19 @@ describe("Single result configuration contract",()=>{
     expect(kpiConfigurationBodySchema.safeParse({...input,scoringRuleConfig:{...input.scoringRuleConfig,bands:bands.slice(0,3)}}).success).toBe(false);
   });
 });
+
+it("accepts exact points with gaps and rejects implicit ranges or misplaced tails",()=>{
+ const bands=[{minResult:0,maxResult:0,compliance:100},{minResult:1,maxResult:1,compliance:65},{minResult:2,maxResult:null,compliance:0}];
+ const input={...base,goal:0,evaluationTypeCode:"ZERO_IS_BETTER",scoringMethod:"RESULT_BANDS",scoringRuleConfig:{...base.scoringRuleConfig,bandMode:"EXACT_POINTS",bands}};
+ expect(kpiConfigurationBodySchema.safeParse(input).success).toBe(true);
+ for(const invalid of [[{...bands[0],maxResult:0.5},...bands.slice(1)],[bands[0],bands[2],bands[1]],[bands[0],bands[0]], [{minResult:-2,maxResult:null,compliance:100}]]) {
+   expect(kpiConfigurationBodySchema.safeParse({...input,scoringRuleConfig:{...input.scoringRuleConfig,bands:invalid}}).success).toBe(false);
+ }
+});
+
+it("allows an explicit first N or lower row",()=>{
+ const bands=[{minResult:null,maxResult:0,compliance:100},{minResult:1,maxResult:1,compliance:65},{minResult:2,maxResult:null,compliance:0}];
+ const input={...base,goal:0,evaluationTypeCode:"ZERO_IS_BETTER",negativeResultPolicy:"ALLOW",scoringMethod:"RESULT_BANDS",scoringRuleConfig:{...base.scoringRuleConfig,bandMode:"EXACT_POINTS",bands}};
+ expect(kpiConfigurationBodySchema.safeParse(input).success).toBe(true);
+ expect(kpiConfigurationBodySchema.safeParse({...input,scoringRuleConfig:{...input.scoringRuleConfig,bands:[bands[1],bands[0],bands[2]]}}).success).toBe(false);
+});

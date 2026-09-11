@@ -1,3 +1,4 @@
+import { periodDisplay } from "../monitoring-results/period-display";
 export type DerivedInputPeriod = { start: string; end: string; label: string };
 
 const frequencyMonthsByCode: Record<string, number> = {
@@ -50,9 +51,9 @@ export function deriveInputPeriods(validFrom: string, validTo: string, frequency
   for (let start = first; start <= last; start = addUtcMonths(start, monthsPerPeriod)) {
     const calculatedEnd = previousUtcDay(addUtcMonths(start, monthsPerPeriod));
     const end = calculatedEnd > last ? last : calculatedEnd;
-    periods.push({ start: toDateValue(start), end: toDateValue(end), label: formatInputPeriod(start, end) });
+    periods.push({ start: toDateValue(start), end: toDateValue(end), label: "" });
   }
-  return periods;
+  return periods.map(period => ({ ...period, label: periodDisplay(period, periods, monthsPerPeriod).label }));
 }
 
 export function formatScheduleValidity(validFrom: string, validTo: string) {
@@ -60,12 +61,6 @@ export function formatScheduleValidity(validFrom: string, validTo: string) {
   const end = parseDate(validTo);
   if (!start || !end) return "Select a validity period";
   return `${formatMonth(start)} – ${formatMonth(end)}`;
-}
-
-function formatInputPeriod(start: Date, end: Date) {
-  return start.getUTCFullYear() === end.getUTCFullYear() && start.getUTCMonth() === end.getUTCMonth()
-    ? formatMonth(start)
-    : `${formatMonth(start)} – ${formatMonth(end)}`;
 }
 
 function formatMonth(value: Date) {

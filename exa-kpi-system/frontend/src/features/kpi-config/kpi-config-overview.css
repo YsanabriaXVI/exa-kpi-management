@@ -428,3 +428,63 @@ html[data-theme="dark"] .overview-goal-value strong,html[data-theme="dark"] .ove
 .overview-group-goal { margin: 12px 0; padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #77aec2; border-radius: 9px; background: var(--ems-surface); }
 .overview-group-goal span { color: var(--ems-muted); font-size: 12px; font-weight: 700; }
 .overview-group-goal strong { color: var(--ems-text); font-size: 15px; }
+.overview-goal-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.overview-goal-value > strong {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.overview-goal-value > small {
+  font-size: 14px;
+}
+
+.kpi-config-page .overview-goal-value > strong,
+.kpi-config-page .overview-goal-value > small {
+  color: #000;
+}
+
+.kpi-config-page .config-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.kpi-config-page .config-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.kpi-config-page .config-table-scroll .config-table {
+  width: 100%;
+  min-width: 1600px;
+  table-layout: auto;
+}
+
+.kpi-config-page .config-table th:nth-child(7),
+.kpi-config-page .config-table td:nth-child(7) {
+  min-width: 280px;
+  padding-inline: 20px;
+}
+
+.kpi-config-page .config-table th:nth-child(8),
+.kpi-config-page .config-table td:nth-child(8) {
+  min-width: 95px;
+  white-space: nowrap;
+}
+.kpi-config-page .config-table th:nth-child(5),
+.kpi-config-page .config-table td:nth-child(5) {
+  padding-left: 3px;
+  padding-right: 19px;
+}
+.config-overview-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}

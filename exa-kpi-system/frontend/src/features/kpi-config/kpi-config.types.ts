@@ -24,10 +24,12 @@ export type TrafficLightRanges = {
 };
 
 export type KpiConfigRecord = {
+  configurationName?: string | null;
+  classification?: {subjectType:string;subjectExternalId:string;subjectCode?:string;subjectLabel:string} | null;
   evaluationTypeCode?: string | null;
   resultSemantics?: string | null;
   scoringMethod?: string | null;
-  scoringRuleConfig?: { model?: string; editorMode?: string; bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "INTERVALS"; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult: number | null; maxResult?: number | null; compliance: number; includesMin?: boolean; includesMax?: boolean }> } | null;
+  scoringRuleConfig?: { model?: string; editorMode?: string; bandMode?: "STEP_POINTS" | "LINEAR_POINTS" | "EXACT_POINTS" | "INTERVALS"; floorPercent?: number; capPercent?: number; bands?: Array<{ minResult: number | null; maxResult?: number | null; compliance: number; includesMin?: boolean; includesMax?: boolean }> } | null;
   negativeResultPolicy?: string | null;
   id: number;
   code: string;
@@ -72,6 +74,8 @@ export type KpiConfigRecord = {
 };
 
 export type KpiConfigInput = {
+  configurationName?: string;
+  classification?: {subjectType:string;subjectExternalId:string;subjectCode?:string;subjectLabel:string};
   scoringMethod?: string;
   scoringRuleConfig?: Record<string, unknown>;
   scoringRuleConfigVersion?: number;

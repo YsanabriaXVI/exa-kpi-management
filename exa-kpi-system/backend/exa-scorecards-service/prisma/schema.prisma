@@ -87,7 +87,6 @@ model PoolPeriodMembershipReference {
 
   @@unique([poolPeriodReferenceId, poolMembershipExternalId], map: "uq_pool_period_membership_reference")
   @@unique([poolPeriodReferenceId, kpiConfigurationExternalId], map: "uq_pool_period_configuration_reference")
-  @@unique([poolPeriodReferenceId, kpiDefinitionExternalId], map: "uq_pool_period_definition_reference")
   @@index([kpiConfigurationExternalId], map: "ix_pool_period_membership_configuration")
   @@map("pool_period_membership_references")
 }
@@ -262,7 +261,6 @@ model ScorecardPeriodKpi {
   composition                  ScorecardPeriodComposition @relation(fields: [scorecardPeriodCompositionId], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "fk_scorecard_period_kpis_composition")
 
   @@unique([scorecardPeriodCompositionId, kpiConfigurationExternalId], map: "uq_scorecard_period_kpi")
-  @@unique([scorecardPeriodCompositionId, kpiDefinitionExternalId], map: "uq_scorecard_period_kpi_definition")
   @@unique([scorecardPeriodCompositionId, displayOrder], map: "uq_scorecard_period_kpi_order")
   @@unique([kpiPoolExternalId, periodKey, kpiConfigurationExternalId], map: "uq_pool_period_kpi_assignment")
   @@index([kpiPoolMembershipExternalId], map: "ix_scorecard_pool_membership_external")

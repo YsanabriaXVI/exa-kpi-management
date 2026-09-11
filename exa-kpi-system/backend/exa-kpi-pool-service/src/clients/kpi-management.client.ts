@@ -7,6 +7,7 @@ import { AppError } from "../utils/app-error.js";
 
 const configurationSchema = z.object({
   id: z.string(), configCode: z.string(), definitionId: z.string(), definitionCode: z.string(), definitionName: z.string(),
+  configurationName: z.string().optional(), sourceDefinitionName: z.string().optional(), classification: z.object({ subjectType: z.string(), subjectExternalId: z.string(), subjectCode: z.string().optional(), subjectLabel: z.string() }).nullable().optional(),
   definitionIsActive: z.boolean(), inputFrequencyId: z.string(), inputFrequencyCode: z.string(), inputFrequencyName: z.string(),
   inputFrequencyIsActive: z.boolean(), status: z.string(), isActive: z.boolean(),
   categoryName: z.string().optional(), measurementUnit: z.string().optional(), dataSource: z.string().optional(), goal: z.string().nullable().optional(),

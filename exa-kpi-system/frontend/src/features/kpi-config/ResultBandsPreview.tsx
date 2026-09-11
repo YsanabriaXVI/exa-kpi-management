@@ -1,7 +1,7 @@
 import { validResultBands, type ResultBand } from "./result-bands";
 import type { TrafficLightRanges } from "./kpi-config.types";
 
-export function ResultBandsPreview({ bands, ranges, complete, pointMode, unit, compact = false, complianceLevels = false }: { bands: ResultBand[]; ranges?: TrafficLightRanges; complete: boolean; unit?: string; pointMode?: "STEP_POINTS" | "LINEAR_POINTS"; compact?: boolean; complianceLevels?: boolean }) {
+export function ResultBandsPreview({ bands, ranges, complete, pointMode, unit, compact = false, exactPoints = false }: { bands: ResultBand[]; ranges?: TrafficLightRanges; complete: boolean; unit?: string; pointMode?: "STEP_POINTS" | "LINEAR_POINTS"; compact?: boolean; exactPoints?: boolean }) {
   const valid = complete && validResultBands(bands);
   const levels = ranges ? [
     { name: "Rojo", color: "red", min: ranges.redFrom, max: ranges.redTo },
@@ -14,7 +14,7 @@ export function ResultBandsPreview({ bands, ranges, complete, pointMode, unit, c
   }) : [...bands].sort((a, b) => (a.minResult ?? -Infinity) - (b.minResult ?? -Infinity));
   const rangeLabel = (band: ResultBand) => {
     if (band.minResult == null && band.maxResult == null) return "Cualquier resultado";
-    if (complianceLevels) return band.maxResult == null ? band.includesMin ? `${band.minResult} en adelante` : `Más de ${band.minResult}` : band.minResult === band.maxResult ? String(band.maxResult) : band.includesMax === false ? `Antes de ${band.maxResult}` : `Hasta ${band.maxResult}`;
+    if (exactPoints) return band.minResult == null ? `${band.maxResult} o menos` : band.maxResult == null ? `${band.minResult}+` : String(band.minResult);
     if (band.minResult == null) return `${band.includesMax === false ? "<" : "\u2264"} ${band.maxResult}`;
     if (band.maxResult == null) return `${band.includesMin === false ? ">" : "\u2265"} ${band.minResult}`;
     if (pointMode && band.maxResult !== undefined) return String(band.minResult);

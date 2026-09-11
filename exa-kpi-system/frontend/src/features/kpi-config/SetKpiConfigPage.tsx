@@ -144,6 +144,8 @@ export function SetKpiConfigPage() {
     return stored || null;
   });
   const [goal, setGoal] = useState("");
+  const [configurationName,setConfigurationName] = useState("");
+  const [customConfigurationName,setCustomConfigurationName] = useState(false);
   const [showGoalErrors, setShowGoalErrors] = useState(false);
   const [periodScope, setPeriodScope] = useState<PeriodScope>("CURRENT_PERIOD");
   const [inputFrequencyCode, setInputFrequencyCode] = useState("");
@@ -181,6 +183,7 @@ export function SetKpiConfigPage() {
   const [groupGoal, setGroupGoal] = useState<GroupGoal | null>(null);
   const [applyDefaultToAll, setApplyDefaultToAll] = useState(false);
   const [measurementUnit, setMeasurementUnit] = useState("");
+  const measurementUnitChosenRef = useRef(false);
   const [dataSource, setDataSource] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [ranges, setRanges] = useState(defaultRanges);
@@ -339,6 +342,7 @@ export function SetKpiConfigPage() {
       return next;
     });
   const affectedPools = globalImpactQuery.data ?? [];
+  const unassignedConfiguration = globalImpactQuery.isSuccess && affectedPools.length === 0;
   const hasAffectedPools = affectedPools.some(({ periods }) =>
     periods.some(
       (period) =>
@@ -397,6 +401,8 @@ export function SetKpiConfigPage() {
     setSelected(definition);
     setSearchTerm(`${definition.code} — ${definition.name}`);
     setGoal(String(config.goal));
+    setConfigurationName(config.configurationName ?? "");
+    setCustomConfigurationName(Boolean(config.configurationName));
     setPeriodScope(config.periodScope ?? "CURRENT_PERIOD");
     setInputFrequencyCode(config.inputFrequencyCode ?? "MONTHLY");
     setEntityEvaluationMode(config.entityEvaluationMode ?? "INDIVIDUAL");
@@ -500,7 +506,7 @@ export function SetKpiConfigPage() {
       USD: ["USD"],
       "USD/KM": ["USD/KM"],
     };
-    if (!measurementUnit && analysis.resultUnitHint && lookupsQuery.data) {
+    if (!measurementUnitChosenRef.current && !measurementUnit && analysis.resultUnitHint && lookupsQuery.data) {
       const aliases = unitAliases[analysis.resultUnitHint.toUpperCase()] ?? [
         analysis.resultUnitHint,
       ];
@@ -768,6 +774,7 @@ export function SetKpiConfigPage() {
 
   const baseConfigPayload = () => ({
     definitionId: selected!.id,
+    configurationName: customConfigurationName ? configurationName.trim() : "",
     goal: Number(goal || 0),
     measurementUnit: individual ? (periodScope === "CURRENT_PERIOD" ? subjectGoals[0]?.goalUnit : subjectGoals[0]?.resultUnit) ?? "" : measurementUnit,
     dataSource,
@@ -818,8 +825,9 @@ export function SetKpiConfigPage() {
     setGoalUnit("%");
     setSubjectGoals(subjectGoals.map(row => ({ ...row, resultUnit: "%", goalUnit: "%" })));
   };
-  const monitoringProfile = useMonitoringProfile(selected ? baseConfigPayload() : null, editConfigQuery.data, {
+  const monitoringProfile = useMonitoringProfile(selected ? {...baseConfigPayload(), goal: isValidGoalNumber(goal) ? Number(goal) : NaN} : null, editConfigQuery.data, {
     ranges,
+    showErrors: showGoalErrors,
     evaluationScope,
     onZeroTarget: () => {
       setPeriodScope("CURRENT_PERIOD");
@@ -841,7 +849,7 @@ export function SetKpiConfigPage() {
   const configPayload = () => ({ ...baseConfigPayload(), ...monitoringProfile.fields });
   const saveMutation = useMutation({
     mutationFn: () => {
-      if (editMode !== "POOL_PERIOD_EDIT" && !monitoringProfile.ready) throw new Error("Completa y confirma las reglas de evaluación para Monitoring antes de guardar.");
+      if (editMode !== "POOL_PERIOD_EDIT" && !monitoringProfile.ready) throw new Error(monitoringProfile.reasons.join(" · "));
       if (editMode === "POOL_PERIOD_EDIT") {
         return kpiPoolService
           .saveConfigurationOverride(
@@ -932,7 +940,9 @@ export function SetKpiConfigPage() {
             ? "These settings changed while you were editing. Reload the page before trying again."
             : mutationError instanceof ApiError
               ? configurationErrorMessage(mutationError)
-              : "KPI Configuration could not be saved.",
+              : mutationError instanceof Error
+                ? mutationError.message
+                : "KPI Configuration could not be saved.",
       );
     },
   });
@@ -1033,7 +1043,9 @@ export function SetKpiConfigPage() {
   };
 
   const clearConfigurationFields = () => {
+    measurementUnitChosenRef.current = false;
     setGoal("");
+    setConfigurationName("");
     setGoalUnit("");
     setMeasurementUnit("");
     setInputFrequencyCode("");
@@ -1084,6 +1096,23 @@ export function SetKpiConfigPage() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     setShowGoalErrors(true);
+    if (customConfigurationName && editMode !== "POOL_PERIOD_EDIT") {
+      const name = configurationName.trim();
+      const letters = name.replace(/[^\p{L}]/gu, "").toLocaleLowerCase();
+      const defaultName = selected?.name?.trim();
+      if (name && name !== defaultName && (name.length < 3 || letters.length < 2 || /^(.)\1{3,}$/u.test(letters) || /^(test|prueba|asdf|qwerty|xxx|sin nombre|n\/a)$/i.test(name))) {
+        showValidationToast("Escribe un nombre descriptivo del KPI, por ejemplo el indicador y la persona o área. Evita nombres de prueba, solo números o caracteres repetidos.");
+        document.getElementById("kpi-configuration-name")?.focus();
+        return;
+      }
+    }
+    const missingField = (event.currentTarget as HTMLFormElement).querySelector<HTMLElement>('[data-config-invalid="true"]');
+    if (missingField && editMode !== "POOL_PERIOD_EDIT") {
+      missingField.scrollIntoView({behavior: "smooth", block: "center"});
+      missingField.focus({preventScroll: true});
+      showValidationToast("Completa o corrige los campos marcados en rojo antes de guardar.");
+      return;
+    }
     const pendingGoal = (event.currentTarget as HTMLFormElement).querySelector<HTMLElement>('[data-goal-invalid="true"]');
     if (pendingGoal) {
       pendingGoal.scrollIntoView({behavior: "smooth", block: "center"});
@@ -1095,6 +1124,15 @@ export function SetKpiConfigPage() {
     setResultUnitErrorVisible(false);
     if (!selected) {
       showValidationToast("Select a KPI Definition before saving.");
+      return;
+    }
+    if (editMode !== "POOL_PERIOD_EDIT" && !monitoringProfile.ready) {
+      const message = monitoringProfile.reasons.join(" · ");
+      setError(message);
+      showValidationToast(message);
+      (event.currentTarget as HTMLFormElement)
+        .querySelector<HTMLElement>('[aria-label="Evaluation"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     if (!inputFrequencyCode || (!individual && !measurementUnit) || !dataSource) {
@@ -1236,6 +1274,7 @@ export function SetKpiConfigPage() {
     }
     if (editMode === "CREATE") saveMutation.mutate();
     else if (editMode === "GLOBAL_EDIT") {
+      if (unassignedConfiguration) { saveMutation.mutate(); return; }
       setImpactSaveRequested(true);
       setImpactModalOpen(true);
     } else setConfirmationOpen(true);
@@ -1393,7 +1432,7 @@ export function SetKpiConfigPage() {
         </section>
       )}
 
-      <form className={`config-form ${showGoalErrors ? "show-goal-errors" : ""}`} onSubmit={submit}>
+      <form noValidate className={`config-form ${showGoalErrors ? "show-goal-errors" : ""}`} onSubmit={submit}>
         <section className="config-card definition-step-card">
           <div className="config-section-heading">
             <span className="step-number">1</span>
@@ -1418,6 +1457,8 @@ export function SetKpiConfigPage() {
                 <Search size={17} />
               )}
               <input
+                data-config-invalid={!selected}
+                aria-invalid={showGoalErrors && !selected}
                 value={searchTerm}
                 readOnly={definitionLocked}
                 aria-readonly={definitionLocked}
@@ -1551,9 +1592,12 @@ export function SetKpiConfigPage() {
         {isEditing && !isSingleResultConfig(editConfigQuery.data) && <p role="status">Configuracion legacy: define una sola meta y revisa las bandas para la nueva revision. Los resultados historicos se conservan.</p>}
         {editMode !== "POOL_PERIOD_EDIT" && (
           <KpiSemanticSetup
+            definitionName={selected?.name ?? ""} configurationName={configurationName} setConfigurationName={setConfigurationName} customName={customConfigurationName} setCustomName={setCustomConfigurationName}
+            showErrors={showGoalErrors}
+            goalInvalid={monitoringProfile.goalInvalid}
             goal={goal} setGoal={setGoal}
             goalUnit={goalUnit || measurementUnit}
-            setGoalUnit={value => { setGoalUnit(value); setMeasurementUnit(value); }}
+            setGoalUnit={value => { measurementUnitChosenRef.current = true; setGoalUnit(value); setMeasurementUnit(value); }}
             inputFrequencyCode={inputFrequencyCode} setInputFrequencyCode={setInputFrequencyCode}
             dataSource={dataSource} setDataSource={setDataSource}
             units={measurementUnitOptions}
@@ -1617,7 +1661,7 @@ export function SetKpiConfigPage() {
             stepNumber={3}
           />
         </section>}
-        {editMode === "GLOBAL_EDIT" && (
+        {editMode === "GLOBAL_EDIT" && !unassignedConfiguration && (
           <section className="config-card revision-period-card">
             <div className="config-section-heading">
               <div>

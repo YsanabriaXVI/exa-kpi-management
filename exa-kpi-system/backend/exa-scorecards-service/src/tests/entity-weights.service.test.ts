@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 const db = vi.hoisted(() => ({ scorecard: { findFirst: vi.fn(), update: vi.fn() }, poolPeriodReference: { findFirst: vi.fn() }, scorecardPeriodComposition: { findFirst: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() }, scorecardPeriodKpi: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() }, outboxEvent: { create: vi.fn() }, $transaction: vi.fn() }));
-const pool = vi.hoisted(() => ({ effectiveSettings: vi.fn() }));
+const pool = vi.hoisted(() => ({ effectiveSettings: vi.fn(), getPool: vi.fn() }));
 vi.mock("../config/prisma.js", () => ({ prisma: db }));
 vi.mock("../clients/kpi-pool.client.js", () => ({ kpiPoolClient: pool }));
 import { scorecardCompositionService } from "../services/scorecard-composition.service.js";
@@ -12,6 +12,7 @@ let row: any;
 let composition: any;
 beforeEach(() => {
   vi.clearAllMocks();
+  pool.getPool.mockResolvedValue({ status: "ACTIVE" });
   row = { id: 2n, kpiConfigurationExternalId:3n, kpiDefinitionExternalId:5n, kpiPoolMembershipExternalId:6n, weightPercent:new Prisma.Decimal(100), entityWeights:[{subjectExternalId:"A",weight:"65.1250"},{subjectExternalId:"B",weight:"34.8750"}], displayOrder:1 };
   composition = {id:1n,statusCode:"PREPARING",scopeCustomizedAt:new Date(),periodKey:"2026-09",periodStart:new Date("2026-09-01"),periodEnd:new Date("2026-09-30"),poolPeriodExternalId:7n,poolCompositionExternalId:8n,kpis:[row],links:[],scopeDepartments:[]};
   db.scorecard.findFirst.mockResolvedValue({id:9n,code:"SC-9",statusCode:"ACTIVE",kpiPoolExternalId:10n});
@@ -86,4 +87,10 @@ describe("Explicit Scorecard entity weights", () => {
     expect(frozen.subjectGoals[0].subjectLabel).toBe("Jacky");
     expect(frozen.groupGoal?.value).toBe("140000");
   });
+});
+
+it("blocks finalization against an inactive source Pool even with a cached composition", async () => {
+  pool.getPool.mockResolvedValue({ status: "INACTIVE" });
+  await expect(scorecardCompositionService.finalize(9n, "2026-09", 1n)).rejects.toMatchObject({ code: "KPI_POOL_INACTIVE" });
+  expect(db.scorecardPeriodComposition.updateMany).not.toHaveBeenCalled();
 });

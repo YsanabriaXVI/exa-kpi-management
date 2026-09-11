@@ -1,3 +1,4 @@
+import { periodDisplay } from "../monitoring-results/period-display";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { PoolInputPeriod } from "./kpi-pool.types";
@@ -13,11 +14,11 @@ export function PoolPeriodSelect({ periods, value, onChange }: { periods: PoolIn
   }, []);
   return <div ref={rootRef} className="pool-period-select" onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); (event.currentTarget.querySelector(":scope > button") as HTMLButtonElement | null)?.focus(); } }}>
     <button type="button" className={open ? "open" : ""} onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open}>
-      <span>{selected ? formatPeriodOption(selected.start) : "Select period"}</span>
+      <span>{selected ? periodDisplay(selected, periods).label : "Select period"}</span>
       {selected && <StatusBadge period={selected}/>}<ChevronDown size={17}/>
     </button>
     {open && <div className="pool-period-select-options" role="listbox">{periods.map((period) => <button type="button" role="option" aria-selected={period.start === value} key={period.start} onClick={() => { onChange(period.start); setOpen(false); }}>
-      <span>{formatPeriodOption(period.start)}</span>
+      <span>{periodDisplay(period, periods).label}</span>
       <StatusBadge period={period}/>
       {period.start === value && <Check size={15}/>}
     </button>)}</div>}
@@ -29,9 +30,3 @@ function StatusBadge({ period }: { period: PoolInputPeriod }) {
   return <small className={`pool-period-select-status ${state}`}>{state === "finalized" ? "Finalized" : state === "editable" ? "Editable" : "Future"}</small>;
 }
 
-function formatPeriodOption(value: string) {
-  const date = new Date(value);
-  const month = new Intl.DateTimeFormat("en", { month: "long", timeZone: "UTC" }).format(date);
-  const year = new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "UTC" }).format(date);
-  return `${month} • ${year}`;
-}
